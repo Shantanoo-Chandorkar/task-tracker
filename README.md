@@ -1,36 +1,237 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Task Tracker
 
-## Getting Started
+**Author:** Shantanoo Chandorkar
 
-First, run the development server:
+---
+
+## What It Does
+
+Task Tracker is a single-user task management app with unlimited nested subtasks, inspired by the list view in ClickUp and Linear.
+
+Key features:
+
+- **Infinite nesting** — tasks can have subtasks, which can have their own subtasks, with no depth limit (a warning appears at 4+ levels to encourage reorganisation)
+- **Status groups** — tasks are grouped by status with collapsible sections; only groups that have tasks are shown
+- **Drag and drop** — reorder sibling tasks by dragging
+- **Rearrangement** — promote a task to its parent's level, or move it to any valid destination in the tree via a searchable dropdown with breadcrumb paths
+- **Copy / Cut / Paste** — clipboard operations work on entire subtrees, with keyboard shortcuts (Ctrl+C / Ctrl+X / Ctrl+V)
+- **Recurring tasks** — configure daily, weekly, monthly, or yearly recurrence with custom intervals and end conditions; a daily cron job spawns new task instances automatically
+- **Settings** — create, rename, reorder, and delete statuses with custom colours
+- **Light / Dark theme** — toggle from the header
+
+---
+
+## Tech Stack
+
+| Concern | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Language | JavaScript (ES2024) |
+| Styling | Tailwind CSS v4 |
+| UI Components | shadcn/ui |
+| Database | Supabase (PostgreSQL) |
+| Server State | TanStack Query v5 |
+| Drag and Drop | @dnd-kit/sortable |
+| Recurrence | rrule + date-fns |
+| Testing | Vitest + Testing Library |
+
+---
+
+## Project Structure
+
+```
+task-tracker/
+├── app/
+│   ├── layout.js              # Root layout — wraps QueryProvider and ClipboardProvider
+│   ├── page.js                # Server Component — SSR fetch, hydrates TanStack Query
+│   ├── loading.js             # Suspense skeleton shown while page.js fetches
+│   ├── error.js               # Error boundary
+│   ├── settings/
+│   │   └── page.js            # Status management page
+│   └── api/
+│       ├── tasks/route.js                  # GET all tasks, POST create
+│       ├── tasks/[id]/route.js             # PATCH update, DELETE
+│       ├── tasks/[id]/move/route.js        # POST reparent + reposition
+│       ├── statuses/route.js               # GET all, POST create
+│       ├── statuses/[id]/route.js          # PATCH update, DELETE
+│       └── cron/recurrence/route.js        # Daily cron — spawns recurring task instances
+│
+├── components/
+│   ├── task-list/
+│   │   ├── TaskList.jsx            # Root list container; groups tasks by status
+│   │   ├── TaskRow.jsx             # Recursive row — renders itself and its children
+│   │   ├── TaskRowActions.jsx      # Hover action bar: edit, delete, copy/cut/paste, move
+│   │   ├── DeleteTaskDialog.jsx    # Confirmation dialog with subtask reparent option
+│   │   ├── TaskRowInlineAdd.jsx    # Inline subtask creation on Enter
+│   │   ├── DepthWarning.jsx        # Amber warning banner at depth 4+
+│   │   └── TaskListSkeleton.jsx    # Loading shimmer
+│   ├── task-form/
+│   │   ├── TaskFormDialog.jsx      # Create / edit modal
+│   │   └── RecurrenceBuilder.jsx   # rrule configuration UI
+│   ├── status/
+│   │   ├── StatusBadge.jsx         # Coloured pill badge
+│   │   ├── StatusPicker.jsx        # Inline status dropdown on each row
+│   │   └── StatusManager.jsx       # Settings page — full status CRUD
+│   └── rearrange/
+│       ├── PromoteButton.jsx       # Move task up one level
+│       └── ParentDropdown.jsx      # Ancestor select dropdown
+│
+├── actions/
+│   ├── task-actions.js         # Server Actions: create, update, delete, paste, reparent-delete
+│   └── status-actions.js       # Server Actions: create, update, delete status
+│
+├── hooks/
+│   ├── useClipboard.js         # Copy / cut / paste logic with localStorage persistence
+│   └── useTaskTree.js          # TanStack Query fetch — returns flat list and nested tree
+│
+├── lib/
+│   ├── tree.js                 # flatToTree, findAncestors, findDescendantIds, recomputeDepth
+│   ├── fractional-index.js     # getPositionBetween, rebalancePositions
+│   ├── recurrence.js           # rrule wrappers — computeNextOccurrence
+│   └── supabase/
+│       ├── client.js           # Browser Supabase client
+│       ├── server.js           # Server Supabase client (Server Components, Actions, Routes)
+│       └── middleware.js       # Middleware Supabase client (reserved for future auth)
+│
+├── providers/
+│   ├── QueryProvider.jsx       # TanStack Query client setup
+│   └── ClipboardProvider.jsx   # Clipboard context + localStorage sync
+│
+└── vercel.json                 # Vercel cron schedule (daily at midnight UTC)
+```
+
+---
+
+## Prerequisites
+
+### 1. Supabase project
+
+Create a free project at [supabase.com](https://supabase.com). Once created, run the following SQL in the **SQL Editor**:
+
+```sql
+-- Statuses
+CREATE TABLE statuses (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  color       TEXT NOT NULL DEFAULT '#6b7280',
+  is_default  BOOLEAN DEFAULT false,
+  position    INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO statuses (name, color, is_default, position) VALUES
+  ('Pending',     '#6b7280', true,  0),
+  ('To Do',       '#3b82f6', false, 1),
+  ('In Progress', '#f59e0b', false, 2),
+  ('Completed',   '#22c55e', false, 3);
+
+-- Tasks (self-referential)
+CREATE TABLE tasks (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title            TEXT NOT NULL,
+  description      TEXT,
+  status_id        UUID REFERENCES statuses(id) ON DELETE SET NULL,
+  parent_id        UUID REFERENCES tasks(id) ON DELETE CASCADE,
+  position         FLOAT NOT NULL DEFAULT 0,
+  depth            INTEGER NOT NULL DEFAULT 0,
+  is_recurring     BOOLEAN DEFAULT false,
+  recurrence_rule  JSONB,
+  next_occurrence  TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ DEFAULT now(),
+  updated_at       TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_tasks_parent_id ON tasks(parent_id);
+CREATE INDEX idx_tasks_position  ON tasks(parent_id, position);
+
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tasks_updated_at
+  BEFORE UPDATE ON tasks
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+```
+
+### 2. Environment variables
+
+Create a `.env.local` file at the project root:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
+CRON_SECRET=<a-random-string-you-generate>
+```
+
+> **Where to find these values:**
+> - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — go to your Supabase project → **Project Settings → API**.
+> - `CRON_SECRET` — any random string you choose (e.g. output of `openssl rand -hex 32`). It is used to authenticate the `/api/cron/recurrence` endpoint.
+
+> **Note:** Supabase uses `PUBLISHABLE_KEY`, not the legacy `ANON_KEY`. Using the old name will silently fail.
+
+---
+
+## Running Locally
+
+### 1. Clone and install
+
+```bash
+git clone <repo-url>
+cd task-tracker
+npm install
+```
+
+### 2. Add environment variables
+
+Create `.env.local` as described in the Prerequisites section above.
+
+### 3. Start the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### 4. (Optional) Run tests
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm test
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Troubleshooting
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Tasks or statuses do not load**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Check that `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` are correct and that the Supabase tables were created with the SQL above. Open the browser console — a failed Supabase request will show the exact error.
 
-## Deploy on Vercel
+**"Failed to fetch tasks" error on first load**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Supabase enforces Row Level Security (RLS) by default. If you enabled RLS on the `tasks` or `statuses` tables without adding policies, all reads will be blocked. Either disable RLS on both tables or add a policy that allows all operations for the anon role.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Drag and drop does not work**
+
+Drag reordering only works between siblings (tasks at the same level under the same parent). Dragging a task to a different parent is intentionally not supported — use the **Move to...** menu in the `···` dropdown instead.
+
+**Recurring tasks are not spawning**
+
+The cron job runs daily at midnight UTC via Vercel Cron. It calls `/api/cron/recurrence` with an `Authorization: Bearer <CRON_SECRET>` header. To test it locally, call that endpoint manually:
+
+```bash
+curl -X GET http://localhost:3000/api/cron/recurrence \
+  -H "Authorization: Bearer <your-CRON_SECRET>"
+```
+
+**Theme toggle has no effect**
+
+The theme toggle switches between `light` and `dark` by adding/removing the `dark` class on the `<html>` element. If the styles are not changing, check that Tailwind's dark mode variant is configured correctly in `globals.css`.
+
+**Build fails after pulling changes**
+
+Run `npm install` first — a dependency may have been added. Then run `npm run build` and check the output for specific errors.
