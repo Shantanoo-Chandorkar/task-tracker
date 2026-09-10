@@ -10,10 +10,12 @@ import { computeNextOccurrence } from '@/lib/recurrence';
  *
  * @param {object} fields
  * @param {string} fields.title - Required task title
+ * @param {string} fields.list_id - Required list this task belongs to
  * @param {string} [fields.description]
  * @param {string} [fields.status_id]
  * @param {string|null} [fields.parent_id]
  * @param {number} [fields.position]
+ * @param {string|null} [fields.due_date] - ISO date string (YYYY-MM-DD), or null
  * @param {boolean} [fields.is_recurring]
  * @param {object} [fields.recurrence_rule]
  * @returns {{ data: object|null, error: string|null }}
@@ -22,11 +24,13 @@ export async function createTask(fields) {
     if (!fields.title || fields.title.trim() === '') {
         return { data: null, error: 'Title is required' };
     }
+    if (!fields.list_id) {
+        return { data: null, error: 'A list is required' };
+    }
 
     try {
         const supabase = await createClient();
 
-        // Compute depth from parent
         let depth = 0;
         if (fields.parent_id) {
             const { data: parent } = await supabase
@@ -37,7 +41,6 @@ export async function createTask(fields) {
             if (parent) depth = parent.depth + 1;
         }
 
-        // Compute position as last sibling + 1 if not provided
         let position = fields.position;
         if (position === undefined || position === null) {
             const query = supabase
@@ -48,13 +51,12 @@ export async function createTask(fields) {
 
             const siblingQuery = fields.parent_id
                 ? query.eq('parent_id', fields.parent_id)
-                : query.is('parent_id', null);
+                : query.eq('list_id', fields.list_id).is('parent_id', null);
 
             const { data: siblings } = await siblingQuery;
             position = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
         }
 
-        // Compute next_occurrence if this is a recurring task
         let next_occurrence = null;
         if (fields.is_recurring && fields.recurrence_rule) {
             const nextDate = computeNextOccurrence(fields.recurrence_rule);
@@ -68,8 +70,10 @@ export async function createTask(fields) {
                 description: fields.description ?? null,
                 status_id: fields.status_id ?? null,
                 parent_id: fields.parent_id ?? null,
+                list_id: fields.list_id,
                 position,
                 depth,
+                due_date: fields.due_date || null,
                 is_recurring: fields.is_recurring ?? false,
                 recurrence_rule: fields.recurrence_rule ?? null,
                 next_occurrence,
@@ -103,7 +107,6 @@ export async function updateTask(id, fields) {
 
         const updates = { ...fields };
 
-        // Recompute next_occurrence when recurrence changes
         if (updates.is_recurring && updates.recurrence_rule) {
             const nextDate = computeNextOccurrence(updates.recurrence_rule);
             updates.next_occurrence = nextDate ? nextDate.toISOString() : null;
@@ -170,7 +173,6 @@ export async function deleteTaskAndReparentChildren(taskId) {
     try {
         const supabase = await createClient();
 
-        // 1. Fetch the task being deleted
         const { data: task, error: taskError } = await supabase
             .from('tasks')
             .select('id, parent_id, position, depth')
@@ -179,14 +181,12 @@ export async function deleteTaskAndReparentChildren(taskId) {
 
         if (taskError || !task) return { error: 'Task not found' };
 
-        // 2. Fetch its direct children ordered by position
         const { data: directChildren = [] } = await supabase
             .from('tasks')
             .select('id, position, depth')
             .eq('parent_id', taskId)
             .order('position', { ascending: true });
 
-        // 3. Fetch all current siblings (same parent, excluding the task being deleted)
         const siblingsQuery = task.parent_id
             ? supabase
                   .from('tasks')
@@ -203,34 +203,32 @@ export async function deleteTaskAndReparentChildren(taskId) {
 
         const { data: siblings = [] } = await siblingsQuery;
 
-        // 4. Splice direct children into the sibling list at the deleted task's slot
-        // Find the index in the ordered siblings where the deleted task would have sat
-        const insertIndex = siblings.filter((s) => s.position < task.position).length;
+        const insertIndex = siblings.filter((sibling) => sibling.position < task.position).length;
         const newSiblingOrder = [
             ...siblings.slice(0, insertIndex),
             ...directChildren,
             ...siblings.slice(insertIndex),
         ];
 
-        // 5. Re-number positions as 1, 2, 3, ... to avoid float precision issues
-        const positionUpdates = newSiblingOrder.map((t, i) => ({ id: t.id, position: i + 1 }));
+        // Whole-integer positions avoid accumulating float precision loss from fractional-index math
+        const positionUpdates = newSiblingOrder.map((sibling, index) => ({
+            id: sibling.id,
+            position: index + 1,
+        }));
 
-        // 6. Re-parent each direct child and decrement its descendants' depths
         for (const child of directChildren) {
-            // Move child up one level (to the deleted task's parent, which may be null for root)
+            // task.parent_id may be null here, which correctly re-roots the child at the top level
             await supabase
                 .from('tasks')
                 .update({ parent_id: task.parent_id, depth: task.depth })
                 .eq('id', child.id);
 
-            // Decrement depth for all of this child's descendants
-            // The child moved from depth (task.depth + 1) to task.depth, so delta is -1
+            // Depth delta is -1: the child moved from depth (task.depth + 1) up to task.depth
             const { data: descendants = [] } = await supabase
                 .from('tasks')
                 .select('id, depth')
                 .eq('parent_id', child.id);
 
-            // BFS to decrement every descendant's depth by 1
             const queue = [...descendants];
             while (queue.length > 0) {
                 const node = queue.shift();
@@ -248,12 +246,11 @@ export async function deleteTaskAndReparentChildren(taskId) {
             }
         }
 
-        // 7. Bulk-update positions for the merged sibling list
         for (const update of positionUpdates) {
             await supabase.from('tasks').update({ position: update.position }).eq('id', update.id);
         }
 
-        // 8. Delete the task — cascade now only hits tasks that were already below the direct children
+        // Cascade now only reaches tasks still below the direct children, already re-parented away above
         const { error: deleteError } = await supabase.from('tasks').delete().eq('id', taskId);
 
         if (deleteError) return { error: 'Failed to delete task' };
@@ -272,14 +269,16 @@ export async function deleteTaskAndReparentChildren(taskId) {
  *
  * @param {object} snapshot - Deep clone of the subtree from the clipboard
  * @param {string|null} parentId - Parent task ID to paste under, or null for root
+ * @param {string} listId - List the pasted copy belongs to (the list currently being viewed)
  * @returns {{ error: string|null }}
  */
-export async function pasteTask(snapshot, parentId) {
+export async function pasteTask(snapshot, parentId, listId) {
     if (!snapshot) return { error: 'No snapshot to paste' };
+    if (!listId) return { error: 'A list is required' };
 
     try {
         const supabase = await createClient();
-        await insertSnapshotNode(supabase, snapshot, parentId, true);
+        await insertSnapshotNode(supabase, snapshot, parentId, true, listId);
         revalidateTag('task-tree');
         return { error: null };
     } catch {
@@ -295,9 +294,9 @@ export async function pasteTask(snapshot, parentId) {
  * @param {object} node - Snapshot node with optional children array
  * @param {string|null} parentId - Parent ID for this insertion
  * @param {boolean} isRoot - Whether this is the root of the paste operation
+ * @param {string} listId - List the inserted copy belongs to
  */
-async function insertSnapshotNode(supabase, node, parentId, isRoot) {
-    // Compute depth from parent
+async function insertSnapshotNode(supabase, node, parentId, isRoot, listId) {
     let depth = 0;
     if (parentId) {
         const { data: parent } = await supabase
@@ -308,7 +307,6 @@ async function insertSnapshotNode(supabase, node, parentId, isRoot) {
         if (parent) depth = parent.depth + 1;
     }
 
-    // Append position after last sibling
     const siblingQuery = parentId
         ? supabase
               .from('tasks')
@@ -319,6 +317,7 @@ async function insertSnapshotNode(supabase, node, parentId, isRoot) {
         : supabase
               .from('tasks')
               .select('position')
+              .eq('list_id', listId)
               .is('parent_id', null)
               .order('position', { ascending: false })
               .limit(1);
@@ -335,8 +334,10 @@ async function insertSnapshotNode(supabase, node, parentId, isRoot) {
         description: node.description ?? null,
         status_id: node.status_id ?? null,
         parent_id: parentId ?? null,
+        list_id: listId,
         position,
         depth,
+        due_date: node.due_date ?? null,
         is_recurring: node.is_recurring ?? false,
         recurrence_rule: node.recurrence_rule ?? null,
         next_occurrence: node.next_occurrence ?? null,
@@ -344,9 +345,8 @@ async function insertSnapshotNode(supabase, node, parentId, isRoot) {
 
     if (error) throw new Error('Failed to insert node: ' + error.message);
 
-    // Recursively insert children
     const children = node.children || [];
     for (const child of children) {
-        await insertSnapshotNode(supabase, child, newId, false);
+        await insertSnapshotNode(supabase, child, newId, false, listId);
     }
 }

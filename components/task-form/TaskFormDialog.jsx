@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,9 +15,11 @@ import {
 } from '@/components/ui/select';
 import RecurrenceBuilder from './RecurrenceBuilder';
 import { createTask, updateTask } from '@/actions/task-actions';
+import { Loader } from '@/components/ui/loader';
 
 /**
- * Modal dialog for creating or editing a task.
+ * Modal for creating or editing a task, rendered through the shared
+ * ResponsiveModal container (Dialog at `lg`+, Sheet below it).
  * In create mode: inserts a new task under the given parentId (or root if null).
  * In edit mode: updates the existing task's fields.
  *
@@ -26,37 +28,53 @@ import { createTask, updateTask } from '@/actions/task-actions';
  * @param {Function} props.onClose - Called when the dialog should close
  * @param {object|null} [props.task] - Task to edit, or null for create mode
  * @param {string|null} [props.parentId] - Parent ID for new subtask creation
+ * @param {string|null} [props.defaultStatusId] - Status to pre-select in create mode
+ * @param {string} [props.listId] - List the new task belongs to (create mode only)
  */
-export default function TaskFormDialog({ open, onClose, task = null, parentId = null }) {
+export default function TaskFormDialog({
+    open,
+    onClose,
+    task = null,
+    parentId = null,
+    defaultStatusId = null,
+    listId = null,
+}) {
     const queryClient = useQueryClient();
     const isEditing = Boolean(task);
 
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [statusId, setStatusId] = useState('');
+    const [dueDate, setDueDate] = useState('');
     const [isRecurring, setIsRecurring] = useState(false);
     const [recurrenceRule, setRecurrenceRule] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
 
-    // Reset form fields when the dialog opens or the task prop changes
-    useEffect(() => {
+    // Reset form fields when the dialog opens for a different task/create-target.
+    // Adjusted during render (React's recommended pattern for resetting state on
+    // prop change) instead of an effect, so there's no extra render/flicker.
+    const resetKey = open ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}` : null;
+    const [lastResetKey, setLastResetKey] = useState(resetKey);
+    if (resetKey !== lastResetKey) {
+        setLastResetKey(resetKey);
         if (open) {
             setTitle(task?.title ?? '');
             setDescription(task?.description ?? '');
-            setStatusId(task?.status_id ?? '');
+            setStatusId(task?.status_id ?? defaultStatusId ?? '');
+            setDueDate(task?.due_date ?? '');
             setIsRecurring(task?.is_recurring ?? false);
             setRecurrenceRule(task?.recurrence_rule ?? null);
             setTitleError('');
         }
-    }, [open, task]);
+    }
 
     const { data: statuses = [] } = useQuery({
         queryKey: ['statuses'],
         queryFn: async () => {
-            const res = await fetch('/api/statuses');
-            if (!res.ok) throw new Error('Failed to fetch statuses');
-            return res.json();
+            const response = await fetch('/api/statuses');
+            if (!response.ok) throw new Error('Failed to fetch statuses');
+            return response.json();
         },
     });
 
@@ -74,7 +92,9 @@ export default function TaskFormDialog({ open, onClose, task = null, parentId = 
             title: title.trim(),
             description: description.trim() || null,
             status_id: statusId || null,
+            due_date: dueDate || null,
             parent_id: isEditing ? task.parent_id : (parentId ?? null),
+            ...(isEditing ? {} : { list_id: listId }),
             is_recurring: isRecurring,
             recurrence_rule: isRecurring ? recurrenceRule : null,
         };
@@ -93,92 +113,90 @@ export default function TaskFormDialog({ open, onClose, task = null, parentId = 
     }
 
     return (
-        <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{isEditing ? 'Edit Task' : 'New Task'}</DialogTitle>
-                </DialogHeader>
-
-                <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-                    {/* Title */}
-                    <div className="space-y-1">
-                        <Input
-                            value={title}
-                            onChange={(e) => {
-                                setTitle(e.target.value);
-                                setTitleError('');
-                            }}
-                            placeholder="Task title"
-                            autoFocus
-                        />
-                        {titleError && <p className="text-xs text-destructive">{titleError}</p>}
-                    </div>
-
-                    {/* Description */}
-                    <Textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Description (optional)"
-                        rows={3}
+        <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit Task' : 'New Task'}>
+            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+                {/* Title */}
+                <div className="space-y-1">
+                    <Input
+                        value={title}
+                        onChange={(e) => {
+                            setTitle(e.target.value);
+                            setTitleError('');
+                        }}
+                        placeholder="Task title"
+                        autoFocus
                     />
+                    {titleError && <p className="text-xs text-destructive">{titleError}</p>}
+                </div>
 
-                    {/* Status */}
-                    <Select value={statusId} onValueChange={setStatusId}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select status..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {statuses.map((status) => (
-                                <SelectItem key={status.id} value={status.id}>
-                                    <span className="flex items-center gap-2">
-                                        <span
-                                            className="h-2 w-2 rounded-full flex-shrink-0"
-                                            style={{ backgroundColor: status.color }}
-                                        />
-                                        {status.name}
-                                    </span>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                {/* Description */}
+                <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Description (optional)"
+                    rows={3}
+                />
 
-                    {/* Recurrence toggle */}
-                    <div className="space-y-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={isRecurring}
-                                onChange={(e) => setIsRecurring(e.target.checked)}
-                                className="rounded border-border"
-                            />
-                            <span className="text-sm text-foreground">Recurring task</span>
-                        </label>
+                {/* Status */}
+                <Select value={statusId} onValueChange={setStatusId}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select status..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {statuses.map((status) => (
+                            <SelectItem key={status.id} value={status.id}>
+                                <span className="flex items-center gap-2">
+                                    <span
+                                        className="h-2 w-2 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: status.color }}
+                                    />
+                                    {status.name}
+                                </span>
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
 
-                        {/* RecurrenceBuilder — shown only when recurring is enabled */}
-                        {isRecurring && (
-                            <RecurrenceBuilder
-                                value={recurrenceRule}
-                                onChange={setRecurrenceRule}
-                            />
-                        )}
-                    </div>
+                {/* Due date */}
+                <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Due date</label>
+                    <Input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        className="w-fit"
+                    />
+                </div>
 
-                    {/* Submit */}
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onClose}
-                            disabled={submitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={submitting}>
-                            {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create task'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
+                {/* Recurrence toggle */}
+                <div className="space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={isRecurring}
+                            onChange={(e) => setIsRecurring(e.target.checked)}
+                            className="rounded border-border"
+                        />
+                        <span className="text-sm text-foreground">Recurring task</span>
+                    </label>
+
+                    {/* RecurrenceBuilder — shown only when recurring is enabled */}
+                    {isRecurring && (
+                        <RecurrenceBuilder value={recurrenceRule} onChange={setRecurrenceRule} />
+                    )}
+                </div>
+
+                {/* Submit */}
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" disabled={submitting} className="gap-1.5">
+                        {submitting && <Loader size="xs" />}
+                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create task'}
+                    </Button>
+                </div>
+            </form>
+        </ResponsiveModal>
     );
 }

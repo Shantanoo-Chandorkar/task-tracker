@@ -19,7 +19,6 @@ export async function createStatus(fields) {
     try {
         const supabase = await createClient();
 
-        // Compute position as last + 1
         const { data: existing } = await supabase
             .from('statuses')
             .select('position')
@@ -52,20 +51,29 @@ export async function createStatus(fields) {
 
 /**
  * Updates specific fields on a status (name, color, position).
+ * `code` is deliberately not accepted here — it identifies the 3 built-in
+ * statuses and must never be settable from the client, even indirectly.
  *
  * @param {string} id - Status ID to update
- * @param {object} fields - Partial status fields to update
+ * @param {object} fields - Partial status fields to update (name, color, position only)
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function updateStatus(id, fields) {
     if (!id) return { data: null, error: 'Status ID is required' };
+
+    const { name, color, position } = fields;
+    const updates = {
+        ...(name !== undefined && { name }),
+        ...(color !== undefined && { color }),
+        ...(position !== undefined && { position }),
+    };
 
     try {
         const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('statuses')
-            .update(fields)
+            .update(updates)
             .eq('id', id)
             .select()
             .single();
@@ -94,7 +102,6 @@ export async function deleteStatus(id) {
     try {
         const supabase = await createClient();
 
-        // Count existing statuses
         const { count } = await supabase
             .from('statuses')
             .select('*', { count: 'exact', head: true });
@@ -103,15 +110,17 @@ export async function deleteStatus(id) {
             return { error: 'Cannot delete the last remaining status' };
         }
 
-        // Prevent deleting the default status
         const { data: target } = await supabase
             .from('statuses')
-            .select('is_default')
+            .select('is_default, code')
             .eq('id', id)
             .single();
 
         if (target?.is_default) {
             return { error: 'Cannot delete the default status' };
+        }
+        if (target?.code) {
+            return { error: 'Cannot delete a built-in status' };
         }
 
         const { error } = await supabase.from('statuses').delete().eq('id', id);
