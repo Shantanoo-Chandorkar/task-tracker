@@ -63,7 +63,7 @@ export default function RecurrenceBuilder({ value, onChange }) {
     useEffect(() => {
         const rule = buildRule(freq, interval, endCondition, count, until);
         onChange(rule);
-    }, [freq, interval, endCondition, count, until]);
+    }, [freq, interval, endCondition, count, until, onChange]);
 
     const previewLabel = humanReadableLabel(buildRule(freq, interval, endCondition, count, until));
 
@@ -101,9 +101,9 @@ export default function RecurrenceBuilder({ value, onChange }) {
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        {END_CONDITIONS.map((c) => (
-                            <SelectItem key={c.value} value={c.value}>
-                                {c.label}
+                        {END_CONDITIONS.map((condition) => (
+                            <SelectItem key={condition.value} value={condition.value}>
+                                {condition.label}
                             </SelectItem>
                         ))}
                     </SelectContent>

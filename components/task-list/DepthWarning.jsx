@@ -1,10 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, X } from 'lucide-react';
 
 const DISMISSED_KEY = 'depth_warning_dismissed';
+const listeners = new Set();
+
+function getSnapshot() {
+    return sessionStorage.getItem(DISMISSED_KEY) === 'true';
+}
+
+// Start hidden on the server/first paint to avoid a flash before we know the real value.
+function getServerSnapshot() {
+    return true;
+}
+
+function subscribe(callback) {
+    listeners.add(callback);
+    return () => listeners.delete(callback);
+}
+
+function dismiss() {
+    sessionStorage.setItem(DISMISSED_KEY, 'true');
+    listeners.forEach((callback) => callback());
+}
 
 /**
  * Amber warning banner shown when tasks reach 4+ levels of nesting.
@@ -12,23 +32,16 @@ const DISMISSED_KEY = 'depth_warning_dismissed';
  * nag the user every time they look at the same deep task.
  */
 export default function DepthWarning() {
-    const [dismissed, setDismissed] = useState(true); // Start hidden to avoid flash
-
-    useEffect(() => {
-        // Check sessionStorage after mount to avoid SSR mismatch
-        const isDismissed = sessionStorage.getItem(DISMISSED_KEY) === 'true';
-        setDismissed(isDismissed);
-    }, []);
+    const dismissed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
     if (dismissed) return null;
 
     function handleDismiss() {
-        sessionStorage.setItem(DISMISSED_KEY, 'true');
-        setDismissed(true);
+        dismiss();
     }
 
     return (
-        <div className="flex items-start gap-2 mx-2 my-1 px-3 py-2 rounded border border-amber-500/30 bg-amber-500/10">
+        <div className="flex items-start gap-2 mx-2 my-1 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-400 flex-1">
                 Tasks are 4+ levels deep. Consider breaking this into separate top-level tasks for

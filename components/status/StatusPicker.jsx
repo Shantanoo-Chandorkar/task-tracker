@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
     Select,
     SelectContent,
@@ -8,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Loader } from '@/components/ui/loader';
 import StatusBadge from './StatusBadge';
 
 /**
@@ -20,17 +23,19 @@ import StatusBadge from './StatusBadge';
  */
 export default function StatusPicker({ task }) {
     const queryClient = useQueryClient();
+    const [pending, setPending] = useState(false);
 
     const { data: statuses = [] } = useQuery({
         queryKey: ['statuses'],
         queryFn: async () => {
-            const res = await fetch('/api/statuses');
-            if (!res.ok) throw new Error('Failed to fetch statuses');
-            return res.json();
+            const response = await fetch('/api/statuses');
+            if (!response.ok) throw new Error('Failed to fetch statuses');
+            return response.json();
         },
     });
 
     async function handleChange(newStatusId) {
+        setPending(true);
         try {
             const response = await fetch(`/api/tasks/${task.id}`, {
                 method: 'PATCH',
@@ -40,22 +45,28 @@ export default function StatusPicker({ task }) {
 
             if (!response.ok) {
                 console.error('Failed to update task status');
+                toast.error('Failed to update task status');
                 return;
             }
 
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         } catch (err) {
             console.error('Status update failed:', err);
+            toast.error('Failed to update task status');
+        } finally {
+            setPending(false);
         }
     }
 
-    const currentStatus = statuses.find((s) => s.id === task.status_id);
+    const currentStatus = statuses.find((status) => status.id === task.status_id);
 
     return (
-        <Select value={task.status_id ?? ''} onValueChange={handleChange}>
+        <Select value={task.status_id ?? ''} onValueChange={handleChange} disabled={pending}>
             <SelectTrigger className="h-auto border-0 bg-transparent p-0 focus:ring-0 shadow-none w-auto min-w-0 [&>svg]:hidden">
                 <SelectValue>
-                    {currentStatus ? (
+                    {pending ? (
+                        <Loader size="xs" className="text-muted-foreground" />
+                    ) : currentStatus ? (
                         <StatusBadge name={currentStatus.name} color={currentStatus.color} />
                     ) : (
                         <span className="text-xs text-muted-foreground">No status</span>

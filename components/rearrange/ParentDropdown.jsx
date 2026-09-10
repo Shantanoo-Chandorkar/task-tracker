@@ -1,6 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { findAncestors } from '@/lib/tree';
 import {
     Select,
@@ -33,12 +34,13 @@ export default function ParentDropdown({ task, flatList, onSuccess }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     newParentId: ancestorId,
-                    afterId: null, // Becomes last child of the ancestor
+                    afterSiblingId: null, // Becomes last child of the ancestor
                 }),
             });
 
             if (!response.ok) {
                 console.error('Move to ancestor failed');
+                toast.error('Failed to move task');
                 return;
             }
 
@@ -46,6 +48,7 @@ export default function ParentDropdown({ task, flatList, onSuccess }) {
             onSuccess?.();
         } catch (err) {
             console.error('Move to ancestor failed:', err);
+            toast.error('Failed to move task');
         }
     }
 

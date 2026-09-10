@@ -1,6 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ArrowUp } from 'lucide-react';
 
@@ -21,7 +22,7 @@ export default function PromoteButton({ task, flatList }) {
 
     if (!task.parent_id) return null;
 
-    const parent = flatList.find((t) => t.id === task.parent_id);
+    const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);
     const grandparentId = parent?.parent_id ?? null;
 
     async function handlePromote() {
@@ -31,18 +32,20 @@ export default function PromoteButton({ task, flatList }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     newParentId: grandparentId,
-                    afterId: task.parent_id,
+                    afterSiblingId: task.parent_id,
                 }),
             });
 
             if (!response.ok) {
                 console.error('Promote failed');
+                toast.error('Failed to promote task');
                 return;
             }
 
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         } catch (err) {
             console.error('Promote operation failed:', err);
+            toast.error('Failed to promote task');
         }
     }
 

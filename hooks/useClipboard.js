@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from 'sonner';
 import { useClipboardContext } from '@/providers/ClipboardProvider';
 import { deepCloneSubtree } from '@/lib/tree';
 import { pasteTask } from '@/actions/task-actions';
@@ -46,25 +47,32 @@ export function useClipboard() {
      *
      * @param {string|null} targetParentId - Parent to paste under, or null for root
      * @param {import('@tanstack/react-query').QueryClient} queryClient
+     * @param {string} listId - List the paste target belongs to (the list currently being viewed)
      */
-    async function pasteTaskToParent(targetParentId, queryClient) {
+    async function pasteTaskToParent(targetParentId, queryClient, listId) {
         if (!clipboard.mode || !clipboard.taskId) return;
 
         try {
             if (clipboard.mode === 'copy') {
-                const { error } = await pasteTask(clipboard.snapshot, targetParentId);
+                const { error } = await pasteTask(clipboard.snapshot, targetParentId, listId);
                 if (error) {
                     console.error('Paste failed:', error);
+                    toast.error('Failed to paste task');
                     return;
                 }
             } else if (clipboard.mode === 'cut') {
                 const response = await fetch(`/api/tasks/${clipboard.taskId}/move`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ newParentId: targetParentId, afterId: null }),
+                    body: JSON.stringify({
+                        newParentId: targetParentId,
+                        afterSiblingId: null,
+                        listId,
+                    }),
                 });
                 if (!response.ok) {
                     console.error('Move failed during cut-paste');
+                    toast.error('Failed to move task');
                     return;
                 }
             }
@@ -73,6 +81,7 @@ export function useClipboard() {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         } catch (err) {
             console.error('Paste operation failed:', err);
+            toast.error('Failed to paste task');
         }
     }
 
