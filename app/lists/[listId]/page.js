@@ -1,0 +1,62 @@
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import TaskList from '@/components/task-list/TaskList';
+
+/**
+ * List task-tree page — Server Component.
+ * Fetches the task tree for one list and all statuses server-side so TanStack
+ * Query on the client can hydrate from initialData with zero client-side
+ * requests on first load.
+ */
+export default async function ListPage({ params }) {
+    const { listId } = await params;
+    const supabase = await createClient();
+
+    const [{ data: list }, { data: tasks }, { data: statuses }, { data: spaces }, { data: lists }] =
+        await Promise.all([
+            supabase.from('lists').select('id').eq('id', listId).maybeSingle(),
+            supabase
+                .from('tasks')
+                .select('*, statuses(id, name, color, is_default, position)')
+                .eq('list_id', listId)
+                .order('depth', { ascending: true })
+                .order('position', { ascending: true }),
+            supabase.from('statuses').select('*').order('position', { ascending: true }),
+            supabase.from('spaces').select('*').order('position', { ascending: true }),
+            supabase.from('lists').select('*').order('position', { ascending: true }),
+        ]);
+
+    if (!list) {
+        return (
+            <div className="max-w-2xl mx-auto px-4 py-24 text-center">
+                <p className="text-sm text-foreground mb-1">This list doesn&apos;t exist.</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                    It may have been deleted. Pick another list from Spaces.
+                </p>
+                <Link href="/spaces" className="text-sm text-foreground underline">
+                    Go to Spaces
+                </Link>
+            </div>
+        );
+    }
+
+    // Normalize nested statuses join to flat status_name / status_color fields
+    // so TaskList and useTaskTree don't need to understand the join structure
+    const normalizedTasks = (tasks || []).map((task) => ({
+        ...task,
+        status_name: task.statuses?.name ?? null,
+        status_color: task.statuses?.color ?? null,
+    }));
+
+    return (
+        <div className="px-4 md:px-8 py-6">
+            <TaskList
+                listId={listId}
+                initialTasks={normalizedTasks}
+                initialStatuses={statuses || []}
+                initialSpaces={spaces || []}
+                initialLists={lists || []}
+            />
+        </div>
+    );
+}

@@ -1,0 +1,93 @@
+'use client';
+
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import ResponsiveModal from '@/components/ui/responsive-modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Loader } from '@/components/ui/loader';
+import { createSpace, updateSpace } from '@/actions/space-actions';
+
+/**
+ * Modal for creating or editing a Space, rendered through the shared
+ * ResponsiveModal container — same container as Task/List creation.
+ *
+ * @param {object} props
+ * @param {boolean} props.open - Whether the dialog is open
+ * @param {Function} props.onClose - Called when the dialog should close
+ * @param {object|null} [props.space] - Space to edit, or null for create mode
+ */
+export default function SpaceFormDialog({ open, onClose, space = null }) {
+    const queryClient = useQueryClient();
+    const isEditing = Boolean(space);
+
+    const [name, setName] = useState('');
+    const [color, setColor] = useState('#6b7280');
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
+    const resetKey = open ? (space?.id ?? 'create') : null;
+    const [lastResetKey, setLastResetKey] = useState(resetKey);
+    if (resetKey !== lastResetKey) {
+        setLastResetKey(resetKey);
+        if (open) {
+            setName(space?.name ?? '');
+            setColor(space?.color ?? '#6b7280');
+            setError('');
+        }
+    }
+
+    async function handleSubmit(e) {
+        e.preventDefault();
+        if (!name.trim()) return;
+
+        setSubmitting(true);
+        const { error } = isEditing
+            ? await updateSpace(space.id, { name: name.trim(), color })
+            : await createSpace({ name: name.trim(), color });
+        setSubmitting(false);
+
+        if (error) {
+            setError(error);
+            return;
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['spaces'] });
+        onClose();
+    }
+
+    return (
+        <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit Space' : 'New Space'}>
+            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+                <div className="flex items-center gap-2">
+                    <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => setColor(e.target.value)}
+                        className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
+                        disabled={submitting}
+                    />
+                    <Input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Space name"
+                        className="flex-1"
+                        autoFocus
+                        disabled={submitting}
+                    />
+                </div>
+                {error && <p className="text-xs text-destructive">{error}</p>}
+
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" disabled={!name.trim() || submitting} className="gap-1.5">
+                        {submitting && <Loader size="xs" />}
+                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create space'}
+                    </Button>
+                </div>
+            </form>
+        </ResponsiveModal>
+    );
+}
