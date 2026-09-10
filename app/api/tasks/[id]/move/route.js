@@ -7,17 +7,23 @@ import { getPositionBetween } from '@/lib/fractional-index';
  * POST /api/tasks/[id]/move
  * Reparents a task to a new parent and repositions it after a specified sibling.
  * Recursively updates the depth of all descendants by the depth delta.
+ * If listId differs from the task's current list, the task and every
+ * descendant are moved to that list too (used for cross-list cut/paste).
  *
- * Body: { newParentId: uuid|null, afterId: uuid|null }
+ * `afterSiblingId: null` means "append at the end" (used by promote/move-
+ * to/paste). To insert as the new first sibling instead, pass
+ * `shouldPrependToStart: true` — a plain `afterSiblingId: null` can't carry
+ * that meaning since it's already taken.
+ *
+ * Body: { newParentId: uuid|null, afterSiblingId: uuid|null, shouldPrependToStart?: boolean, listId?: uuid }
  */
 export async function POST(request, { params }) {
     const { id } = await params;
 
     try {
         const supabase = await createClient();
-        const { newParentId, afterId } = await request.json();
+        const { newParentId, afterSiblingId, shouldPrependToStart, listId } = await request.json();
 
-        // Fetch the task being moved
         const { data: task, error: taskError } = await supabase
             .from('tasks')
             .select('*')
@@ -28,7 +34,9 @@ export async function POST(request, { params }) {
             return NextResponse.json({ error: 'Task not found' }, { status: 404 });
         }
 
-        // Compute new depth from the target parent
+        const targetListId = listId ?? task.list_id;
+        const listChanged = targetListId !== task.list_id;
+
         let newDepth = 0;
         if (newParentId) {
             const { data: newParent } = await supabase
@@ -41,13 +49,16 @@ export async function POST(request, { params }) {
 
         const depthDelta = newDepth - task.depth;
 
-        // Update all descendants' depths if the task is moving to a different depth level
-        if (depthDelta !== 0) {
-            await updateDescendantDepths(supabase, id, depthDelta);
+        if (depthDelta !== 0 || listChanged) {
+            await updateDescendants(
+                supabase,
+                id,
+                depthDelta,
+                task.list_id,
+                listChanged ? targetListId : null,
+            );
         }
 
-        // Compute new position using fractional indexing
-        // Get siblings at the target parent (excluding the task being moved)
         const siblingsQuery = newParentId
             ? supabase
                   .from('tasks')
@@ -58,20 +69,25 @@ export async function POST(request, { params }) {
             : supabase
                   .from('tasks')
                   .select('id, position')
+                  .eq('list_id', targetListId)
                   .is('parent_id', null)
                   .neq('id', id)
                   .order('position', { ascending: true });
 
         const { data: siblings } = await siblingsQuery;
-        const newPosition = computeNewPosition(siblings || [], afterId);
+        const newPosition = computeNewPosition(
+            siblings || [],
+            afterSiblingId,
+            shouldPrependToStart,
+        );
 
-        // Update the task's parent, depth, and position
         const { data: updated, error: updateError } = await supabase
             .from('tasks')
             .update({
                 parent_id: newParentId ?? null,
                 depth: newDepth,
                 position: newPosition,
+                list_id: targetListId,
             })
             .eq('id', id)
             .select()
@@ -89,37 +105,40 @@ export async function POST(request, { params }) {
 }
 
 /**
- * Fetches all tasks and recursively updates the depth of every descendant
- * of the given task by the specified delta.
+ * Fetches every task in the subtree's current list and recursively updates
+ * each descendant's depth (by the given delta) and, if the subtree is
+ * changing lists, its list_id too.
  *
  * @param {object} supabase - Supabase client
  * @param {string} taskId - Root of the subtree whose descendants need updating
  * @param {number} depthDelta - Amount to add to each descendant's current depth
+ * @param {string} currentListId - List the subtree currently lives in, before the move
+ * @param {string|null} newListId - List to move descendants into, or null if the list isn't changing
  */
-async function updateDescendantDepths(supabase, taskId, depthDelta) {
-    const { data: allTasks } = await supabase.from('tasks').select('id, parent_id, depth');
+async function updateDescendants(supabase, taskId, depthDelta, currentListId, newListId) {
+    const { data: allTasks } = await supabase
+        .from('tasks')
+        .select('id, parent_id, depth')
+        .eq('list_id', currentListId);
     if (!allTasks) return;
 
-    // BFS to collect all descendants
     const descendants = [];
     const queue = [taskId];
 
     while (queue.length > 0) {
         const currentId = queue.shift();
-        const children = allTasks.filter((t) => t.parent_id === currentId);
+        const children = allTasks.filter((task) => task.parent_id === currentId);
         for (const child of children) {
             descendants.push(child);
             queue.push(child.id);
         }
     }
 
-    // Update each descendant individually
     // For v1 with typically shallow trees, individual updates are acceptable
-    for (const desc of descendants) {
-        await supabase
-            .from('tasks')
-            .update({ depth: desc.depth + depthDelta })
-            .eq('id', desc.id);
+    for (const descendant of descendants) {
+        const updates = { depth: descendant.depth + depthDelta };
+        if (newListId) updates.list_id = newListId;
+        await supabase.from('tasks').update(updates).eq('id', descendant.id);
     }
 }
 
@@ -128,24 +147,28 @@ async function updateDescendantDepths(supabase, taskId, depthDelta) {
  * Uses fractional indexing so existing positions don't need renumbering.
  *
  * @param {{ id: string, position: number }[]} siblings - Sorted sibling list (excluding the moving task)
- * @param {string|null} afterId - ID of the sibling to insert after, or null to prepend/append
+ * @param {string|null} afterSiblingId - ID of the sibling to insert after, or null to append at the end
+ * @param {boolean} [shouldPrependToStart] - If true, insert as the new first sibling instead (overrides afterSiblingId)
  * @returns {number} New position value
  */
-function computeNewPosition(siblings, afterId) {
-    if (!afterId) {
-        // No afterId: insert at the end
-        const last = siblings[siblings.length - 1];
-        return getPositionBetween(last?.position ?? null, null);
+function computeNewPosition(siblings, afterSiblingId, shouldPrependToStart) {
+    if (shouldPrependToStart) {
+        const firstSibling = siblings[0];
+        return getPositionBetween(null, firstSibling?.position ?? null);
     }
 
-    const afterIndex = siblings.findIndex((s) => s.id === afterId);
-    if (afterIndex === -1) {
-        // afterId not found in siblings: insert at the end
-        const last = siblings[siblings.length - 1];
-        return getPositionBetween(last?.position ?? null, null);
+    if (!afterSiblingId) {
+        const lastSibling = siblings[siblings.length - 1];
+        return getPositionBetween(lastSibling?.position ?? null, null);
     }
 
-    const a = siblings[afterIndex].position;
-    const b = siblings[afterIndex + 1]?.position ?? null;
-    return getPositionBetween(a, b);
+    const afterSiblingIndex = siblings.findIndex((sibling) => sibling.id === afterSiblingId);
+    if (afterSiblingIndex === -1) {
+        const lastSibling = siblings[siblings.length - 1];
+        return getPositionBetween(lastSibling?.position ?? null, null);
+    }
+
+    const beforePosition = siblings[afterSiblingIndex].position;
+    const afterPosition = siblings[afterSiblingIndex + 1]?.position ?? null;
+    return getPositionBetween(beforePosition, afterPosition);
 }
