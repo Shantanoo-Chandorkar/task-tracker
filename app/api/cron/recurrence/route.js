@@ -25,7 +25,6 @@ export async function GET(request) {
     try {
         const supabase = await createClient();
 
-        // Find all recurring tasks whose next_occurrence is now or in the past
         const { data: dueTasks, error: fetchError } = await supabase
             .from('tasks')
             .select('*')
@@ -50,7 +49,6 @@ export async function GET(request) {
         let processed = 0;
 
         for (const task of dueTasks) {
-            // Find the last sibling's position to append after it
             const siblingQuery = task.parent_id
                 ? supabase
                       .from('tasks')
@@ -61,6 +59,7 @@ export async function GET(request) {
                 : supabase
                       .from('tasks')
                       .select('position')
+                      .eq('list_id', task.list_id)
                       .is('parent_id', null)
                       .order('position', { ascending: false })
                       .limit(1);
@@ -68,18 +67,26 @@ export async function GET(request) {
             const { data: siblings } = await siblingQuery;
             const newPosition = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
 
-            // Insert the new task instance as a sibling
-            await supabase.from('tasks').insert({
+            const { error: insertError } = await supabase.from('tasks').insert({
                 title: task.title,
                 description: task.description,
                 status_id: defaultStatus?.id ?? null,
                 parent_id: task.parent_id,
+                list_id: task.list_id,
                 position: newPosition,
                 depth: task.depth,
                 is_recurring: false, // New instances are not themselves recurring
             });
 
-            // Advance the original task's next_occurrence to the next future date
+            if (insertError) {
+                // Skip advancing next_occurrence so this task is retried on the next cron run
+                console.error(
+                    `Failed to spawn recurring task instance for task ${task.id}:`,
+                    insertError.message,
+                );
+                continue;
+            }
+
             const nextDate = computeNextOccurrence(task.recurrence_rule);
             if (nextDate) {
                 await supabase

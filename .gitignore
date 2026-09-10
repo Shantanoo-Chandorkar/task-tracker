@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/supabase
 
 # next.js
 /.next/
@@ -43,3 +44,6 @@ next-env.d.ts
 # Markdown Files
 *.md
 !README.md
+
+# dev-only source assets (icons already generated and tracked separately)
+/task-tracker-logo.png

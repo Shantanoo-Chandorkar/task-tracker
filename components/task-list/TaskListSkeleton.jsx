@@ -7,7 +7,7 @@ export default function TaskListSkeleton() {
     const rowWidths = ['w-3/4', 'w-1/2', 'w-2/3', 'w-4/5', 'w-1/3', 'w-3/5', 'w-2/5', 'w-1/2'];
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <div className="px-4 md:px-8 py-6 space-y-6">
             {/* Status group header skeleton */}
             <div className="flex items-center gap-2 pb-2 border-b border-border">
                 <div className="h-3 w-3 rounded-full bg-muted animate-pulse" />

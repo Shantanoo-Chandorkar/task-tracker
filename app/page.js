@@ -1,34 +1,40 @@
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import TaskList from '@/components/task-list/TaskList';
+import SpaceListManager from '@/components/space/SpaceListManager';
 
 /**
  * Root page — Server Component.
- * Fetches the full task tree and all statuses server-side so TanStack Query
- * on the client can hydrate from initialData with zero client-side requests on first load.
+ * Redirects to the first available list (ordered by space, then list,
+ * position). With no lists yet, shows the Space/List manager inline so a
+ * first-time user can create one without a separate onboarding flow.
  */
 export default async function Page() {
     const supabase = await createClient();
 
-    const [{ data: tasks }, { data: statuses }] = await Promise.all([
-        supabase
-            .from('tasks')
-            .select('*, statuses(id, name, color, is_default, position)')
-            .order('depth', { ascending: true })
-            .order('position', { ascending: true }),
-        supabase.from('statuses').select('*').order('position', { ascending: true }),
+    const [{ data: spaces }, { data: lists }] = await Promise.all([
+        supabase.from('spaces').select('*').order('position', { ascending: true }),
+        supabase.from('lists').select('*').order('position', { ascending: true }),
     ]);
 
-    // Normalize nested statuses join to flat status_name / status_color fields
-    // so TaskList and useTaskTree don't need to understand the join structure
-    const normalizedTasks = (tasks || []).map((task) => ({
-        ...task,
-        status_name: task.statuses?.name ?? null,
-        status_color: task.statuses?.color ?? null,
-    }));
+    const firstSpaceWithList = (spaces || []).find((space) =>
+        (lists || []).some((list) => list.space_id === space.id),
+    );
+
+    if (firstSpaceWithList) {
+        const firstList = (lists || []).find((list) => list.space_id === firstSpaceWithList.id);
+        redirect(`/lists/${firstList.id}`);
+    }
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-6">
-            <TaskList initialTasks={normalizedTasks} initialStatuses={statuses || []} />
+        <div className="max-w-2xl mx-auto px-4 py-8">
+            <div className="mb-8">
+                <h1 className="text-xl font-semibold">Welcome to Task Tracker</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                    Create a space and a list to get started.
+                </p>
+            </div>
+
+            <SpaceListManager initialSpaces={spaces || []} initialLists={lists || []} />
         </div>
     );
 }

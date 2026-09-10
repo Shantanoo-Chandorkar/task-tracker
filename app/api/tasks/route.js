@@ -3,17 +3,23 @@ import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
 /**
- * GET /api/tasks
- * Returns the full flat task list with status details joined in.
+ * GET /api/tasks?list_id=<id>
+ * Returns the flat task list for one list, with status details joined in.
  * TanStack Query uses this endpoint for all client-side refetches.
  */
-export async function GET() {
+export async function GET(request) {
     try {
         const supabase = await createClient();
+        const listId = request.nextUrl.searchParams.get('list_id');
+
+        if (!listId) {
+            return NextResponse.json({ error: 'list_id is required' }, { status: 400 });
+        }
 
         const { data: tasks, error } = await supabase
             .from('tasks')
             .select('*, statuses(id, name, color, is_default, position)')
+            .eq('list_id', listId)
             .order('depth', { ascending: true })
             .order('position', { ascending: true });
 
@@ -43,13 +49,15 @@ export async function POST(request) {
     try {
         const supabase = await createClient();
         const body = await request.json();
-        const { title, description, status_id, parent_id, position } = body;
+        const { title, description, status_id, parent_id, position, list_id } = body;
 
         if (!title || title.trim() === '') {
             return NextResponse.json({ error: 'Title is required' }, { status: 400 });
         }
+        if (!list_id) {
+            return NextResponse.json({ error: 'list_id is required' }, { status: 400 });
+        }
 
-        // Compute depth from parent
         let depth = 0;
         if (parent_id) {
             const { data: parent } = await supabase
@@ -60,7 +68,6 @@ export async function POST(request) {
             if (parent) depth = parent.depth + 1;
         }
 
-        // Compute position as last sibling + 1 if not provided
         let computedPosition = position;
         if (computedPosition === undefined || computedPosition === null) {
             const siblingQuery = parent_id
@@ -73,6 +80,7 @@ export async function POST(request) {
                 : supabase
                       .from('tasks')
                       .select('position')
+                      .eq('list_id', list_id)
                       .is('parent_id', null)
                       .order('position', { ascending: false })
                       .limit(1);
@@ -88,6 +96,7 @@ export async function POST(request) {
                 description: description ?? null,
                 status_id: status_id ?? null,
                 parent_id: parent_id ?? null,
+                list_id,
                 position: computedPosition,
                 depth,
             })

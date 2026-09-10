@@ -115,15 +115,16 @@ CREATE TABLE statuses (
   name        TEXT NOT NULL,
   color       TEXT NOT NULL DEFAULT '#6b7280',
   is_default  BOOLEAN DEFAULT false,
+  code        TEXT UNIQUE, -- 'todo' | 'in_progress' | 'done' for the 3 built-in, non-deletable statuses; NULL for custom ones
   position    INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 
-INSERT INTO statuses (name, color, is_default, position) VALUES
-  ('Pending',     '#6b7280', true,  0),
-  ('To Do',       '#3b82f6', false, 1),
-  ('In Progress', '#f59e0b', false, 2),
-  ('Completed',   '#22c55e', false, 3);
+INSERT INTO statuses (name, color, is_default, code, position) VALUES
+  ('Pending',     '#6b7280', true,  NULL,           0),
+  ('To Do',       '#3b82f6', false, 'todo',         1),
+  ('In Progress', '#f59e0b', false, 'in_progress',  2),
+  ('Done',        '#22c55e', false, 'done',         3);
 
 -- Tasks (self-referential)
 CREATE TABLE tasks (
@@ -134,6 +135,7 @@ CREATE TABLE tasks (
   parent_id        UUID REFERENCES tasks(id) ON DELETE CASCADE,
   position         FLOAT NOT NULL DEFAULT 0,
   depth            INTEGER NOT NULL DEFAULT 0,
+  due_date         DATE,
   is_recurring     BOOLEAN DEFAULT false,
   recurrence_rule  JSONB,
   next_occurrence  TIMESTAMPTZ,
