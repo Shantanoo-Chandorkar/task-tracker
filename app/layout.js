@@ -1,8 +1,14 @@
 import { Geist, Geist_Mono } from 'next/font/google';
+import { Toaster } from 'sonner';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { ClipboardProvider } from '@/providers/ClipboardProvider';
-import Link from 'next/link';
-import ThemeToggle from '@/components/ThemeToggle';
+import DesktopSidebar from '@/components/nav/DesktopSidebar';
+import MobileTopBar from '@/components/nav/MobileTopBar';
+import BottomNav from '@/components/nav/BottomNav';
+import QuickCreateFab from '@/components/nav/QuickCreateFab';
+import GlobalSearch from '@/components/nav/GlobalSearch';
+import NavigationProgressBar from '@/components/nav/NavigationProgressBar';
+import ServiceWorkerRegister from '@/components/nav/ServiceWorkerRegister';
 import './globals.css';
 
 const geistSans = Geist({
@@ -20,35 +26,40 @@ export const metadata = {
     description: 'Nested task management',
 };
 
+export const viewport = {
+    themeColor: '#171717',
+};
+
 export default function RootLayout({ children }) {
     return (
         <html
             lang="en"
             className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
         >
-            <body className="min-h-full flex flex-col bg-background text-foreground">
+            <body className="h-screen overflow-hidden flex flex-col bg-background text-foreground">
+                <NavigationProgressBar />
+                <ServiceWorkerRegister />
+                <GlobalSearch />
                 <QueryProvider>
                     <ClipboardProvider>
-                        <header className="border-b border-border px-4 py-3 flex items-center justify-between">
-                            <Link
-                                href="/"
-                                className="text-sm font-semibold text-foreground hover:text-muted-foreground transition-colors"
-                            >
-                                Task Tracker
-                            </Link>
-                            <nav className="flex items-center gap-3">
-                                <Link
-                                    href="/settings"
-                                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                >
-                                    Settings
-                                </Link>
-                                <ThemeToggle />
-                            </nav>
-                        </header>
-                        <main className="flex-1">{children}</main>
+                        <div className="flex flex-1 min-h-0">
+                            <DesktopSidebar />
+                            {/* Only this column's <main> scrolls — the sidebar and the
+                                mobile top bar stay pinned in place, never the whole page. */}
+                            <div className="flex flex-1 flex-col min-h-0 min-w-0">
+                                <MobileTopBar />
+                                <main className="flex-1 min-h-0 overflow-y-auto pb-20 lg:pb-0">
+                                    {children}
+                                </main>
+                                <BottomNav />
+                            </div>
+                            {/* bottom-20 (not bottom-6) clears the TanStack Query devtools
+                                toggle button, which also docks bottom-right in dev mode. */}
+                            <QuickCreateFab className="hidden lg:flex fixed bottom-20 right-6 z-30 h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg" />
+                        </div>
                     </ClipboardProvider>
                 </QueryProvider>
+                <Toaster richColors position="bottom-right" />
             </body>
         </html>
     );
