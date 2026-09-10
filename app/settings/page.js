@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import StatusManager from '@/components/status/StatusManager';
+import InstallAppCard from '@/components/nav/InstallAppCard';
 
 /**
  * Settings page — Server Component.
@@ -15,14 +16,8 @@ export default async function SettingsPage() {
         .order('position', { ascending: true });
 
     return (
-        <div className="max-w-2xl mx-auto px-4 py-8">
-            <div className="mb-8">
-                <h1 className="text-xl font-semibold">Settings</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                    Configure your task tracker workspace.
-                </p>
-            </div>
-
+        <div className="px-4 md:px-8 py-8 space-y-8">
+            <InstallAppCard />
             <StatusManager initialStatuses={statuses || []} />
         </div>
     );
