@@ -32,23 +32,21 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
     return (
-        <html
-            lang="en"
-            className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-        >
-            <body className="h-screen overflow-hidden flex flex-col bg-background text-foreground">
+        <html lang="en" className={`dark ${geistSans.variable} ${geistMono.variable} antialiased`}>
+            <body className="flex flex-col bg-background text-foreground">
                 <NavigationProgressBar />
                 <ServiceWorkerRegister />
                 <GlobalSearch />
                 <QueryProvider>
                     <ClipboardProvider>
-                        <div className="flex flex-1 min-h-0">
+                        <div className="flex">
                             <DesktopSidebar />
-                            {/* Only this column's <main> scrolls — the sidebar and the
-                                mobile top bar stay pinned in place, never the whole page. */}
-                            <div className="flex flex-1 flex-col min-h-0 min-w-0">
+                            {/* <body> is the real scrolling element (native pull-to-refresh needs
+                                the document itself to scroll) — the sidebar and mobile top bar
+                                stay pinned via sticky/fixed instead of trapping scroll in here. */}
+                            <div className="flex flex-1 flex-col min-w-0">
                                 <MobileTopBar />
-                                <main className="flex-1 min-h-0 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
+                                <main className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
                                     {children}
                                 </main>
                                 <BottomNav />

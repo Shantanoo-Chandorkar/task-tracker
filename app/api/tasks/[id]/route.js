@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { canMarkTaskDone, getDoneStatusId } from '@/lib/task-completion';
 
 /**
  * PATCH /api/tasks/[id]
@@ -15,6 +16,19 @@ export async function PATCH(request, { params }) {
 
         if (Object.keys(body).length === 0) {
             return NextResponse.json({ error: 'No fields provided to update' }, { status: 400 });
+        }
+
+        if (body.status_id) {
+            const doneStatusId = await getDoneStatusId(supabase);
+            if (doneStatusId && body.status_id === doneStatusId) {
+                const canComplete = await canMarkTaskDone(supabase, id, doneStatusId);
+                if (!canComplete) {
+                    return NextResponse.json(
+                        { error: 'Complete all subtasks before marking this task done' },
+                        { status: 409 },
+                    );
+                }
+            }
         }
 
         const { data, error } = await supabase

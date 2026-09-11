@@ -61,7 +61,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
                 {/* Drag handle — always visible (mobile has no hover to reveal it on) */}
                 <button
                     {...listeners}
-                    className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground p-0.5 flex-shrink-0 focus:outline-none"
+                    className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground p-3 -m-3 flex-shrink-0 focus:outline-none"
                     aria-label="Drag to reorder"
                     tabIndex={-1}
                 >
@@ -114,7 +114,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
 
                 {/* Inline status picker */}
                 <div className="flex-shrink-0">
-                    <StatusPicker task={task} />
+                    <StatusPicker task={task} flatList={flatList} />
                 </div>
 
                 {/* Hover action bar */}

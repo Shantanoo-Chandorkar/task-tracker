@@ -48,7 +48,7 @@ export default function MobileTopBar() {
           : 'Task Tracker';
 
     return (
-        <div className="lg:hidden flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
+        <div className="lg:hidden sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-2.5">
             <MobileNavDrawer />
 
             <div className="flex-1 text-center leading-tight">

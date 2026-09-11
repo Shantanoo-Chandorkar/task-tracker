@@ -6,7 +6,8 @@ import {
     DndContext,
     closestCenter,
     KeyboardSensor,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
@@ -177,7 +178,7 @@ function SublistHeader({ sublist, taskCount, isCollapsed, onToggle, onEdit, onDe
             <button
                 {...listeners}
                 {...attributes}
-                className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 p-3 -m-3"
                 aria-label="Drag to reorder"
             >
                 <GripVertical className="h-3.5 w-3.5" />
@@ -323,7 +324,10 @@ export default function TaskList({
     ];
 
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+        // Touch needs its own sensor (not PointerSensor, which would race with it): a short
+        // delay + move tolerance lets a tap or scroll happen without being grabbed as a drag.
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
@@ -387,7 +391,7 @@ export default function TaskList({
             }
 
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            toast.dismiss(toastId);
+            toast.success('Order updated', { id: toastId });
         } catch (caughtError) {
             console.error('Drag reorder failed:', caughtError);
             toast.error('Failed to reorder task', { id: toastId });
@@ -404,13 +408,24 @@ export default function TaskList({
         queryClient.setQueryData(['sublists', listId], reordered);
 
         const toastId = toast.loading('Saving order...');
-        for (let i = 0; i < reordered.length; i++) {
-            if (reordered[i].position !== i) {
-                await updateSublist(reordered[i].id, { position: i });
+        try {
+            for (let i = 0; i < reordered.length; i++) {
+                if (reordered[i].position !== i) {
+                    const { error } = await updateSublist(reordered[i].id, { position: i });
+                    if (error) {
+                        toast.error(error, { id: toastId });
+                        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                        return;
+                    }
+                }
             }
+            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+            toast.success('Order updated', { id: toastId });
+        } catch (caughtError) {
+            console.error('Sublist reorder failed:', caughtError);
+            toast.error('Failed to reorder sublist', { id: toastId });
+            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
         }
-        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-        toast.dismiss(toastId);
     }
 
     function handleDragEnd({ active, over }) {
