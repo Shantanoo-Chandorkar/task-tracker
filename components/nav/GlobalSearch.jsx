@@ -13,6 +13,7 @@ import {
     CommandItem,
 } from '@/components/ui/command';
 import { Loader } from '@/components/ui/loader';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 const listeners = new Set();
 let isOpenState = false;
@@ -51,12 +52,11 @@ export default function GlobalSearch() {
     const router = useRouter();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState(EMPTY_RESULTS);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isFetching, setIsFetching] = useState(false);
+    const trimmedQuery = query.trim();
+    const debouncedQuery = useDebouncedValue(trimmedQuery, 250);
 
-    // Reset the query when the palette closes, so reopening starts fresh —
-    // adjusted during render (same pattern as TaskFormDialog's resetKey)
-    // instead of an effect, since this is a synchronous response to `open`
-    // changing, not a subscription to an external system.
+    // Adjusted during render, not an effect — reacts to `open` changing, not an external system.
     const [lastOpen, setLastOpen] = useState(open);
     if (open !== lastOpen) {
         setLastOpen(open);
@@ -78,32 +78,38 @@ export default function GlobalSearch() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // Debounced server search — a genuine external-system sync (network
-    // fetch on a timer), so `setResults` only ever fires inside the async
-    // callback, never synchronously in the effect body.
+    // `cancelled` guards against a slower earlier response landing after a later one.
     useEffect(() => {
-        if (!open || !query.trim()) return;
-        const trimmed = query.trim();
-        setIsLoading(true);
+        if (!open || !debouncedQuery) {
+            setResults(EMPTY_RESULTS);
+            return;
+        }
 
-        const timeoutId = setTimeout(async () => {
-            const response = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
-            if (response.ok) setResults(await response.json());
-            setIsLoading(false);
-        }, 250);
+        let cancelled = false;
+        setIsFetching(true);
 
-        return () => clearTimeout(timeoutId);
-    }, [query, open]);
+        fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`)
+            .then((response) => (response.ok ? response.json() : EMPTY_RESULTS))
+            .then((data) => {
+                if (!cancelled) setResults(data);
+            })
+            .finally(() => {
+                if (!cancelled) setIsFetching(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [debouncedQuery, open]);
 
     function handleSelect(href) {
         closeSearch();
         router.push(href);
     }
 
-    // An empty query displays no results even if stale results from a
-    // previous search are still in state (cleared for real once the palette
-    // closes and reopens) — avoids a synchronous setState just to blank it.
-    const displayResults = query.trim() ? results : EMPTY_RESULTS;
+    // Covers the debounce gap too, not just the fetch, so results are never shown stale.
+    const isLoading = Boolean(trimmedQuery) && (trimmedQuery !== debouncedQuery || isFetching);
+    const displayResults = trimmedQuery && !isLoading ? results : EMPTY_RESULTS;
     const hasResults =
         displayResults.tasks.length > 0 ||
         displayResults.lists.length > 0 ||
@@ -118,12 +124,12 @@ export default function GlobalSearch() {
         >
             <Command shouldFilter={false}>
                 <CommandInput
-                    placeholder="Search tasks, lists, spaces..."
+                    placeholder="Search tasks, lists, spaces"
                     value={query}
                     onValueChange={setQuery}
                 />
                 <CommandList>
-                    {!hasResults && query.trim() && isLoading && (
+                    {!hasResults && isLoading && (
                         <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
                             <Loader size="sm" />
                             Searching...
@@ -132,7 +138,7 @@ export default function GlobalSearch() {
 
                     {!hasResults && !isLoading && (
                         <CommandEmpty>
-                            {query.trim() ? 'No results.' : 'Type to search...'}
+                            {trimmedQuery ? 'No results.' : 'Type to search'}
                         </CommandEmpty>
                     )}
 
