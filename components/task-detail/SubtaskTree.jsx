@@ -1,10 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronRight } from 'lucide-react';
-import { updateTask } from '@/actions/task-actions';
+import { updateTask, completeTaskAndDescendants } from '@/actions/task-actions';
+import { findIncompleteDescendants } from '@/lib/tree';
+import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 
 /**
  * Recursive nested subtask list — each row links to its own task page, with a done/undone checkbox.
@@ -12,10 +15,12 @@ import { updateTask } from '@/actions/task-actions';
  * @param {object} props
  * @param {object[]} props.nodes - Task nodes (from flatToTree) with a `children` array
  * @param {string} props.listId - The list these tasks belong to, for building links
+ * @param {object[]} props.flatList - Full flat task list, used to check descendant completeness
  * @param {number} [props.depth] - Current nesting depth (0 = direct children)
  */
-export default function SubtaskTree({ nodes, listId, depth = 0 }) {
+export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
     const queryClient = useQueryClient();
+    const [confirmNode, setConfirmNode] = useState(null);
 
     const { data: statuses = [] } = useQuery({
         queryKey: ['statuses'],
@@ -37,11 +42,36 @@ export default function SubtaskTree({ nodes, listId, depth = 0 }) {
      * @param {boolean} checked - Whether the box was just checked
      */
     async function handleToggle(node, checked) {
+        if (checked && doneStatus) {
+            const incomplete = findIncompleteDescendants(node.id, flatList, doneStatus.id);
+            if (incomplete.length > 0) {
+                setConfirmNode(node);
+                return;
+            }
+        }
+
         const targetStatus = checked ? doneStatus : defaultStatus;
         if (!targetStatus) return;
 
         const toastId = toast.loading(checked ? 'Marking complete...' : 'Marking incomplete...');
         const { error } = await updateTask(node.id, { status_id: targetStatus.id });
+
+        if (error) {
+            toast.error(error, { id: toastId });
+            return;
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        toast.dismiss(toastId);
+    }
+
+    async function handleCascadeComplete() {
+        const node = confirmNode;
+        setConfirmNode(null);
+        if (!node) return;
+
+        const toastId = toast.loading('Marking complete...');
+        const { error } = await completeTaskAndDescendants(node.id);
 
         if (error) {
             toast.error(error, { id: toastId });
@@ -85,10 +115,26 @@ export default function SubtaskTree({ nodes, listId, depth = 0 }) {
                         </Link>
                     </div>
                     {node.children.length > 0 && (
-                        <SubtaskTree nodes={node.children} listId={listId} depth={depth + 1} />
+                        <SubtaskTree
+                            nodes={node.children}
+                            listId={listId}
+                            flatList={flatList}
+                            depth={depth + 1}
+                        />
                     )}
                 </div>
             ))}
+            <CompleteTaskDialog
+                open={!!confirmNode}
+                onClose={() => setConfirmNode(null)}
+                task={confirmNode}
+                incompleteCount={
+                    confirmNode && doneStatus
+                        ? findIncompleteDescendants(confirmNode.id, flatList, doneStatus.id).length
+                        : 0
+                }
+                onConfirm={handleCascadeComplete}
+            />
         </div>
     );
 }

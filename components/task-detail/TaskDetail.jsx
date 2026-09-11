@@ -152,7 +152,7 @@ export default function TaskDetail({ listId, taskId, initialTasks }) {
                     </Button>
                 </div>
                 {children.length > 0 ? (
-                    <SubtaskTree nodes={children} listId={listId} />
+                    <SubtaskTree nodes={children} listId={listId} flatList={flatList} />
                 ) : (
                     <p className="text-sm text-muted-foreground pb-4">No subtasks yet.</p>
                 )}

@@ -114,7 +114,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
 
                 {/* Inline status picker */}
                 <div className="flex-shrink-0">
-                    <StatusPicker task={task} />
+                    <StatusPicker task={task} flatList={flatList} />
                 </div>
 
                 {/* Hover action bar */}

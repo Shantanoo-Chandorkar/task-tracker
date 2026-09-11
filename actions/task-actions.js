@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
+import { findDescendantIds } from '@/lib/tree';
+import { canMarkTaskDone, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
 
 /**
  * Deepest relative depth in a clipboard snapshot's subtree (0 = root with no children).
@@ -147,6 +149,16 @@ export async function updateTask(taskId, fields) {
 
         const updates = { ...fields };
 
+        if (updates.status_id) {
+            const doneStatusId = await getDoneStatusId(supabase);
+            if (doneStatusId && updates.status_id === doneStatusId) {
+                const canComplete = await canMarkTaskDone(supabase, taskId, doneStatusId);
+                if (!canComplete) {
+                    return { data: null, error: 'Complete all subtasks before marking this task done' };
+                }
+            }
+        }
+
         if ('sublist_id' in updates && updates.sublist_id) {
             const { data: existingTask } = await supabase
                 .from('tasks')
@@ -188,6 +200,43 @@ export async function updateTask(taskId, fields) {
         return { data: updatedTask, error: null };
     } catch {
         return { data: null, error: 'Unexpected error updating task' };
+    }
+}
+
+/**
+ * Marks a task and all its descendants (any depth) as done in one update. Used when
+ * completing a parent that still has incomplete subtasks — the user has already
+ * confirmed the cascade via a UI dialog before this is called.
+ *
+ * @param {string} taskId - Root task to complete along with its descendants
+ * @returns {{ error: string|null }}
+ */
+export async function completeTaskAndDescendants(taskId) {
+    if (!taskId) return { error: 'Task ID is required' };
+
+    try {
+        const supabase = await createClient();
+
+        const { task, listTasks } = await getTaskListTree(supabase, taskId);
+        if (!task) return { error: 'Task not found' };
+
+        const doneStatusId = await getDoneStatusId(supabase);
+        if (!doneStatusId) return { error: 'No "done" status configured' };
+
+        const descendantIds = Array.from(findDescendantIds(taskId, listTasks));
+        const idsToComplete = [taskId, ...descendantIds];
+
+        const { error } = await supabase
+            .from('tasks')
+            .update({ status_id: doneStatusId })
+            .in('id', idsToComplete);
+
+        if (error) return { error: 'Failed to mark tasks complete' };
+
+        revalidateTag('task-tree');
+        return { error: null };
+    } catch {
+        return { error: 'Unexpected error completing tasks' };
     }
 }
 

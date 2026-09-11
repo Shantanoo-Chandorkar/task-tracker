@@ -23,12 +23,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
-import { deleteTask, deleteTaskAndReparentChildren, updateTask } from '@/actions/task-actions';
+import {
+    deleteTask,
+    deleteTaskAndReparentChildren,
+    updateTask,
+    completeTaskAndDescendants,
+} from '@/actions/task-actions';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
-import { findAncestors, findDescendantIds } from '@/lib/tree';
+import { findAncestors, findDescendantIds, findIncompleteDescendants } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
+import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 
 /**
@@ -56,6 +62,7 @@ export default function TaskRowActions({
     const { clipboard, copyTask, cutTask, pasteTask } = useClipboard();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const isDesktop = useIsDesktop();
@@ -83,6 +90,9 @@ export default function TaskRowActions({
     const doneStatus = statuses.find((status) => status.code === 'done');
     const defaultStatus = statuses.find((status) => status.is_default);
     const isDone = task.status_id === doneStatus?.id;
+    const incompleteDescendants = doneStatus
+        ? findIncompleteDescendants(task.id, flatList, doneStatus.id)
+        : [];
 
     const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);
     const grandparentId = parent?.parent_id ?? null;
@@ -204,12 +214,33 @@ export default function TaskRowActions({
     }
 
     async function handleToggleComplete() {
+        if (!isDone && incompleteDescendants.length > 0) {
+            setCompleteConfirmOpen(true);
+            return;
+        }
+
         const targetStatus = isDone ? defaultStatus : doneStatus;
         if (!targetStatus) return;
 
         setPending(true);
         const toastId = toast.loading(isDone ? 'Marking incomplete...' : 'Marking complete...');
         const { error } = await updateTask(task.id, { status_id: targetStatus.id });
+        setPending(false);
+
+        if (error) {
+            toast.error(error, { id: toastId });
+            return;
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        toast.dismiss(toastId);
+    }
+
+    async function handleCascadeComplete() {
+        setCompleteConfirmOpen(false);
+        setPending(true);
+        const toastId = toast.loading('Marking complete...');
+        const { error } = await completeTaskAndDescendants(task.id);
         setPending(false);
 
         if (error) {
@@ -355,6 +386,15 @@ export default function TaskRowActions({
                 task={task}
                 flatList={flatList}
                 onConfirm={handleDeleteConfirm}
+            />
+
+            {/* Cascade-complete confirmation — only shown when subtasks are still incomplete */}
+            <CompleteTaskDialog
+                open={completeConfirmOpen}
+                onClose={() => setCompleteConfirmOpen(false)}
+                task={task}
+                incompleteCount={incompleteDescendants.length}
+                onConfirm={handleCascadeComplete}
             />
 
             {/* Move-to destination picker — mobile only; desktop uses the DropdownMenuSub flyout above */}
