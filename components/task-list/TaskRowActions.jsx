@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
     DropdownMenu,
@@ -13,7 +13,13 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
@@ -34,11 +40,18 @@ import MoveDestinationList from '@/components/task-list/MoveDestinationList';
  * @param {object} props.task - The task this action bar belongs to
  * @param {object[]} props.flatList - Full flat list for move/promote/delete lookups
  * @param {Function} props.onAddSubtask - Called when "Add Subtask" is selected
+ * @param {boolean} [props.canAddSubtask] - Whether depth allows a subtask; default true
  * @param {string} props.listId - The list this task belongs to (for paste target scoping)
- * @param {Function} [props.onDeleted] - Called after a successful delete, in addition to the
- *   query invalidation — lets a page showing only this task (e.g. its own detail page) navigate away
+ * @param {Function} [props.onDeleted] - Called after delete, so a task's own detail page can navigate away
  */
-export default function TaskRowActions({ task, flatList, onAddSubtask, listId, onDeleted }) {
+export default function TaskRowActions({
+    task,
+    flatList,
+    onAddSubtask,
+    canAddSubtask = true,
+    listId,
+    onDeleted,
+}) {
     const queryClient = useQueryClient();
     const { clipboard, copyTask, cutTask, pasteTask } = useClipboard();
     const [editOpen, setEditOpen] = useState(false);
@@ -46,14 +59,24 @@ export default function TaskRowActions({ task, flatList, onAddSubtask, listId, o
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const isDesktop = useIsDesktop();
+    const isRootTask = !task.parent_id;
+
+    const { data: sublists = [] } = useQuery({
+        queryKey: ['sublists', listId],
+        queryFn: async () => {
+            const response = await fetch(`/api/sublists?list_id=${listId}`);
+            if (!response.ok) throw new Error('Failed to fetch sublists');
+            return response.json();
+        },
+        enabled: isRootTask,
+    });
 
     const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);
     const grandparentId = parent?.parent_id ?? null;
     const canPromote = Boolean(task.parent_id);
     const hasPaste = Boolean(clipboard.mode && clipboard.taskId);
 
-    // All tasks that are valid reparent destinations:
-    // exclude the task itself, its current parent (already there), and any descendants (cycle)
+    // Valid reparent targets exclude the task itself, its current parent, and any descendants (cycle).
     const descendantIds = findDescendantIds(task.id, flatList);
     const validTargets = flatList
         .filter(
@@ -62,7 +85,7 @@ export default function TaskRowActions({ task, flatList, onAddSubtask, listId, o
                 flatTask.id !== task.parent_id &&
                 !descendantIds.has(flatTask.id),
         )
-        .sort((a, b) => a.depth - b.depth || a.title.localeCompare(b.title));
+        .sort((taskA, taskB) => taskA.depth - taskB.depth || taskA.title.localeCompare(taskB.title));
 
     /**
      * Builds a breadcrumb label for a target task so duplicate titles are unambiguous.
@@ -143,20 +166,42 @@ export default function TaskRowActions({ task, flatList, onAddSubtask, listId, o
         toast.success('Task moved', { id: toastId });
     }
 
+    async function handleMoveToSublist(targetSublistId) {
+        setPending(true);
+        const toastId = toast.loading('Moving task...');
+        const response = await fetch(`/api/tasks/${task.id}/move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                newParentId: null,
+                sublistId: targetSublistId,
+                afterSiblingId: null,
+                listId,
+            }),
+        });
+        setPending(false);
+
+        if (!response.ok) {
+            toast.error('Failed to move task', { id: toastId });
+            return;
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        toast.success('Task moved', { id: toastId });
+    }
+
     async function handlePaste() {
         setPending(true);
         const toastId = toast.loading('Pasting task...');
-        // pasteTask already surfaces its own error toast on failure — just
-        // clear the loading toast here rather than claiming a false success.
-        await pasteTask(task.id, queryClient, listId);
+        // pasteTask already toasts its own errors — just clear the loading toast, don't claim success.
+        await pasteTask(task.id, queryClient, listId, flatList);
         toast.dismiss(toastId);
         setPending(false);
     }
 
     return (
         <>
-            {/* Edit/Delete live only in the ··· menu below — no point duplicating them as
-                standalone icons next to it. Always visible (no hover to reveal it on mobile). */}
+            {/* Edit/Delete live only in this menu — always visible since mobile has no hover. */}
             <div className="flex items-center gap-0.5 flex-shrink-0">
                 {/* ··· context menu */}
                 <DropdownMenu>
@@ -177,7 +222,13 @@ export default function TaskRowActions({ task, flatList, onAddSubtask, listId, o
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-40">
                         <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={onAddSubtask}>Add Subtask</DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={onAddSubtask}
+                            disabled={!canAddSubtask}
+                            className={!canAddSubtask ? 'opacity-40' : ''}
+                        >
+                            Add Subtask
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => copyTask(task.id, flatList)}>
                             Copy
@@ -201,9 +252,7 @@ export default function TaskRowActions({ task, flatList, onAddSubtask, listId, o
                             </DropdownMenuItem>
                         )}
 
-                        {/* Move to — shows all valid reparent destinations with breadcrumb paths.
-                            A nested flyout has no room to render on mobile widths, so it opens
-                            a bottom Sheet there instead; desktop keeps the flyout. */}
+                        {/* Nested flyouts don't fit mobile widths, so this opens a bottom Sheet there instead. */}
                         {validTargets.length > 0 &&
                             (isDesktop ? (
                                 <DropdownMenuSub>
@@ -224,6 +273,28 @@ export default function TaskRowActions({ task, flatList, onAddSubtask, listId, o
                                     Move to...
                                 </DropdownMenuItem>
                             ))}
+
+                        {/* Root tasks only — subtasks always render nested, never in a sublist. */}
+                        {isRootTask && sublists.length > 0 && (
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>Move to sublist...</DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
+                                    <DropdownMenuItem onClick={() => handleMoveToSublist(null)}>
+                                        No sublist
+                                    </DropdownMenuItem>
+                                    {sublists
+                                        .filter((sublist) => sublist.id !== task.sublist_id)
+                                        .map((sublist) => (
+                                            <DropdownMenuItem
+                                                key={sublist.id}
+                                                onClick={() => handleMoveToSublist(sublist.id)}
+                                            >
+                                                {sublist.name}
+                                            </DropdownMenuItem>
+                                        ))}
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                        )}
 
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -253,6 +324,9 @@ export default function TaskRowActions({ task, flatList, onAddSubtask, listId, o
                 <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
                     <SheetHeader>
                         <SheetTitle>Move to...</SheetTitle>
+                        <SheetDescription className="sr-only">
+                            Choose a task to move this one under
+                        </SheetDescription>
                     </SheetHeader>
                     <MoveDestinationList
                         destinations={moveDestinations}

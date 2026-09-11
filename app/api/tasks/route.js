@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
+import { getNestingMode, isDepthAllowed } from '@/lib/config';
 
 /**
  * GET /api/tasks?list_id=<id>
@@ -49,13 +50,33 @@ export async function POST(request) {
     try {
         const supabase = await createClient();
         const body = await request.json();
-        const { title, description, status_id, parent_id, position, list_id } = body;
+        const { title, description, status_id, parent_id, sublist_id, position, list_id } = body;
 
         if (!title || title.trim() === '') {
             return NextResponse.json({ error: 'Title is required' }, { status: 400 });
         }
         if (!list_id) {
             return NextResponse.json({ error: 'list_id is required' }, { status: 400 });
+        }
+        if (sublist_id && parent_id) {
+            return NextResponse.json(
+                { error: "A subtask can't belong to a sublist directly" },
+                { status: 400 },
+            );
+        }
+
+        if (sublist_id) {
+            const { data: sublist } = await supabase
+                .from('sublists')
+                .select('list_id')
+                .eq('id', sublist_id)
+                .single();
+            if (!sublist || sublist.list_id !== list_id) {
+                return NextResponse.json(
+                    { error: 'Sublist does not belong to this list' },
+                    { status: 400 },
+                );
+            }
         }
 
         let depth = 0;
@@ -68,34 +89,49 @@ export async function POST(request) {
             if (parent) depth = parent.depth + 1;
         }
 
+        const nestingMode = await getNestingMode();
+        if (!isDepthAllowed(depth, nestingMode)) {
+            return NextResponse.json(
+                { error: 'Maximum nesting depth reached' },
+                { status: 400 },
+            );
+        }
+
         let computedPosition = position;
         if (computedPosition === undefined || computedPosition === null) {
-            const siblingQuery = parent_id
-                ? supabase
-                      .from('tasks')
-                      .select('position')
-                      .eq('parent_id', parent_id)
-                      .order('position', { ascending: false })
-                      .limit(1)
-                : supabase
-                      .from('tasks')
-                      .select('position')
-                      .eq('list_id', list_id)
-                      .is('parent_id', null)
-                      .order('position', { ascending: false })
-                      .limit(1);
+            let siblingQuery;
+            if (parent_id) {
+                siblingQuery = supabase
+                    .from('tasks')
+                    .select('position')
+                    .eq('parent_id', parent_id)
+                    .order('position', { ascending: false })
+                    .limit(1);
+            } else {
+                siblingQuery = supabase
+                    .from('tasks')
+                    .select('position')
+                    .eq('list_id', list_id)
+                    .is('parent_id', null)
+                    .order('position', { ascending: false })
+                    .limit(1);
+                siblingQuery = sublist_id
+                    ? siblingQuery.eq('sublist_id', sublist_id)
+                    : siblingQuery.is('sublist_id', null);
+            }
 
             const { data: siblings } = await siblingQuery;
             computedPosition = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
         }
 
-        const { data, error } = await supabase
+        const { data: createdTask, error } = await supabase
             .from('tasks')
             .insert({
                 title: title.trim(),
                 description: description ?? null,
                 status_id: status_id ?? null,
                 parent_id: parent_id ?? null,
+                sublist_id: parent_id ? null : (sublist_id ?? null),
                 list_id,
                 position: computedPosition,
                 depth,
@@ -108,7 +144,7 @@ export async function POST(request) {
         }
 
         revalidateTag('task-tree');
-        return NextResponse.json(data, { status: 201 });
+        return NextResponse.json(createdTask, { status: 201 });
     } catch {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }

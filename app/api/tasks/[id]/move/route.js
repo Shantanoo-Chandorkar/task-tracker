@@ -2,40 +2,68 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { getPositionBetween } from '@/lib/fractional-index';
+import { findAncestors, findDescendantIds } from '@/lib/tree';
+import { getNestingMode, FINITE_MAX_DEPTH } from '@/lib/config';
 
 /**
  * POST /api/tasks/[id]/move
- * Reparents a task to a new parent and repositions it after a specified sibling.
- * Recursively updates the depth of all descendants by the depth delta.
- * If listId differs from the task's current list, the task and every
- * descendant are moved to that list too (used for cross-list cut/paste).
+ * Reparents a task and repositions it after a sibling; cascades depth (and list) to descendants.
  *
- * `afterSiblingId: null` means "append at the end" (used by promote/move-
- * to/paste). To insert as the new first sibling instead, pass
- * `shouldPrependToStart: true` — a plain `afterSiblingId: null` can't carry
- * that meaning since it's already taken.
+ * afterSiblingId: null means "append at the end"; shouldPrependToStart flags "insert at the start" instead.
+ * sublistId only applies to root tasks (newParentId null); omitted on promote, it inherits the
+ * task's original root ancestor's sublist.
  *
- * Body: { newParentId: uuid|null, afterSiblingId: uuid|null, shouldPrependToStart?: boolean, listId?: uuid }
+ * Body: { newParentId: uuid|null, afterSiblingId: uuid|null, shouldPrependToStart?: boolean,
+ *   listId?: uuid, sublistId?: uuid|null }
  */
 export async function POST(request, { params }) {
-    const { id } = await params;
+    const { id: taskId } = await params;
 
     try {
         const supabase = await createClient();
-        const { newParentId, afterSiblingId, shouldPrependToStart, listId } = await request.json();
+        const { newParentId, afterSiblingId, shouldPrependToStart, listId, sublistId } =
+            await request.json();
 
         const { data: task, error: taskError } = await supabase
             .from('tasks')
             .select('*')
-            .eq('id', id)
+            .eq('id', taskId)
             .single();
 
         if (taskError || !task) {
             return NextResponse.json({ error: 'Task not found' }, { status: 404 });
         }
 
+        // Defense in depth — a self/descendant reparent creates a cycle that hangs every tree walker.
+        if (newParentId === taskId) {
+            return NextResponse.json(
+                { error: 'A task cannot be its own parent' },
+                { status: 400 },
+            );
+        }
+        if (newParentId) {
+            const { data: allTasksInList } = await supabase
+                .from('tasks')
+                .select('id, parent_id')
+                .eq('list_id', task.list_id);
+            const descendantIds = findDescendantIds(taskId, allTasksInList || []);
+            if (descendantIds.has(newParentId)) {
+                return NextResponse.json(
+                    { error: 'Cannot move a task into its own descendant' },
+                    { status: 400 },
+                );
+            }
+        }
+
         const targetListId = listId ?? task.list_id;
         const listChanged = targetListId !== task.list_id;
+
+        if (sublistId && newParentId) {
+            return NextResponse.json(
+                { error: "A subtask can't belong to a sublist directly" },
+                { status: 400 },
+            );
+        }
 
         let newDepth = 0;
         if (newParentId) {
@@ -49,30 +77,90 @@ export async function POST(request, { params }) {
 
         const depthDelta = newDepth - task.depth;
 
+        // Cap must hold for the deepest descendant of the moved subtree, not just the
+        // moved task itself — reparenting a subtree carries its whole shape with it.
+        const nestingMode = await getNestingMode();
+        if (nestingMode === 'finite' && depthDelta > 0) {
+            const { data: allTasksForDepthCheck } = await supabase
+                .from('tasks')
+                .select('id, parent_id, depth')
+                .eq('list_id', task.list_id);
+            const descendantIds = findDescendantIds(taskId, allTasksForDepthCheck || []);
+            const descendantDepths = [...descendantIds].map(
+                (descendantId) =>
+                    allTasksForDepthCheck.find((t) => t.id === descendantId)?.depth ?? task.depth,
+            );
+            const maxCurrentDepth = Math.max(task.depth, ...descendantDepths);
+            if (maxCurrentDepth + depthDelta > FINITE_MAX_DEPTH) {
+                return NextResponse.json(
+                    { error: 'Move would exceed maximum nesting depth' },
+                    { status: 400 },
+                );
+            }
+        }
+
         if (depthDelta !== 0 || listChanged) {
             await updateDescendants(
                 supabase,
-                id,
+                taskId,
                 depthDelta,
                 task.list_id,
                 listChanged ? targetListId : null,
             );
         }
 
-        const siblingsQuery = newParentId
-            ? supabase
-                  .from('tasks')
-                  .select('id, position')
-                  .eq('parent_id', newParentId)
-                  .neq('id', id)
-                  .order('position', { ascending: true })
-            : supabase
-                  .from('tasks')
-                  .select('id, position')
-                  .eq('list_id', targetListId)
-                  .is('parent_id', null)
-                  .neq('id', id)
-                  .order('position', { ascending: true });
+        // Root sublist target: explicit sublistId, else the promoted task's original root ancestor's sublist.
+        let resolvedSublistId = null;
+        if (!newParentId) {
+            if (sublistId !== undefined) {
+                resolvedSublistId = sublistId ?? null;
+            } else if (task.parent_id) {
+                const { data: allTasksInList } = await supabase
+                    .from('tasks')
+                    .select('id, parent_id, sublist_id')
+                    .eq('list_id', task.list_id);
+                const ancestors = findAncestors(taskId, allTasksInList || []);
+                const rootAncestor = ancestors[ancestors.length - 1];
+                resolvedSublistId = rootAncestor?.sublist_id ?? null;
+            } else {
+                resolvedSublistId = task.sublist_id ?? null;
+            }
+
+            if (resolvedSublistId) {
+                const { data: sublist } = await supabase
+                    .from('sublists')
+                    .select('list_id')
+                    .eq('id', resolvedSublistId)
+                    .single();
+                if (!sublist || sublist.list_id !== targetListId) {
+                    return NextResponse.json(
+                        { error: 'Sublist does not belong to this list' },
+                        { status: 400 },
+                    );
+                }
+            }
+        }
+
+        let siblingsQuery;
+        if (newParentId) {
+            siblingsQuery = supabase
+                .from('tasks')
+                .select('id, position')
+                .eq('parent_id', newParentId)
+                .neq('id', taskId)
+                .order('position', { ascending: true });
+        } else {
+            siblingsQuery = supabase
+                .from('tasks')
+                .select('id, position')
+                .eq('list_id', targetListId)
+                .is('parent_id', null)
+                .neq('id', taskId)
+                .order('position', { ascending: true });
+            siblingsQuery = resolvedSublistId
+                ? siblingsQuery.eq('sublist_id', resolvedSublistId)
+                : siblingsQuery.is('sublist_id', null);
+        }
 
         const { data: siblings } = await siblingsQuery;
         const newPosition = computeNewPosition(
@@ -85,11 +173,12 @@ export async function POST(request, { params }) {
             .from('tasks')
             .update({
                 parent_id: newParentId ?? null,
+                sublist_id: newParentId ? null : resolvedSublistId,
                 depth: newDepth,
                 position: newPosition,
                 list_id: targetListId,
             })
-            .eq('id', id)
+            .eq('id', taskId)
             .select()
             .single();
 
