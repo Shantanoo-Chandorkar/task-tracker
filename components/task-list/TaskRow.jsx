@@ -18,7 +18,7 @@ import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 /**
  * Recursive row component — renders one task and all its children.
  * Each level of children is wrapped in a SortableContext for sibling DnD reordering.
- * Indentation: 24px per depth level. Children have a faint left border as a connecting line.
+ * Indentation: `--row-indent` per depth level (16px mobile, 24px desktop), set by the ancestor section.
  *
  * @param {object} props
  * @param {object} props.task - Task node with a populated `.children` array
@@ -56,7 +56,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
             {/* Task row — flat, hairline-separated: no per-row card background or radius */}
             <div
                 className={`group flex items-center gap-1.5 py-2 px-2 border-b border-border/60 motion-safe:transition-colors duration-150 hover:bg-muted/50 cursor-default ${isCut ? 'opacity-40' : ''}`}
-                style={{ paddingLeft: `${depth * 24 + 8}px` }}
+                style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth} + 8px)` }}
             >
                 {/* Drag handle — always visible (mobile has no hover to reveal it on) */}
                 <button
@@ -139,7 +139,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
             {hasChildren && isExpanded && (
                 <div
                     className="border-l border-border motion-safe:transition-all duration-200"
-                    style={{ marginLeft: `${depth * 24 + 20}px` }}
+                    style={{ marginLeft: `calc(var(--row-indent, 24px) * ${depth} + 20px)` }}
                 >
                     {/* Depth warning shown before children that would be at depth 4+ */}
                     {depth === 3 && <DepthWarning />}

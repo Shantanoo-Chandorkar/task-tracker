@@ -185,7 +185,7 @@ function SpaceSection({
                 <button
                     type="button"
                     onClick={() => onAddListRequest(space.id)}
-                    className="w-full py-2 pl-8 pr-2 text-left text-sm text-muted-foreground hover:text-foreground"
+                    className="w-full py-2 pl-4 md:pl-8 pr-2 text-left text-sm text-muted-foreground hover:text-foreground"
                 >
                     + Add list
                 </button>
