@@ -1,10 +1,7 @@
 'use client';
 
 /**
- * Scrollable list of move destinations for the mobile "Move to..." Sheet —
- * plain full-width buttons (not a Radix menu) since the Sheet handles its
- * own focus/dismiss behavior and destinations need larger touch targets
- * than a DropdownMenuItem provides.
+ * Move destinations for the mobile "Move to..." Sheet — plain buttons, not a Radix menu, for bigger touch targets.
  *
  * @param {object} props
  * @param {{ id: string, label: string }[]} props.destinations - Move targets to list

@@ -7,12 +7,7 @@ import { ChevronRight } from 'lucide-react';
 import { updateTask } from '@/actions/task-actions';
 
 /**
- * Recursive nested subtask list. Each row links to that subtask's own task
- * page — browsing deeper in the tree is navigation, not an inline expand
- * toggle — plus a completion checkbox that toggles the task's status between
- * the built-in "done"-coded status and the default status. Grandchildren
- * render indented beneath their parent so depth beyond direct children is
- * visible without an extra click.
+ * Recursive nested subtask list — each row links to its own task page, with a done/undone checkbox.
  *
  * @param {object} props
  * @param {object[]} props.nodes - Task nodes (from flatToTree) with a `children` array

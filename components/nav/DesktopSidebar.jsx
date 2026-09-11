@@ -2,14 +2,12 @@
 
 import Link from 'next/link';
 import { Search } from 'lucide-react';
-import ThemeToggle from '@/components/ThemeToggle';
 import SidebarNav from './SidebarNav';
 import { openSearch } from './GlobalSearch';
 
 /**
- * Persistent left sidebar shown at `lg` (1024px) and above — app name header
- * + search trigger, the shared SidebarNav content, and a theme toggle in the
- * footer.
+ * Persistent left sidebar shown at `lg` (1024px) and above — app name header,
+ * search trigger, and the shared SidebarNav content.
  */
 export default function DesktopSidebar() {
     return (
@@ -30,10 +28,6 @@ export default function DesktopSidebar() {
                 </button>
             </div>
             <SidebarNav />
-            <div className="mt-3 flex items-center justify-between border-t border-border px-2 pt-3">
-                <span className="text-xs text-muted-foreground">Theme</span>
-                <ThemeToggle />
-            </div>
         </aside>
     );
 }

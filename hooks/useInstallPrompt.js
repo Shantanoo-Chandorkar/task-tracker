@@ -19,11 +19,7 @@ function subscribeToStandaloneChange(callback) {
 }
 
 /**
- * Captures the browser's `beforeinstallprompt` event so it can be replayed
- * later from a button click, and tracks whether the app is already
- * installed. The event only fires once and only when the browser's own
- * install criteria are met — this doesn't request installability, it just
- * exposes the browser's own signal.
+ * Captures the browser's `beforeinstallprompt` event for replay later, and tracks install state.
  *
  * @returns {{ canPrompt: boolean, isInstalled: boolean, promptInstall: () => Promise<string|null> }}
  */

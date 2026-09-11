@@ -95,7 +95,7 @@ function StatusGroup({
     if (tasks.length === 0) return null;
 
     return (
-        <section className="space-y-0.5">
+        <section className="space-y-0.5 pl-4 md:pl-8 [--row-indent:16px] md:[--row-indent:24px]">
             <button
                 className="flex items-center gap-2 w-full py-2 text-left group/header"
                 onClick={onToggle}
@@ -550,7 +550,7 @@ export default function TaskList({
                                     />
                                     {!isCollapsed && (
                                         <button
-                                            className="flex items-center gap-1.5 pl-8 pr-2 py-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground motion-safe:transition-colors w-full text-left"
+                                            className="flex items-center gap-1.5 pl-4 md:pl-8 pr-2 py-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground motion-safe:transition-colors w-full text-left"
                                             onClick={() =>
                                                 setCreateDialog({
                                                     open: true,

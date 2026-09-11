@@ -22,8 +22,6 @@ function getIsDesktopServerSnapshot() {
 
 /**
  * Reports whether the viewport is at or above the `lg` (1024px) breakpoint.
- * Shared by any UI that swaps between a desktop and a mobile presentation
- * (e.g. ResponsiveModal's Dialog/Sheet choice, TaskRowActions' move picker).
  *
  * @returns {boolean} Whether the viewport is desktop-width
  */

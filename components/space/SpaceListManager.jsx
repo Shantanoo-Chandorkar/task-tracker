@@ -185,7 +185,7 @@ function SpaceSection({
                 <button
                     type="button"
                     onClick={() => onAddListRequest(space.id)}
-                    className="w-full py-2 pl-8 pr-2 text-left text-sm text-muted-foreground hover:text-foreground"
+                    className="w-full py-2 pl-4 md:pl-8 pr-2 text-left text-sm text-muted-foreground hover:text-foreground"
                 >
                     + Add list
                 </button>
@@ -195,13 +195,7 @@ function SpaceSection({
 }
 
 /**
- * Full Space/List management UI — create, rename, recolor, reorder, and delete
- * Spaces and the Lists inside them. Spaces reorder among themselves; Lists
- * reorder within their own Space. Create/edit for both goes through
- * SpaceFormDialog/ListFormDialog (the same modal container Task creation
- * uses) rather than inline forms, for a consistent editing experience
- * everywhere. Deleting either cascades to tasks, so both are confirmed with
- * a dialog that states exactly how many tasks would be removed.
+ * Full Space/List management UI — create, rename, recolor, reorder, and delete both.
  *
  * @param {object} props
  * @param {object[]} props.initialSpaces - SSR-fetched spaces for initial hydration

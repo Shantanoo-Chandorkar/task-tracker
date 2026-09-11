@@ -48,7 +48,7 @@ export default function RootLayout({ children }) {
                                 mobile top bar stay pinned in place, never the whole page. */}
                             <div className="flex flex-1 flex-col min-h-0 min-w-0">
                                 <MobileTopBar />
-                                <main className="flex-1 min-h-0 overflow-y-auto pb-20 lg:pb-0">
+                                <main className="flex-1 min-h-0 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
                                     {children}
                                 </main>
                                 <BottomNav />

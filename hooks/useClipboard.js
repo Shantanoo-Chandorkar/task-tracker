@@ -40,10 +40,7 @@ export function useClipboard() {
     }
 
     /**
-     * Pastes the clipboard contents under the target parent.
-     * - Copy mode: recursively inserts the snapshot with new IDs via server action
-     * - Cut mode: moves the original task via the move API
-     * Always clears the clipboard and invalidates the task query after pasting.
+     * Pastes the clipboard contents under the target parent, then clears the clipboard.
      *
      * @param {string|null} targetParentId - Parent to paste under, or null for root
      * @param {import('@tanstack/react-query').QueryClient} queryClient

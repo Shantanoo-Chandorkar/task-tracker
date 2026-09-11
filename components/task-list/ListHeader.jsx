@@ -3,16 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 /**
- * Small header above the status tiles: muted Space name + bold List name,
- * matching the artifact's desktop `.desktop-header`. Reads from the same
- * `['spaces']`/`['lists']` query cache the sidebar already populates — no
- * new fetch.
- *
- * `initialSpaces`/`initialLists` seed the query cache from the server-rendered
- * list page. Without them the server always has no data for these two queries
- * (they're never SSR'd elsewhere on this route) while the client can resolve
- * them before hydration finishes, which throws a hydration mismatch — same
- * `initialData` pattern `TaskList` already uses for tasks/statuses.
+ * Space + List name header above the status tiles — reads the shared `['spaces']`/`['lists']` cache.
+ * `initialSpaces`/`initialLists` seed that cache from SSR to avoid a hydration mismatch.
  *
  * @param {object} props
  * @param {string} props.listId - The list currently being viewed

@@ -2,10 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import TaskDetail from '@/components/task-detail/TaskDetail';
 
 /**
- * Task detail page — Server Component.
- * Fetches the same per-list flat task array as the list page so TaskDetail can
- * hydrate the shared `['tasks', listId]` query from initialData with no
- * client-side request on first load.
+ * Task detail page — Server Component. Fetches the task list SSR to hydrate TaskDetail's query.
  */
 export default async function TaskDetailPage({ params }) {
     const { listId, taskId } = await params;

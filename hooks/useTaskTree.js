@@ -4,9 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { flatToTree } from '@/lib/tree';
 
 /**
- * Fetches all tasks from the API and returns both the flat list and the nested tree.
- * Uses TanStack Query for caching and automatic background refetching.
- * Accepts `initialData` to hydrate from SSR without triggering a client-side fetch on first load.
+ * Fetches all tasks and returns both the flat list and the nested tree, cached via TanStack Query.
  *
  * @param {object[]} [initialData] - Initial flat task list from SSR (passed as prop from server component)
  * @returns {{ tree: object[], flatList: object[], isLoading: boolean, error: Error|null }}

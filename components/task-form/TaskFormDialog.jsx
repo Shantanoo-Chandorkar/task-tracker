@@ -18,10 +18,7 @@ import { createTask, updateTask } from '@/actions/task-actions';
 import { Loader } from '@/components/ui/loader';
 
 /**
- * Modal for creating or editing a task, rendered through the shared
- * ResponsiveModal container (Dialog at `lg`+, Sheet below it).
- * In create mode: inserts a new task under the given parentId (or root if null).
- * In edit mode: updates the existing task's fields.
+ * Modal for creating or editing a task, via the shared ResponsiveModal container.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open

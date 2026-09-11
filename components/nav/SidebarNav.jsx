@@ -4,12 +4,10 @@ import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { LayoutGrid, Settings } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 /**
- * Shared nav content: a Spaces (management page) link, Spaces grouped with
- * their Lists (name + task count), and a Settings link. Pure presentational
- * content — no wrapper chrome — so it can be framed differently by
- * DesktopSidebar (persistent aside) and MobileNavDrawer (Sheet).
+ * Shared nav content: Spaces link, Space-grouped Lists, and Settings — framed by the caller.
  *
  * @param {object} props
  * @param {Function} [props.onNavigate] - Called after a link is clicked (used to close the mobile drawer)
@@ -96,6 +94,11 @@ export default function SidebarNav({ onNavigate }) {
                 <Settings className="h-4 w-4" />
                 Settings
             </Link>
+
+            <div className="mt-3 flex items-center justify-between border-t border-border px-2 pt-3">
+                <span className="text-xs text-muted-foreground">Theme</span>
+                <ThemeToggle />
+            </div>
         </nav>
     );
 }
