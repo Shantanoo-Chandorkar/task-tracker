@@ -6,14 +6,8 @@ import { usePathname } from 'next/navigation';
 const STALLED_NAVIGATION_TIMEOUT_MS = 8000;
 
 /**
- * Tracks whether an internal Next.js Link navigation is in flight, for a
- * top-of-page progress bar. The App Router has no built-in "navigation
- * started" event, so this listens for clicks on internal links to start the
- * bar. Clearing it again is handled during render — comparing the current
- * `usePathname()` value against the last-seen one (the same render-time
- * state-adjustment pattern used in TaskFormDialog for its reset-on-prop-change
- * case) rather than a derived-state-via-effect, since the route actually
- * changing is what a completed client-side navigation looks like here.
+ * Tracks whether an internal Link navigation is in flight, for the top-of-page progress bar.
+ * No built-in App Router event for this, so it listens for internal link clicks instead.
  *
  * @returns {boolean} True while a navigation is in flight
  */

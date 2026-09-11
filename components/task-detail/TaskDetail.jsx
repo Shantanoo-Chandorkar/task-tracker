@@ -15,10 +15,7 @@ import SubtaskTree from './SubtaskTree';
 import { Button } from '@/components/ui/button';
 
 /**
- * Task detail page content — title, status, description, recurrence, and the
- * full nested subtask tree. Shares the same `['tasks', listId]` query cache as
- * the list view, so edits made from either place stay in sync without a new
- * API route.
+ * Task detail page content — title, status, description, recurrence, and the subtask tree.
  *
  * @param {object} props
  * @param {string} props.listId - List this task belongs to
@@ -58,9 +55,7 @@ export default function TaskDetail({ listId, taskId, initialTasks }) {
     // Root-first order for the breadcrumb trail
     const ancestors = findAncestors(taskId, flatList).reverse();
 
-    // flatToTree on task + its descendants yields a single rooted subtree —
-    // the task's parent (outside this filtered set) is simply not linked, so
-    // the task itself becomes the root with `children` already nested.
+    // The task's parent is outside this filtered set, so flatToTree makes the task the root.
     const descendantIds = findDescendantIds(taskId, flatList);
     const subtreeFlat = flatList.filter(
         (flatTask) => flatTask.id === taskId || descendantIds.has(flatTask.id),

@@ -44,10 +44,7 @@ function closeSearch() {
 const EMPTY_RESULTS = { tasks: [], lists: [], spaces: [] };
 
 /**
- * Global search palette — tasks, lists, and spaces, searched server-side via
- * `/api/search`. Mounted once at the root layout; opened from anywhere via
- * `openSearch()` (used by the desktop sidebar and mobile top bar's search
- * buttons) or the `Cmd/Ctrl+K` shortcut bound here.
+ * Global search palette — tasks, lists, and spaces, searched server-side via `/api/search`.
  */
 export default function GlobalSearch() {
     const open = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);

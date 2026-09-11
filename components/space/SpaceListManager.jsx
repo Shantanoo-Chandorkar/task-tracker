@@ -195,13 +195,7 @@ function SpaceSection({
 }
 
 /**
- * Full Space/List management UI — create, rename, recolor, reorder, and delete
- * Spaces and the Lists inside them. Spaces reorder among themselves; Lists
- * reorder within their own Space. Create/edit for both goes through
- * SpaceFormDialog/ListFormDialog (the same modal container Task creation
- * uses) rather than inline forms, for a consistent editing experience
- * everywhere. Deleting either cascades to tasks, so both are confirmed with
- * a dialog that states exactly how many tasks would be removed.
+ * Full Space/List management UI — create, rename, recolor, reorder, and delete both.
  *
  * @param {object} props
  * @param {object[]} props.initialSpaces - SSR-fetched spaces for initial hydration

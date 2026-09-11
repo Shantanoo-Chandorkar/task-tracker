@@ -14,12 +14,7 @@ import SpaceFormDialog from '@/components/space/SpaceFormDialog';
 import ListFormDialog from '@/components/space/ListFormDialog';
 
 /**
- * Floating action button with a 3-option speed-dial (New Task / New List /
- * New Space) — one consolidated entry point for every creation flow,
- * reachable from anywhere instead of only from the list/Spaces pages.
- * Mounted twice: once inside BottomNav (mobile/tablet, below `lg`) and once
- * directly in the root layout (desktop, `lg`+) — each instance owns its own
- * menu/dialog state, positioned via `className`.
+ * Floating action button with a New Task / New List / New Space speed-dial.
  *
  * @param {object} props
  * @param {string} props.className - Positioning + sizing classes for the button itself

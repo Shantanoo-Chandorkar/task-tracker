@@ -1,10 +1,7 @@
 'use client';
 
 /**
- * Horizontal row of per-status count tiles above the task list. Tapping a
- * tile filters the list down to just that status; tapping the active tile
- * again clears the filter. Counts read from data the list already has in
- * memory — no separate fetch.
+ * Per-status count tiles above the task list; tapping one filters to that status, tapping again clears it.
  *
  * @param {object} props
  * @param {object[]} props.statuses - Statuses with at least id/name/color

@@ -13,12 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 /**
- * Confirmation dialog for task deletion.
- *
- * When the task has no children, shows a simple confirm/cancel prompt.
- * When the task has children, offers two choices:
- *   - "Move subtasks to parent" — re-parents direct children before deleting
- *   - "Delete everything" — cascade deletes the entire subtree
+ * Confirmation dialog for deleting a task; offers reparent-first or cascade-delete when it has children.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is visible

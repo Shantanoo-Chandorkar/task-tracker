@@ -4,11 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigationProgress } from '@/hooks/useNavigationProgress';
 
 /**
- * Thin top-of-page bar that sweeps in while a page navigation is in flight
- * (clicking a task title, Spaces, Settings, ...) — eases toward 90% and never
- * completes on its own, so it always reads as "still working" until the new
- * route actually renders (the `loading.js` skeleton for that route takes over
- * showing what's happening underneath).
+ * Thin top-of-page bar that sweeps toward 90% during a navigation and never completes on its own.
  */
 export default function NavigationProgressBar() {
     const isLoading = useNavigationProgress();
@@ -16,9 +12,7 @@ export default function NavigationProgressBar() {
     const [lastIsLoading, setLastIsLoading] = useState(isLoading);
     const rafRef = useRef(null);
 
-    // isLoading just flipped — render-time adjustment (see TaskFormDialog's
-    // resetKey pattern), not a derived-state-via-effect: bump onto the sweep
-    // when starting, jump to complete when finishing.
+    // Adjusted during render, not an effect — see TaskFormDialog's resetKey pattern.
     if (isLoading !== lastIsLoading) {
         setLastIsLoading(isLoading);
         if (isLoading) {

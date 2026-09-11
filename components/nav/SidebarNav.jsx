@@ -7,10 +7,7 @@ import { LayoutGrid, Settings } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 
 /**
- * Shared nav content: a Spaces (management page) link, Spaces grouped with
- * their Lists (name + task count), and a Settings link. Pure presentational
- * content — no wrapper chrome — so it can be framed differently by
- * DesktopSidebar (persistent aside) and MobileNavDrawer (Sheet).
+ * Shared nav content: Spaces link, Space-grouped Lists, and Settings — framed by the caller.
  *
  * @param {object} props
  * @param {Function} [props.onNavigate] - Called after a link is clicked (used to close the mobile drawer)
