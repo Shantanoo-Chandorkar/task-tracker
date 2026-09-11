@@ -21,7 +21,7 @@ export default function MobileNavDrawer() {
             >
                 <Menu className="h-5 w-5" />
             </button>
-            <SheetContent side="left" className="flex w-72 flex-col p-3">
+            <SheetContent side="left" className="flex w-[80%] flex-col p-3">
                 <SheetHeader className="p-0 pb-2">
                     <SheetTitle>Task Tracker</SheetTitle>
                 </SheetHeader>

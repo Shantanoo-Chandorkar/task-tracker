@@ -11,7 +11,7 @@ import { openSearch } from './GlobalSearch';
  */
 export default function DesktopSidebar() {
     return (
-        <aside className="hidden lg:flex w-52 flex-shrink-0 flex-col border-r border-border bg-muted/40 p-3">
+        <aside className="hidden lg:flex w-[20%] flex-shrink-0 flex-col border-r border-border bg-muted/40 p-3">
             <div className="flex items-center justify-between pb-4 px-2">
                 <Link
                     href="/"
