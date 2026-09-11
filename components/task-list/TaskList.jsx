@@ -95,7 +95,7 @@ function StatusGroup({
     if (tasks.length === 0) return null;
 
     return (
-        <section className="space-y-0.5">
+        <section className="space-y-0.5 pl-8">
             <button
                 className="flex items-center gap-2 w-full py-2 text-left group/header"
                 onClick={onToggle}
