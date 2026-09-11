@@ -5,9 +5,10 @@ import { useParams, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { LayoutGrid, Settings } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
+import SyncIssueBadge from '@/components/nav/SyncIssueBadge';
 
 /**
- * Shared nav content: Spaces link, Space-grouped Lists, and Settings — framed by the caller.
+ * Shared nav content: Spaces link, Space-grouped Lists, and Settings - framed by the caller.
  *
  * @param {object} props
  * @param {Function} [props.onNavigate] - Called after a link is clicked (used to close the mobile drawer)
@@ -91,7 +92,10 @@ export default function SidebarNav({ onNavigate }) {
                 onClick={onNavigate}
                 className="mt-auto flex items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground no-underline hover:text-foreground"
             >
-                <Settings className="h-4 w-4" />
+                <span className="relative">
+                    <Settings className="h-4 w-4" />
+                    <SyncIssueBadge />
+                </span>
                 Settings
             </Link>
 

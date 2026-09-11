@@ -23,14 +23,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
-import {
-    deleteTask,
-    deleteTaskAndReparentChildren,
-    updateTask,
-    completeTaskAndDescendants,
-    duplicateTask,
-} from '@/actions/task-actions';
+import { enqueueOrRun } from '@/lib/offline-queue';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
+import { useTaskStatusMutations } from '@/hooks/useTaskStatusMutations';
 import { findAncestors, findDescendantIds, findIncompleteDescendants } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
@@ -38,7 +33,7 @@ import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 
 /**
- * Action bar for a task row — a single, always-visible `···` dropdown with
+ * Action bar for a task row - a single, always-visible `···` dropdown with
  * the full action set (edit, delete, add subtask, duplicate, promote,
  * move to).
  *
@@ -59,6 +54,7 @@ export default function TaskRowActions({
     onDeleted,
 }) {
     const queryClient = useQueryClient();
+    const { updateStatus, completeWithCascade } = useTaskStatusMutations(listId);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
@@ -129,86 +125,133 @@ export default function TaskRowActions({
         setDeleteOpen(false);
         setPending(true);
         const toastId = toast.loading('Deleting task...');
-        const { error } =
-            strategy === 'reparent'
-                ? await deleteTaskAndReparentChildren(task.id)
-                : await deleteTask(task.id);
+
+        // Optimistic removal - mirrors the DB cascade for plain delete. For the
+        // reparent strategy, children are hidden too until the sync confirms the
+        // real reparent; they reappear correctly once that lands.
+        const queryKey = ['tasks', listId];
+        const previousTasks = queryClient.getQueryData(queryKey);
+        const idsToRemove = new Set([task.id, ...findDescendantIds(task.id, flatList)]);
+        queryClient.setQueryData(queryKey, (current) =>
+            current?.filter((existingTask) => !idsToRemove.has(existingTask.id)),
+        );
+
+        const mutationType = strategy === 'reparent' ? 'deleteTaskAndReparentChildren' : 'deleteTask';
+        const { error, queued } = await enqueueOrRun(mutationType, { taskId: task.id });
         setPending(false);
 
         if (error) {
+            queryClient.setQueryData(queryKey, previousTasks);
             toast.error(error, { id: toastId });
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task deleted', { id: toastId });
+        if (queued) {
+            toast.success("Deleted - will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.success('Task deleted', { id: toastId });
+        }
         onDeleted?.();
     }
 
-    async function handlePromote() {
+    /**
+     * Applies a reparent to the cached task list the same way the server would: recomputes
+     * the task's own depth from its new parent, cascades the delta to its descendants, and
+     * appends it at the end of its new sibling group. Position is an approximation (exact
+     * order settles once the move syncs and the list next refetches) - same tradeoff already
+     * accepted for offline creates.
+     *
+     * @param {object[]} currentTasks - Cached flat task list to patch
+     * @param {string|null} newParentId - New parent, or null for a root-level move
+     * @param {string|null} newSublistId - New sublist for a root-level move; ignored otherwise
+     * @returns {object[]} Patched task list
+     */
+    function applyOptimisticMove(currentTasks, newParentId, newSublistId) {
+        const tasksById = new Map(currentTasks.map((existingTask) => [existingTask.id, existingTask]));
+        const newDepth = newParentId ? (tasksById.get(newParentId)?.depth ?? 0) + 1 : 0;
+        const depthDelta = newDepth - task.depth;
+        const descendantIds = findDescendantIds(task.id, currentTasks);
+
+        const siblingPositions = currentTasks
+            .filter((existingTask) =>
+                newParentId
+                    ? existingTask.parent_id === newParentId
+                    : !existingTask.parent_id &&
+                      (existingTask.sublist_id ?? null) === (newSublistId ?? null),
+            )
+            .map((existingTask) => existingTask.position);
+        const newPosition = siblingPositions.length > 0 ? Math.max(...siblingPositions) + 1 : 1;
+
+        return currentTasks.map((existingTask) => {
+            if (existingTask.id === task.id) {
+                return {
+                    ...existingTask,
+                    parent_id: newParentId ?? null,
+                    sublist_id: newParentId ? null : (newSublistId ?? null),
+                    depth: newDepth,
+                    position: newPosition,
+                };
+            }
+            if (descendantIds.has(existingTask.id)) {
+                return { ...existingTask, depth: existingTask.depth + depthDelta };
+            }
+            return existingTask;
+        });
+    }
+
+    /**
+     * Runs a reparent through the offline outbox with optimistic UI and rollback.
+     *
+     * @param {object} moveParams - Params forwarded to the moveTask server action
+     * @param {string|null} optimisticSublistId - Sublist to reflect optimistically for a root-level move
+     */
+    async function runMove(moveParams, optimisticSublistId = null) {
         setPending(true);
         const toastId = toast.loading('Moving task...');
-        const response = await fetch(`/api/tasks/${task.id}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                newParentId: grandparentId,
-                afterSiblingId: task.parent_id,
-                listId,
-            }),
-        });
+
+        const queryKey = ['tasks', listId];
+        const previousTasks = queryClient.getQueryData(queryKey);
+        queryClient.setQueryData(queryKey, (current) =>
+            current ? applyOptimisticMove(current, moveParams.newParentId ?? null, optimisticSublistId) : current,
+        );
+
+        const { error, queued } = await enqueueOrRun('moveTask', { taskId: task.id, params: moveParams });
         setPending(false);
 
-        if (!response.ok) {
-            toast.error('Failed to move task', { id: toastId });
+        if (error) {
+            queryClient.setQueryData(queryKey, previousTasks);
+            toast.error(error, { id: toastId });
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task moved', { id: toastId });
+        if (queued) {
+            toast.success("Saved - will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.success('Task moved', { id: toastId });
+        }
+    }
+
+    async function handlePromote() {
+        const rootSublistId = grandparentId
+            ? null
+            : (findAncestors(task.id, flatList).at(-1)?.sublist_id ?? null);
+        await runMove(
+            { newParentId: grandparentId, afterSiblingId: task.parent_id, listId },
+            rootSublistId,
+        );
     }
 
     async function handleMoveTo(targetId) {
-        setPending(true);
-        const toastId = toast.loading('Moving task...');
-        const response = await fetch(`/api/tasks/${task.id}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ newParentId: targetId, afterSiblingId: null, listId }),
-        });
-        setPending(false);
-
-        if (!response.ok) {
-            toast.error('Failed to move task', { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task moved', { id: toastId });
+        await runMove({ newParentId: targetId, afterSiblingId: null, listId });
     }
 
     async function handleMoveToSublist(targetSublistId) {
-        setPending(true);
-        const toastId = toast.loading('Moving task...');
-        const response = await fetch(`/api/tasks/${task.id}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                newParentId: null,
-                sublistId: targetSublistId,
-                afterSiblingId: null,
-                listId,
-            }),
-        });
-        setPending(false);
-
-        if (!response.ok) {
-            toast.error('Failed to move task', { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task moved', { id: toastId });
+        await runMove(
+            { newParentId: null, sublistId: targetSublistId, afterSiblingId: null, listId },
+            targetSublistId,
+        );
     }
 
     async function handleToggleComplete() {
@@ -222,7 +265,7 @@ export default function TaskRowActions({
 
         setPending(true);
         const toastId = toast.loading(isDone ? 'Marking incomplete...' : 'Marking complete...');
-        const { error } = await updateTask(task.id, { status_id: targetStatus.id });
+        const { error, queued } = await updateStatus(task.id, targetStatus.id);
         setPending(false);
 
         if (error) {
@@ -230,15 +273,19 @@ export default function TaskRowActions({
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.dismiss(toastId);
+        if (queued) {
+            toast.success("Saved - will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.dismiss(toastId);
+        }
     }
 
     async function handleCascadeComplete() {
         setCompleteConfirmOpen(false);
         setPending(true);
         const toastId = toast.loading('Marking complete...');
-        const { error } = await completeTaskAndDescendants(task.id);
+        const { error, queued } = await completeWithCascade(task.id, doneStatus.id, flatList);
         setPending(false);
 
         if (error) {
@@ -246,14 +293,19 @@ export default function TaskRowActions({
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.dismiss(toastId);
+        if (queued) {
+            toast.success("Saved - will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.dismiss(toastId);
+        }
     }
 
     async function handleDuplicate() {
         setPending(true);
         const toastId = toast.loading('Duplicating task...');
-        const { error } = await duplicateTask(task.id);
+        const newRootId = crypto.randomUUID();
+        const { error, queued } = await enqueueOrRun('duplicateTask', { taskId: task.id, newRootId });
         setPending(false);
 
         if (error) {
@@ -261,13 +313,17 @@ export default function TaskRowActions({
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task duplicated', { id: toastId });
+        if (queued) {
+            toast.success("Saved - will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.success('Task duplicated', { id: toastId });
+        }
     }
 
     return (
         <>
-            {/* Edit/Delete live only in this menu — always visible since mobile has no hover. */}
+            {/* Edit/Delete live only in this menu - always visible since mobile has no hover. */}
             <div className="flex items-center gap-0.5 flex-shrink-0">
                 {/* ··· context menu */}
                 <DropdownMenu>
@@ -306,7 +362,7 @@ export default function TaskRowActions({
                         <DropdownMenuItem onClick={handleDuplicate}>Duplicate</DropdownMenuItem>
                         <DropdownMenuSeparator />
 
-                        {/* Promote — only for non-root tasks */}
+                        {/* Promote - only for non-root tasks */}
                         {canPromote && (
                             <DropdownMenuItem onClick={handlePromote}>
                                 Promote to sibling
@@ -335,7 +391,7 @@ export default function TaskRowActions({
                                 </DropdownMenuItem>
                             ))}
 
-                        {/* Root tasks only — subtasks always render nested, never in a sublist. */}
+                        {/* Root tasks only - subtasks always render nested, never in a sublist. */}
                         {isRootTask && sublists.length > 0 && (
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>Move to sublist...</DropdownMenuSubTrigger>
@@ -380,7 +436,7 @@ export default function TaskRowActions({
                 onConfirm={handleDeleteConfirm}
             />
 
-            {/* Cascade-complete confirmation — only shown when subtasks are still incomplete */}
+            {/* Cascade-complete confirmation - only shown when subtasks are still incomplete */}
             <CompleteTaskDialog
                 open={completeConfirmOpen}
                 onClose={() => setCompleteConfirmOpen(false)}
@@ -389,7 +445,7 @@ export default function TaskRowActions({
                 onConfirm={handleCascadeComplete}
             />
 
-            {/* Move-to destination picker — mobile only; desktop uses the DropdownMenuSub flyout above */}
+            {/* Move-to destination picker - mobile only; desktop uses the DropdownMenuSub flyout above */}
             <Sheet open={moveSheetOpen} onOpenChange={(open) => !open && setMoveSheetOpen(false)}>
                 <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
                     <SheetHeader>

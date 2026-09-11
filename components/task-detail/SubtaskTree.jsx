@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ChevronRight } from 'lucide-react';
-import { updateTask, completeTaskAndDescendants } from '@/actions/task-actions';
+import { useTaskStatusMutations } from '@/hooks/useTaskStatusMutations';
 import { findIncompleteDescendants } from '@/lib/tree';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 
 /**
- * Recursive nested subtask list — each row links to its own task page, with a done/undone checkbox.
+ * Recursive nested subtask list - each row links to its own task page, with a done/undone checkbox.
  *
  * @param {object} props
  * @param {object[]} props.nodes - Task nodes (from flatToTree) with a `children` array
@@ -20,6 +20,7 @@ import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
  */
 export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
     const queryClient = useQueryClient();
+    const { updateStatus, completeWithCascade } = useTaskStatusMutations(listId);
     const [confirmNode, setConfirmNode] = useState(null);
 
     const { data: statuses = [] } = useQuery({
@@ -36,7 +37,7 @@ export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
 
     /**
      * Toggles a subtask's status between the built-in "done" status and the
-     * default status, in place — checking a subtask doesn't navigate to it.
+     * default status, in place - checking a subtask doesn't navigate to it.
      *
      * @param {object} node - The subtask being toggled
      * @param {boolean} checked - Whether the box was just checked
@@ -54,32 +55,40 @@ export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
         if (!targetStatus) return;
 
         const toastId = toast.loading(checked ? 'Marking complete...' : 'Marking incomplete...');
-        const { error } = await updateTask(node.id, { status_id: targetStatus.id });
+        const { error, queued } = await updateStatus(node.id, targetStatus.id);
 
         if (error) {
             toast.error(error, { id: toastId });
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.dismiss(toastId);
+        if (queued) {
+            toast.success("Saved - will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.dismiss(toastId);
+        }
     }
 
     async function handleCascadeComplete() {
         const node = confirmNode;
         setConfirmNode(null);
-        if (!node) return;
+        if (!node || !doneStatus) return;
 
         const toastId = toast.loading('Marking complete...');
-        const { error } = await completeTaskAndDescendants(node.id);
+        const { error, queued } = await completeWithCascade(node.id, doneStatus.id, flatList);
 
         if (error) {
             toast.error(error, { id: toastId });
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.dismiss(toastId);
+        if (queued) {
+            toast.success("Saved - will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.dismiss(toastId);
+        }
     }
 
     if (!nodes || nodes.length === 0) return null;

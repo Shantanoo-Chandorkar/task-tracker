@@ -49,7 +49,7 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Minimalist Charcoal palette — locked in the Bucket 2b plan. Accent (orange)
+/* Minimalist Charcoal palette - locked in the Bucket 2b plan. Accent (orange)
    carries Shadcn's --primary (buttons, links, active nav, focus ring); the
    structural --accent token (menu/row hover backgrounds) stays neutral gray so
    hover states don't turn orange everywhere. --metric (cyan) is a custom
