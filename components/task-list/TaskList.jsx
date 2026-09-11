@@ -391,7 +391,7 @@ export default function TaskList({
             }
 
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            toast.dismiss(toastId);
+            toast.success('Order updated', { id: toastId });
         } catch (caughtError) {
             console.error('Drag reorder failed:', caughtError);
             toast.error('Failed to reorder task', { id: toastId });
@@ -408,13 +408,24 @@ export default function TaskList({
         queryClient.setQueryData(['sublists', listId], reordered);
 
         const toastId = toast.loading('Saving order...');
-        for (let i = 0; i < reordered.length; i++) {
-            if (reordered[i].position !== i) {
-                await updateSublist(reordered[i].id, { position: i });
+        try {
+            for (let i = 0; i < reordered.length; i++) {
+                if (reordered[i].position !== i) {
+                    const { error } = await updateSublist(reordered[i].id, { position: i });
+                    if (error) {
+                        toast.error(error, { id: toastId });
+                        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                        return;
+                    }
+                }
             }
+            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+            toast.success('Order updated', { id: toastId });
+        } catch (caughtError) {
+            console.error('Sublist reorder failed:', caughtError);
+            toast.error('Failed to reorder sublist', { id: toastId });
+            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
         }
-        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-        toast.dismiss(toastId);
     }
 
     function handleDragEnd({ active, over }) {
