@@ -12,6 +12,7 @@ import {
     CommandGroup,
     CommandItem,
 } from '@/components/ui/command';
+import { Loader } from '@/components/ui/loader';
 
 const listeners = new Set();
 let isOpenState = false;
@@ -53,6 +54,7 @@ export default function GlobalSearch() {
     const router = useRouter();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState(EMPTY_RESULTS);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Reset the query when the palette closes, so reopening starts fresh —
     // adjusted during render (same pattern as TaskFormDialog's resetKey)
@@ -85,10 +87,12 @@ export default function GlobalSearch() {
     useEffect(() => {
         if (!open || !query.trim()) return;
         const trimmed = query.trim();
+        setIsLoading(true);
 
         const timeoutId = setTimeout(async () => {
             const response = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
             if (response.ok) setResults(await response.json());
+            setIsLoading(false);
         }, 250);
 
         return () => clearTimeout(timeoutId);
@@ -122,7 +126,14 @@ export default function GlobalSearch() {
                     onValueChange={setQuery}
                 />
                 <CommandList>
-                    {!hasResults && (
+                    {!hasResults && query.trim() && isLoading && (
+                        <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                            <Loader size="sm" />
+                            Searching...
+                        </div>
+                    )}
+
+                    {!hasResults && !isLoading && (
                         <CommandEmpty>
                             {query.trim() ? 'No results.' : 'Type to search...'}
                         </CommandEmpty>
