@@ -71,6 +71,7 @@ export async function createTask(fields) {
             if (parent) depth = parent.depth + 1;
         }
 
+        // MAX_DEPTH_CONSTANT
         const nestingMode = await getNestingMode();
         if (!isDepthAllowed(depth, nestingMode)) {
             return { data: null, error: 'Maximum nesting depth reached' };

@@ -43,6 +43,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
 
     const isCut = clipboard.mode === 'cut' && clipboard.taskId === task.id;
     const hasChildren = task.children && task.children.length > 0;
+    // MAX_DEPTH_CONSTANT
     const canAddSubtask = !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH);
     const recurringLabel = task.is_recurring ? humanReadableLabel(task.recurrence_rule) : null;
 
@@ -141,8 +142,8 @@ export default function TaskRow({ task, depth, flatList, listId }) {
                     className="border-l border-border motion-safe:transition-all duration-200"
                     style={{ marginLeft: `calc(var(--row-indent, 24px) * ${depth} + 20px)` }}
                 >
-                    {/* Depth warning shown before children that would be at depth 4+ */}
-                    {depth === 3 && <DepthWarning />}
+                    {/* Depth warning shown before children one level past the max. MAX_DEPTH_CONSTANT */}
+                    {depth === FINITE_MAX_DEPTH + 1 && <DepthWarning />}
 
                     <SortableContext
                         items={task.children.map((child) => child.id)}

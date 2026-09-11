@@ -79,6 +79,7 @@ export async function POST(request, { params }) {
 
         // Cap must hold for the deepest descendant of the moved subtree, not just the
         // moved task itself — reparenting a subtree carries its whole shape with it.
+        // MAX_DEPTH_CONSTANT
         const nestingMode = await getNestingMode();
         if (nestingMode === 'finite' && depthDelta > 0) {
             const { data: allTasksForDepthCheck } = await supabase
