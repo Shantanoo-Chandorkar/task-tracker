@@ -131,9 +131,14 @@ export default function TaskDetail({ listId, taskId, initialTasks }) {
                 )}
             </div>
 
-            {task.description && (
-                <p className="text-sm text-foreground whitespace-pre-wrap">{task.description}</p>
-            )}
+            <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Description</p>
+                {task.description ? (
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{task.description}</p>
+                ) : (
+                    <p className="text-sm text-muted-foreground">No description</p>
+                )}
+            </div>
 
             {/* Subtasks */}
             <div className="pt-2 border-t border-border">
