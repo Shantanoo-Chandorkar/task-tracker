@@ -8,6 +8,7 @@ import QuickCreateFab from '@/components/nav/QuickCreateFab';
 import GlobalSearch from '@/components/nav/GlobalSearch';
 import NavigationProgressBar from '@/components/nav/NavigationProgressBar';
 import ServiceWorkerRegister from '@/components/nav/ServiceWorkerRegister';
+import OfflineBanner from '@/components/nav/OfflineBanner';
 import './globals.css';
 
 const geistSans = Geist({
@@ -35,6 +36,7 @@ export default function RootLayout({ children }) {
             <body className="flex flex-col bg-background text-foreground">
                 <NavigationProgressBar />
                 <ServiceWorkerRegister />
+                <OfflineBanner />
                 <GlobalSearch />
                 <QueryProvider>
                     <div className="flex">

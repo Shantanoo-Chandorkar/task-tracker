@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import RecurrenceBuilder from './RecurrenceBuilder';
-import { createTask, updateTask } from '@/actions/task-actions';
+import { enqueueOrRun } from '@/lib/offline-queue';
 import { Loader } from '@/components/ui/loader';
 
 /**
@@ -111,16 +112,76 @@ export default function TaskFormDialog({
             recurrence_rule: isRecurring ? recurrenceRule : null,
         };
 
-        const { error } = isEditing ? await updateTask(task.id, fields) : await createTask(fields);
+        const targetListId = isEditing ? task.list_id : listId;
+        const queryKey = ['tasks', targetListId];
+        const previousTasks = queryClient.getQueryData(queryKey);
+
+        let result;
+        if (isEditing) {
+            // Optimistic patch — the edit is visible immediately regardless of connectivity.
+            queryClient.setQueryData(queryKey, (current) =>
+                current?.map((existingTask) =>
+                    existingTask.id === task.id ? { ...existingTask, ...fields } : existingTask,
+                ),
+            );
+            result = await enqueueOrRun('updateTask', { taskId: task.id, fields });
+        } else {
+            // Decided on-device so the task can render immediately and, if edited again
+            // before it ever syncs, later offline edits reference the same final id.
+            const newTaskId = crypto.randomUUID();
+            const currentTasks = previousTasks ?? [];
+
+            let depth = 0;
+            if (fields.parent_id) {
+                const parentTask = currentTasks.find((existingTask) => existingTask.id === fields.parent_id);
+                if (parentTask) depth = parentTask.depth + 1;
+            }
+
+            const siblingPositions = fields.parent_id
+                ? currentTasks
+                      .filter((existingTask) => existingTask.parent_id === fields.parent_id)
+                      .map((existingTask) => existingTask.position)
+                : currentTasks
+                      .filter(
+                          (existingTask) =>
+                              !existingTask.parent_id &&
+                              (existingTask.sublist_id ?? null) === (fields.sublist_id ?? null),
+                      )
+                      .map((existingTask) => existingTask.position);
+            const position = siblingPositions.length > 0 ? Math.max(...siblingPositions) + 1 : 1;
+
+            queryClient.setQueryData(queryKey, (current) => [
+                ...(current ?? []),
+                {
+                    id: newTaskId,
+                    ...fields,
+                    depth,
+                    position,
+                    next_occurrence: null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                },
+            ]);
+
+            result = await enqueueOrRun('createTask', { fields: { ...fields, id: newTaskId } });
+        }
 
         setSubmitting(false);
 
-        if (error) {
-            setTitleError(error);
+        if (result.error) {
+            // A genuine rejection (not a network-level queue) never actually applied —
+            // don't leave the optimistic change showing something that didn't happen.
+            queryClient.setQueryData(queryKey, previousTasks);
+            setTitleError(result.error);
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        if (result.queued) {
+            toast.success("Saved — will sync when you're back online");
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        }
+
         onClose();
     }
 

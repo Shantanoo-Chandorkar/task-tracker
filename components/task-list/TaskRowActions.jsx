@@ -23,13 +23,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
-import {
-    deleteTask,
-    deleteTaskAndReparentChildren,
-    updateTask,
-    completeTaskAndDescendants,
-    duplicateTask,
-} from '@/actions/task-actions';
+import { updateTask, completeTaskAndDescendants, duplicateTask } from '@/actions/task-actions';
+import { enqueueOrRun } from '@/lib/offline-queue';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 import { findAncestors, findDescendantIds, findIncompleteDescendants } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
@@ -129,19 +124,33 @@ export default function TaskRowActions({
         setDeleteOpen(false);
         setPending(true);
         const toastId = toast.loading('Deleting task...');
-        const { error } =
-            strategy === 'reparent'
-                ? await deleteTaskAndReparentChildren(task.id)
-                : await deleteTask(task.id);
+
+        // Optimistic removal — mirrors the DB cascade for plain delete. For the
+        // reparent strategy, children are hidden too until the sync confirms the
+        // real reparent; they reappear correctly once that lands.
+        const queryKey = ['tasks', listId];
+        const previousTasks = queryClient.getQueryData(queryKey);
+        const idsToRemove = new Set([task.id, ...findDescendantIds(task.id, flatList)]);
+        queryClient.setQueryData(queryKey, (current) =>
+            current?.filter((existingTask) => !idsToRemove.has(existingTask.id)),
+        );
+
+        const mutationType = strategy === 'reparent' ? 'deleteTaskAndReparentChildren' : 'deleteTask';
+        const { error, queued } = await enqueueOrRun(mutationType, { taskId: task.id });
         setPending(false);
 
         if (error) {
+            queryClient.setQueryData(queryKey, previousTasks);
             toast.error(error, { id: toastId });
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task deleted', { id: toastId });
+        if (queued) {
+            toast.success("Deleted — will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.success('Task deleted', { id: toastId });
+        }
         onDeleted?.();
     }
 

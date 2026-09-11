@@ -27,6 +27,8 @@ function snapshotMaxRelativeDepth(node) {
  * @param {object} fields
  * @param {string} fields.title - Required task title
  * @param {string} fields.list_id - Required list this task belongs to
+ * @param {string} [fields.id] - Client-generated UUID; lets a replayed offline
+ *   create be idempotent instead of inserting a second row
  * @param {string} [fields.description]
  * @param {string} [fields.status_id]
  * @param {string|null} [fields.parent_id]
@@ -109,6 +111,7 @@ export async function createTask(fields) {
         const { data: createdTask, error } = await supabase
             .from('tasks')
             .insert({
+                id: fields.id ?? crypto.randomUUID(),
                 title: fields.title.trim(),
                 description: fields.description ?? null,
                 status_id: fields.status_id ?? null,
@@ -126,6 +129,16 @@ export async function createTask(fields) {
             .single();
 
         if (error) {
+            // A replayed offline create can land after the first attempt's response was
+            // lost — the row already exists, so this isn't a real failure, just an echo.
+            if (error.code === '23505' && fields.id) {
+                const { data: existingTask } = await supabase
+                    .from('tasks')
+                    .select()
+                    .eq('id', fields.id)
+                    .single();
+                if (existingTask) return { data: existingTask, error: null };
+            }
             return { data: null, error: 'Failed to create task' };
         }
 
