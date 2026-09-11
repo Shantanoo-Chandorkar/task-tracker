@@ -1,5 +1,5 @@
 /**
- * Next.js native manifest route - generates and auto-links /manifest.webmanifest.
+ * Next.js native manifest route — generates and auto-links /manifest.webmanifest.
  * Colors match the locked Minimalist Charcoal palette (see plan history).
  */
 export default function manifest() {

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,11 +13,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { enqueueOrRun } from '@/lib/offline-queue';
+import { createList, updateList } from '@/actions/list-actions';
 
 /**
  * Modal for creating or editing a List, rendered through the shared
- * ResponsiveModal container - same container as Task/Space creation.
+ * ResponsiveModal container — same container as Task/Space creation.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open
@@ -62,51 +61,17 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
         if (!name.trim() || !spaceId) return;
 
         setSubmitting(true);
-
-        const queryKey = ['lists'];
-        const previousLists = queryClient.getQueryData(queryKey) ?? [];
-        const fields = { name: name.trim(), color, space_id: spaceId };
-
-        let result;
-        if (isEditing) {
-            queryClient.setQueryData(queryKey, (current) =>
-                current?.map((existingList) =>
-                    existingList.id === list.id ? { ...existingList, ...fields } : existingList,
-                ),
-            );
-            result = await enqueueOrRun('updateList', { id: list.id, fields });
-        } else {
-            const newListId = crypto.randomUUID();
-            const siblingLists = previousLists.filter(
-                (existingList) => existingList.space_id === spaceId,
-            );
-            const position =
-                siblingLists.length > 0
-                    ? Math.max(...siblingLists.map((existingList) => existingList.position)) + 1
-                    : 0;
-
-            queryClient.setQueryData(queryKey, (current) => [
-                ...(current ?? []),
-                { id: newListId, ...fields, position, task_count: 0 },
-            ]);
-
-            result = await enqueueOrRun('createList', { fields: { ...fields, id: newListId } });
-        }
-
+        const { error } = isEditing
+            ? await updateList(list.id, { name: name.trim(), color, space_id: spaceId })
+            : await createList({ name: name.trim(), color, space_id: spaceId });
         setSubmitting(false);
 
-        if (result.error) {
-            queryClient.setQueryData(queryKey, previousLists);
-            setError(result.error);
+        if (error) {
+            setError(error);
             return;
         }
 
-        if (result.queued) {
-            toast.success("Saved - will sync when you're back online");
-        } else {
-            await queryClient.invalidateQueries({ queryKey });
-        }
-
+        await queryClient.invalidateQueries({ queryKey: ['lists'] });
         onClose();
     }
 

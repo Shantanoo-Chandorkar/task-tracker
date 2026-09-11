@@ -25,7 +25,7 @@ function subscribeToStandaloneChange(callback) {
  */
 export function useInstallPrompt() {
     const [installPromptEvent, setInstallPromptEvent] = useState(null);
-    // Just-installed is a one-off event (fires once, in this tab, mid-session) - matchMedia
+    // Just-installed is a one-off event (fires once, in this tab, mid-session) — matchMedia
     // won't retroactively flip for a tab that isn't itself running standalone yet.
     const [justInstalled, setJustInstalled] = useState(false);
     const isStandalone = useSyncExternalStore(

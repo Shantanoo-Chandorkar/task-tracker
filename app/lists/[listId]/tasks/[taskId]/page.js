@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import TaskDetail from '@/components/task-detail/TaskDetail';
 
 /**
- * Task detail page - Server Component. Fetches the task list SSR to hydrate TaskDetail's query.
+ * Task detail page — Server Component. Fetches the task list SSR to hydrate TaskDetail's query.
  */
 export default async function TaskDetailPage({ params }) {
     const { listId, taskId } = await params;

@@ -9,8 +9,6 @@ import { revalidateTag } from 'next/cache';
  * @param {object} fields
  * @param {string} fields.name - Required sublist name
  * @param {string} fields.list_id - Required parent list ID
- * @param {string} [fields.id] - Client-generated UUID; lets a replayed offline
- *   create be idempotent instead of inserting a second row
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
@@ -37,7 +35,6 @@ export async function createSublist(fields) {
         const { data: createdSublist, error } = await supabase
             .from('sublists')
             .insert({
-                id: fields.id ?? crypto.randomUUID(),
                 name: fields.name.trim(),
                 list_id: fields.list_id,
                 color: fields.color ?? '#6b7280',
@@ -47,16 +44,6 @@ export async function createSublist(fields) {
             .single();
 
         if (error) {
-            // A replayed offline create can land after the first attempt's response was
-            // lost - the row already exists, so this isn't a real failure, just an echo.
-            if (error.code === '23505' && fields.id) {
-                const { data: existingSublist } = await supabase
-                    .from('sublists')
-                    .select()
-                    .eq('id', fields.id)
-                    .single();
-                if (existingSublist) return { data: existingSublist, error: null };
-            }
             return { data: null, error: 'Failed to create sublist' };
         }
 
@@ -99,7 +86,7 @@ export async function updateSublist(sublistId, fields) {
 }
 
 /**
- * Deletes a sublist, cascading to its tasks - callers should warn with the task count first.
+ * Deletes a sublist, cascading to its tasks — callers should warn with the task count first.
  *
  * @param {string} sublistId - Sublist ID to delete
  * @returns {{ error: string|null }}

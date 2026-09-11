@@ -32,7 +32,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { enqueueOrRun, enqueueReorder } from '@/lib/offline-queue';
+import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
 
 /**
@@ -103,7 +103,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
                     status.is_default
                         ? 'Cannot delete the default status'
                         : status.code
-                          ? 'Built-in status - can’t be deleted'
+                          ? 'Built-in status — can’t be deleted'
                           : isOnly
                             ? 'Cannot delete the only status'
                             : 'Delete status'
@@ -116,7 +116,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
 }
 
 /**
- * Full status management UI - create, rename, recolor, reorder, and delete statuses.
+ * Full status management UI — create, rename, recolor, reorder, and delete statuses.
  * Create/edit go through StatusFormDialog, the same modal container Task/List/Sublist use.
  *
  * @param {object} props
@@ -147,36 +147,22 @@ export default function StatusManager({ initialStatuses }) {
     async function handleDragEnd({ active, over }) {
         if (!over || active.id === over.id) return;
 
-        const queryKey = ['statuses'];
-        const previousStatuses = queryClient.getQueryData(queryKey);
-
         const oldIndex = statuses.findIndex((status) => status.id === active.id);
         const newIndex = statuses.findIndex((status) => status.id === over.id);
         const reordered = arrayMove(statuses, oldIndex, newIndex);
 
-        queryClient.setQueryData(queryKey, reordered);
+        queryClient.setQueryData(['statuses'], reordered);
 
         const toastId = toast.loading('Saving order...');
 
-        const changed = reordered.filter((status, index) => status.position !== index);
-        const results = await enqueueReorder(changed, 'updateStatus', (status) => ({
-            id: status.id,
-            fields: { position: reordered.indexOf(status) },
-        }));
-
-        const failure = results.find((result) => result.error);
-        if (failure) {
-            queryClient.setQueryData(queryKey, previousStatuses);
-            toast.error(failure.error, { id: toastId });
-            return;
+        for (let i = 0; i < reordered.length; i++) {
+            if (reordered[i].position !== i) {
+                await updateStatus(reordered[i].id, { position: i });
+            }
         }
 
-        if (results.some((result) => result.queued)) {
-            toast.success("Saved - will sync when you're back online", { id: toastId });
-        } else {
-            await queryClient.invalidateQueries({ queryKey });
-            toast.dismiss(toastId);
-        }
+        await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+        toast.dismiss(toastId);
     }
 
     async function handleConfirmDelete() {
@@ -184,25 +170,15 @@ export default function StatusManager({ initialStatuses }) {
 
         setDeleting(true);
         const toastId = toast.loading('Deleting status...');
-
-        const queryKey = ['statuses'];
-        const previousStatuses = queryClient.getQueryData(queryKey);
-        queryClient.setQueryData(queryKey, (current) =>
-            current?.filter((existingStatus) => existingStatus.id !== deleteTarget.id),
-        );
-
-        const { error, queued } = await enqueueOrRun('deleteStatus', { id: deleteTarget.id });
+        const { error } = await deleteStatus(deleteTarget.id);
         setDeleting(false);
         setDeleteTarget(null);
 
         if (error) {
-            queryClient.setQueryData(queryKey, previousStatuses);
             toast.error(error, { id: toastId });
             setError(error);
-        } else if (queued) {
-            toast.success("Deleted - will sync when you're back online", { id: toastId });
         } else {
-            await queryClient.invalidateQueries({ queryKey });
+            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
             toast.success('Status deleted', { id: toastId });
         }
     }

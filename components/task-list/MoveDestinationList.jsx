@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Move destinations for the mobile "Move to..." Sheet - plain buttons, not a Radix menu, for bigger touch targets.
+ * Move destinations for the mobile "Move to..." Sheet — plain buttons, not a Radix menu, for bigger touch targets.
  *
  * @param {object} props
  * @param {{ id: string, label: string }[]} props.destinations - Move targets to list

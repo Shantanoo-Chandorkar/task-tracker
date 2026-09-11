@@ -6,7 +6,7 @@ import SidebarNav from './SidebarNav';
 import { openSearch } from './GlobalSearch';
 
 /**
- * Persistent left sidebar shown at `lg` (1024px) and above - app name header,
+ * Persistent left sidebar shown at `lg` (1024px) and above — app name header,
  * search trigger, and the shared SidebarNav content.
  */
 export default function DesktopSidebar() {

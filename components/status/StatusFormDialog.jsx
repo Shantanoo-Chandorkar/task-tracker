@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
-import { enqueueOrRun } from '@/lib/offline-queue';
+import { createStatus, updateStatus } from '@/actions/status-actions';
 
 /**
  * Modal for creating or editing a Status, rendered through the shared ResponsiveModal container.
@@ -42,50 +41,17 @@ export default function StatusFormDialog({ open, onClose, status = null }) {
         if (!name.trim()) return;
 
         setSubmitting(true);
-
-        const queryKey = ['statuses'];
-        const previousStatuses = queryClient.getQueryData(queryKey) ?? [];
-        const fields = { name: name.trim(), color };
-
-        let result;
-        if (isEditing) {
-            queryClient.setQueryData(queryKey, (current) =>
-                current?.map((existingStatus) =>
-                    existingStatus.id === status.id ? { ...existingStatus, ...fields } : existingStatus,
-                ),
-            );
-            result = await enqueueOrRun('updateStatus', { id: status.id, fields });
-        } else {
-            const newStatusId = crypto.randomUUID();
-            const position =
-                previousStatuses.length > 0
-                    ? Math.max(...previousStatuses.map((existingStatus) => existingStatus.position)) + 1
-                    : 0;
-
-            queryClient.setQueryData(queryKey, (current) => [
-                ...(current ?? []),
-                { id: newStatusId, ...fields, position, is_default: false, code: null },
-            ]);
-
-            result = await enqueueOrRun('createStatus', { fields: { ...fields, id: newStatusId } });
-        }
-
+        const { error } = isEditing
+            ? await updateStatus(status.id, { name: name.trim(), color })
+            : await createStatus({ name: name.trim(), color });
         setSubmitting(false);
 
-        if (result.error) {
-            // A genuine rejection never actually applied - don't leave the optimistic
-            // change showing something that didn't happen.
-            queryClient.setQueryData(queryKey, previousStatuses);
-            setError(result.error);
+        if (error) {
+            setError(error);
             return;
         }
 
-        if (result.queued) {
-            toast.success("Saved - will sync when you're back online");
-        } else {
-            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-        }
-
+        await queryClient.invalidateQueries({ queryKey: ['statuses'] });
         onClose();
     }
 

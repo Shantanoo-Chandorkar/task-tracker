@@ -8,8 +8,6 @@ import { revalidateTag } from 'next/cache';
  *
  * @param {object} fields
  * @param {string} fields.name - Required status name
- * @param {string} [fields.id] - Client-generated UUID; lets a replayed offline
- *   create be idempotent instead of inserting a second row
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
@@ -32,7 +30,6 @@ export async function createStatus(fields) {
         const { data, error } = await supabase
             .from('statuses')
             .insert({
-                id: fields.id ?? crypto.randomUUID(),
                 name: fields.name.trim(),
                 color: fields.color ?? '#6b7280',
                 position,
@@ -41,16 +38,6 @@ export async function createStatus(fields) {
             .single();
 
         if (error) {
-            // A replayed offline create can land after the first attempt's response was
-            // lost - the row already exists, so this isn't a real failure, just an echo.
-            if (error.code === '23505' && fields.id) {
-                const { data: existingStatus } = await supabase
-                    .from('statuses')
-                    .select()
-                    .eq('id', fields.id)
-                    .single();
-                if (existingStatus) return { data: existingStatus, error: null };
-            }
             return { data: null, error: 'Failed to create status' };
         }
 
@@ -64,7 +51,7 @@ export async function createStatus(fields) {
 
 /**
  * Updates specific fields on a status (name, color, position).
- * `code` is deliberately not accepted here - it identifies the 3 built-in
+ * `code` is deliberately not accepted here — it identifies the 3 built-in
  * statuses and must never be settable from the client, even indirectly.
  *
  * @param {string} id - Status ID to update

@@ -31,7 +31,7 @@ function subscribe(callback) {
     return () => listeners.delete(callback);
 }
 
-/** Opens the global search palette - called from the desktop sidebar and mobile top bar triggers. */
+/** Opens the global search palette — called from the desktop sidebar and mobile top bar triggers. */
 export function openSearch() {
     isOpenState = true;
     listeners.forEach((callback) => callback());
@@ -45,7 +45,7 @@ function closeSearch() {
 const EMPTY_RESULTS = { tasks: [], lists: [], spaces: [] };
 
 /**
- * Global search palette - tasks, lists, and spaces, searched server-side via `/api/search`.
+ * Global search palette — tasks, lists, and spaces, searched server-side via `/api/search`.
  */
 export default function GlobalSearch() {
     const open = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -56,7 +56,7 @@ export default function GlobalSearch() {
     const trimmedQuery = query.trim();
     const debouncedQuery = useDebouncedValue(trimmedQuery, 250);
 
-    // Adjusted during render, not an effect - reacts to `open` changing, not an external system.
+    // Adjusted during render, not an effect — reacts to `open` changing, not an external system.
     const [lastOpen, setLastOpen] = useState(open);
     if (open !== lastOpen) {
         setLastOpen(open);

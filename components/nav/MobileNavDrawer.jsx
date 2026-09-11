@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import SidebarNav from './SidebarNav';
 
 /**
- * Hamburger button + slide-in Sheet wrapping the shared SidebarNav content -
+ * Hamburger button + slide-in Sheet wrapping the shared SidebarNav content —
  * the mobile/tablet equivalent of DesktopSidebar, shown below `lg` (1024px).
  */
 export default function MobileNavDrawer() {

@@ -15,7 +15,7 @@ import { humanReadableLabel } from '@/lib/recurrence';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 
 /**
- * Recursive row component - renders one task and all its children.
+ * Recursive row component — renders one task and all its children.
  * Each level of children is wrapped in a SortableContext for sibling DnD reordering.
  * Indentation: `--row-indent` per depth level (16px mobile, 24px desktop), set by the ancestor section.
  *
@@ -51,12 +51,12 @@ export default function TaskRow({ task, depth, flatList, listId }) {
             {...attributes}
             className={isDragging ? 'opacity-50 relative z-10' : ''}
         >
-            {/* Task row - flat, hairline-separated: no per-row card background or radius */}
+            {/* Task row — flat, hairline-separated: no per-row card background or radius */}
             <div
                 className="group flex items-center gap-1.5 py-2 px-2 border-b border-border/60 motion-safe:transition-colors duration-150 hover:bg-muted/50 cursor-default"
                 style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth})` }}
             >
-                {/* Drag handle - always visible (mobile has no hover to reveal it on) */}
+                {/* Drag handle — always visible (mobile has no hover to reveal it on) */}
                 <button
                     {...listeners}
                     className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground p-3 -m-3 flex-shrink-0 focus:outline-none"
@@ -112,7 +112,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
 
                 {/* Inline status picker */}
                 <div className="flex-shrink-0">
-                    <StatusPicker task={task} flatList={flatList} listId={listId} />
+                    <StatusPicker task={task} flatList={flatList} />
                 </div>
 
                 {/* Hover action bar */}

@@ -10,7 +10,7 @@ function getSnapshot() {
     const stored = localStorage.getItem('theme');
     if (stored === 'light') return false;
     if (stored === 'dark') return true;
-    // No stored preference - use system preference, default to dark
+    // No stored preference — use system preference, default to dark
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
@@ -38,7 +38,7 @@ function setTheme(isDark) {
 export default function ThemeToggle() {
     const isDark = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-    // Keep the DOM class in sync with the resolved theme - a legitimate
+    // Keep the DOM class in sync with the resolved theme — a legitimate
     // external-system sync, not a state reset.
     useEffect(() => {
         document.documentElement.classList.toggle('dark', isDark);

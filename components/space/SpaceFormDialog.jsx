@@ -2,16 +2,15 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
-import { enqueueOrRun } from '@/lib/offline-queue';
+import { createSpace, updateSpace } from '@/actions/space-actions';
 
 /**
  * Modal for creating or editing a Space, rendered through the shared
- * ResponsiveModal container - same container as Task/List creation.
+ * ResponsiveModal container — same container as Task/List creation.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open
@@ -43,48 +42,17 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
         if (!name.trim()) return;
 
         setSubmitting(true);
-
-        const queryKey = ['spaces'];
-        const previousSpaces = queryClient.getQueryData(queryKey) ?? [];
-        const fields = { name: name.trim(), color };
-
-        let result;
-        if (isEditing) {
-            queryClient.setQueryData(queryKey, (current) =>
-                current?.map((existingSpace) =>
-                    existingSpace.id === space.id ? { ...existingSpace, ...fields } : existingSpace,
-                ),
-            );
-            result = await enqueueOrRun('updateSpace', { id: space.id, fields });
-        } else {
-            const newSpaceId = crypto.randomUUID();
-            const position =
-                previousSpaces.length > 0
-                    ? Math.max(...previousSpaces.map((existingSpace) => existingSpace.position)) + 1
-                    : 0;
-
-            queryClient.setQueryData(queryKey, (current) => [
-                ...(current ?? []),
-                { id: newSpaceId, ...fields, position },
-            ]);
-
-            result = await enqueueOrRun('createSpace', { fields: { ...fields, id: newSpaceId } });
-        }
-
+        const { error } = isEditing
+            ? await updateSpace(space.id, { name: name.trim(), color })
+            : await createSpace({ name: name.trim(), color });
         setSubmitting(false);
 
-        if (result.error) {
-            queryClient.setQueryData(queryKey, previousSpaces);
-            setError(result.error);
+        if (error) {
+            setError(error);
             return;
         }
 
-        if (result.queued) {
-            toast.success("Saved - will sync when you're back online");
-        } else {
-            await queryClient.invalidateQueries({ queryKey });
-        }
-
+        await queryClient.invalidateQueries({ queryKey: ['spaces'] });
         onClose();
     }
 

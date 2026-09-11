@@ -5,10 +5,9 @@ import { usePathname, useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ListChecks, LayoutGrid, Settings } from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
-import SyncIssueBadge from './SyncIssueBadge';
 
 /**
- * Mobile bottom navigation - Tasks / Spaces / Settings, with a center-FAB quick-create.
+ * Mobile bottom navigation — Tasks / Spaces / Settings, with a center-FAB quick-create.
  */
 export default function BottomNav() {
     const pathname = usePathname();
@@ -75,10 +74,7 @@ export default function BottomNav() {
                         href="/settings"
                         className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
                     >
-                        <span className="relative">
-                            <Settings className="h-5 w-5" />
-                            <SyncIssueBadge />
-                        </span>
+                        <Settings className="h-5 w-5" />
                         Settings
                     </Link>
                 </div>

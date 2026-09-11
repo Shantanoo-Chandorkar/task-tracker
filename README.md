@@ -10,14 +10,14 @@ Task Tracker is a single-user task management app with unlimited nested subtasks
 
 Key features:
 
-- **Infinite nesting** - tasks can have subtasks, which can have their own subtasks, with no depth limit (a warning appears at 4+ levels to encourage reorganisation)
-- **Status groups** - tasks are grouped by status with collapsible sections; only groups that have tasks are shown
-- **Drag and drop** - reorder sibling tasks by dragging
-- **Rearrangement** - promote a task to its parent's level, or move it to any valid destination in the tree via a searchable dropdown with breadcrumb paths
-- **Duplicate** - clones a task and its whole subtree as a sibling right below it, with a keyboard shortcut (Ctrl+D)
-- **Recurring tasks** - configure daily, weekly, monthly, or yearly recurrence with custom intervals and end conditions; a daily cron job spawns new task instances automatically
-- **Settings** - create, rename, reorder, and delete statuses with custom colours
-- **Light / Dark theme** - toggle from the header
+- **Infinite nesting** — tasks can have subtasks, which can have their own subtasks, with no depth limit (a warning appears at 4+ levels to encourage reorganisation)
+- **Status groups** — tasks are grouped by status with collapsible sections; only groups that have tasks are shown
+- **Drag and drop** — reorder sibling tasks by dragging
+- **Rearrangement** — promote a task to its parent's level, or move it to any valid destination in the tree via a searchable dropdown with breadcrumb paths
+- **Duplicate** — clones a task and its whole subtree as a sibling right below it, with a keyboard shortcut (Ctrl+D)
+- **Recurring tasks** — configure daily, weekly, monthly, or yearly recurrence with custom intervals and end conditions; a daily cron job spawns new task instances automatically
+- **Settings** — create, rename, reorder, and delete statuses with custom colours
+- **Light / Dark theme** — toggle from the header
 
 ---
 
@@ -42,8 +42,8 @@ Key features:
 ```
 task-tracker/
 ├── app/
-│   ├── layout.js              # Root layout - wraps QueryProvider
-│   ├── page.js                # Server Component - SSR fetch, hydrates TanStack Query
+│   ├── layout.js              # Root layout — wraps QueryProvider
+│   ├── page.js                # Server Component — SSR fetch, hydrates TanStack Query
 │   ├── loading.js             # Suspense skeleton shown while page.js fetches
 │   ├── error.js               # Error boundary
 │   ├── settings/
@@ -54,12 +54,12 @@ task-tracker/
 │       ├── tasks/[id]/move/route.js        # POST reparent + reposition
 │       ├── statuses/route.js               # GET all, POST create
 │       ├── statuses/[id]/route.js          # PATCH update, DELETE
-│       └── cron/recurrence/route.js        # Daily cron - spawns recurring task instances
+│       └── cron/recurrence/route.js        # Daily cron — spawns recurring task instances
 │
 ├── components/
 │   ├── task-list/
 │   │   ├── TaskList.jsx            # Root list container; groups tasks by status
-│   │   ├── TaskRow.jsx             # Recursive row - renders itself and its children
+│   │   ├── TaskRow.jsx             # Recursive row — renders itself and its children
 │   │   ├── TaskRowActions.jsx      # Hover action bar: edit, delete, duplicate, move
 │   │   ├── DeleteTaskDialog.jsx    # Confirmation dialog with subtask reparent option
 │   │   ├── TaskRowInlineAdd.jsx    # Inline subtask creation on Enter
@@ -71,7 +71,7 @@ task-tracker/
 │   ├── status/
 │   │   ├── StatusBadge.jsx         # Coloured pill badge
 │   │   ├── StatusPicker.jsx        # Inline status dropdown on each row
-│   │   └── StatusManager.jsx       # Settings page - full status CRUD
+│   │   └── StatusManager.jsx       # Settings page — full status CRUD
 │   └── rearrange/
 │       ├── PromoteButton.jsx       # Move task up one level
 │       └── ParentDropdown.jsx      # Ancestor select dropdown
@@ -81,12 +81,12 @@ task-tracker/
 │   └── status-actions.js       # Server Actions: create, update, delete status
 │
 ├── hooks/
-│   └── useTaskTree.js          # TanStack Query fetch - returns flat list and nested tree
+│   └── useTaskTree.js          # TanStack Query fetch — returns flat list and nested tree
 │
 ├── lib/
 │   ├── tree.js                 # flatToTree, findAncestors, findDescendantIds, recomputeDepth
 │   ├── fractional-index.js     # getPositionBetween, rebalancePositions
-│   ├── recurrence.js           # rrule wrappers - computeNextOccurrence
+│   ├── recurrence.js           # rrule wrappers — computeNextOccurrence
 │   └── supabase/
 │       ├── client.js           # Browser Supabase client
 │       ├── server.js           # Server Supabase client (Server Components, Actions, Routes)
@@ -168,8 +168,8 @@ CRON_SECRET=<a-random-string-you-generate>
 ```
 
 > **Where to find these values:**
-> - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - go to your Supabase project → **Project Settings → API**.
-> - `CRON_SECRET` - any random string you choose (e.g. output of `openssl rand -hex 32`). It is used to authenticate the `/api/cron/recurrence` endpoint.
+> - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — go to your Supabase project → **Project Settings → API**.
+> - `CRON_SECRET` — any random string you choose (e.g. output of `openssl rand -hex 32`). It is used to authenticate the `/api/cron/recurrence` endpoint.
 
 > **Note:** Supabase uses `PUBLISHABLE_KEY`, not the legacy `ANON_KEY`. Using the old name will silently fail.
 
@@ -209,7 +209,7 @@ npm test
 
 **Tasks or statuses do not load**
 
-Check that `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` are correct and that the Supabase tables were created with the SQL above. Open the browser console - a failed Supabase request will show the exact error.
+Check that `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` are correct and that the Supabase tables were created with the SQL above. Open the browser console — a failed Supabase request will show the exact error.
 
 **"Failed to fetch tasks" error on first load**
 
@@ -217,7 +217,7 @@ Supabase enforces Row Level Security (RLS) by default. If you enabled RLS on the
 
 **Drag and drop does not work**
 
-Drag reordering only works between siblings (tasks at the same level under the same parent). Dragging a task to a different parent is intentionally not supported - use the **Move to...** menu in the `···` dropdown instead.
+Drag reordering only works between siblings (tasks at the same level under the same parent). Dragging a task to a different parent is intentionally not supported — use the **Move to...** menu in the `···` dropdown instead.
 
 **Recurring tasks are not spawning**
 
@@ -234,4 +234,4 @@ The theme toggle switches between `light` and `dark` by adding/removing the `dar
 
 **Build fails after pulling changes**
 
-Run `npm install` first - a dependency may have been added. Then run `npm run build` and check the output for specific errors.
+Run `npm install` first — a dependency may have been added. Then run `npm run build` and check the output for specific errors.

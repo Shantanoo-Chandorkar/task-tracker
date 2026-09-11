@@ -94,7 +94,7 @@ export async function GET(request) {
                     .update({ next_occurrence: nextDate.toISOString() })
                     .eq('id', task.id);
             } else {
-                // No more future occurrences - clear the recurring flag
+                // No more future occurrences — clear the recurring flag
                 await supabase
                     .from('tasks')
                     .update({ is_recurring: false, next_occurrence: null })

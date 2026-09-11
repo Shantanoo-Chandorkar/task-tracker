@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 /**
- * Space + List name header above the status tiles - reads the shared `['spaces']`/`['lists']` cache.
+ * Space + List name header above the status tiles — reads the shared `['spaces']`/`['lists']` cache.
  * `initialSpaces`/`initialLists` seed that cache from SSR to avoid a hydration mismatch.
  *
  * @param {object} props
