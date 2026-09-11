@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import StatusManager from '@/components/status/StatusManager';
 import InstallAppCard from '@/components/nav/InstallAppCard';
+import SyncIssuesCard from '@/components/settings/SyncIssuesCard';
 
 /**
  * Settings page — Server Component.
@@ -18,6 +19,7 @@ export default async function SettingsPage() {
     return (
         <div className="px-4 md:px-8 py-8 space-y-8">
             <InstallAppCard />
+            <SyncIssuesCard />
             <StatusManager initialStatuses={statuses || []} />
         </div>
     );
