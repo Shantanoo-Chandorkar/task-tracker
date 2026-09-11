@@ -13,7 +13,7 @@ import {
 import { Loader } from '@/components/ui/loader';
 import StatusBadge from './StatusBadge';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
-import { completeTaskAndDescendants } from '@/actions/task-actions';
+import { useTaskStatusMutations } from '@/hooks/useTaskStatusMutations';
 import { findIncompleteDescendants } from '@/lib/tree';
 
 /**
@@ -26,9 +26,11 @@ import { findIncompleteDescendants } from '@/lib/tree';
  * @param {object} props
  * @param {object} props.task - The task whose status is being shown/changed
  * @param {object[]} props.flatList - Full flat task list, used to check descendant completeness
+ * @param {string} props.listId - The list this task belongs to
  */
-export default function StatusPicker({ task, flatList }) {
+export default function StatusPicker({ task, flatList, listId }) {
     const queryClient = useQueryClient();
+    const { updateStatus, completeWithCascade } = useTaskStatusMutations(listId);
     const [pending, setPending] = useState(false);
     const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
 
@@ -53,25 +55,18 @@ export default function StatusPicker({ task, flatList }) {
         }
 
         setPending(true);
-        try {
-            const response = await fetch(`/api/tasks/${task.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status_id: newStatusId }),
-            });
+        const { error, queued } = await updateStatus(task.id, newStatusId);
+        setPending(false);
 
-            if (!response.ok) {
-                console.error('Failed to update task status');
-                toast.error('Failed to update task status');
-                return;
-            }
+        if (error) {
+            toast.error(error);
+            return;
+        }
 
+        if (queued) {
+            toast.success("Saved — will sync when you're back online");
+        } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        } catch (err) {
-            console.error('Status update failed:', err);
-            toast.error('Failed to update task status');
-        } finally {
-            setPending(false);
         }
     }
 
@@ -79,7 +74,7 @@ export default function StatusPicker({ task, flatList }) {
         setCompleteConfirmOpen(false);
         setPending(true);
         const toastId = toast.loading('Marking complete...');
-        const { error } = await completeTaskAndDescendants(task.id);
+        const { error, queued } = await completeWithCascade(task.id, doneStatus.id, flatList ?? []);
         setPending(false);
 
         if (error) {
@@ -87,8 +82,12 @@ export default function StatusPicker({ task, flatList }) {
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.dismiss(toastId);
+        if (queued) {
+            toast.success("Saved — will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.dismiss(toastId);
+        }
     }
 
     const currentStatus = statuses.find((status) => status.id === task.status_id);

@@ -8,6 +8,8 @@ import { revalidateTag } from 'next/cache';
  *
  * @param {object} fields
  * @param {string} fields.name - Required space name
+ * @param {string} [fields.id] - Client-generated UUID; lets a replayed offline
+ *   create be idempotent instead of inserting a second row
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
@@ -30,6 +32,7 @@ export async function createSpace(fields) {
         const { data, error } = await supabase
             .from('spaces')
             .insert({
+                id: fields.id ?? crypto.randomUUID(),
                 name: fields.name.trim(),
                 color: fields.color ?? '#6b7280',
                 position,
@@ -38,6 +41,16 @@ export async function createSpace(fields) {
             .single();
 
         if (error) {
+            // A replayed offline create can land after the first attempt's response was
+            // lost — the row already exists, so this isn't a real failure, just an echo.
+            if (error.code === '23505' && fields.id) {
+                const { data: existingSpace } = await supabase
+                    .from('spaces')
+                    .select()
+                    .eq('id', fields.id)
+                    .single();
+                if (existingSpace) return { data: existingSpace, error: null };
+            }
             return { data: null, error: 'Failed to create space' };
         }
 

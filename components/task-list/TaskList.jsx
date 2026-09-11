@@ -32,8 +32,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { flatToTree, findDescendantIds } from '@/lib/tree';
-import { duplicateTask } from '@/actions/task-actions';
-import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
+import { enqueueOrRun, enqueueReorder } from '@/lib/offline-queue';
 import TaskRow from './TaskRow';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import SublistFormDialog from '@/components/space/SublistFormDialog';
@@ -353,8 +352,10 @@ export default function TaskList({
         const afterSiblingId = oldIndex < newIndex ? over.id : (siblingIds[newIndex - 1] ?? null);
 
         // Optimistic reorder — lands in the new slot immediately, without waiting on the persist round-trip.
+        const queryKey = ['tasks', listId];
+        const previousTasks = queryClient.getQueryData(queryKey);
         const reorderedSiblingIds = arrayMove(siblingIds, oldIndex, newIndex);
-        queryClient.setQueryData(['tasks', listId], (current) => {
+        queryClient.setQueryData(queryKey, (current) => {
             const list = current ?? flatList;
             const tasksById = new Map(list.map((task) => [task.id, task]));
             const reorderedSiblings = reorderedSiblingIds.map((taskId) => tasksById.get(taskId));
@@ -369,32 +370,28 @@ export default function TaskList({
 
         const toastId = toast.loading('Saving order...');
 
-        try {
-            const response = await fetch(`/api/tasks/${active.id}/move`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    newParentId: activeTask.parent_id ?? null,
-                    sublistId: activeTask.parent_id ? undefined : (activeTask.sublist_id ?? null),
-                    afterSiblingId,
-                    shouldPrependToStart: isMovingToStart,
-                    listId,
-                }),
-            });
+        const { error, queued } = await enqueueOrRun('moveTask', {
+            taskId: active.id,
+            params: {
+                newParentId: activeTask.parent_id ?? null,
+                sublistId: activeTask.parent_id ? undefined : (activeTask.sublist_id ?? null),
+                afterSiblingId,
+                shouldPrependToStart: isMovingToStart,
+                listId,
+            },
+        });
 
-            if (!response.ok) {
-                console.error('Drag reorder failed');
-                toast.error('Failed to reorder task', { id: toastId });
-                await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-                return;
-            }
+        if (error) {
+            queryClient.setQueryData(queryKey, previousTasks);
+            toast.error(error, { id: toastId });
+            return;
+        }
 
+        if (queued) {
+            toast.success("Saved — will sync when you're back online", { id: toastId });
+        } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.success('Order updated', { id: toastId });
-        } catch (caughtError) {
-            console.error('Drag reorder failed:', caughtError);
-            toast.error('Failed to reorder task', { id: toastId });
-            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         }
     }
 
@@ -403,27 +400,32 @@ export default function TaskList({
         const newIndex = sublists.findIndex((sublist) => sublist.id === over.id);
         if (oldIndex === -1 || newIndex === -1) return;
 
+        const queryKey = ['sublists', listId];
+        const previousSublists = queryClient.getQueryData(queryKey);
+
         const reordered = arrayMove(sublists, oldIndex, newIndex);
-        queryClient.setQueryData(['sublists', listId], reordered);
+        queryClient.setQueryData(queryKey, reordered);
 
         const toastId = toast.loading('Saving order...');
-        try {
-            for (let i = 0; i < reordered.length; i++) {
-                if (reordered[i].position !== i) {
-                    const { error } = await updateSublist(reordered[i].id, { position: i });
-                    if (error) {
-                        toast.error(error, { id: toastId });
-                        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-                        return;
-                    }
-                }
-            }
-            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+
+        const changed = reordered.filter((sublist, index) => sublist.position !== index);
+        const results = await enqueueReorder(changed, 'updateSublist', (sublist) => ({
+            id: sublist.id,
+            fields: { position: reordered.indexOf(sublist) },
+        }));
+
+        const failure = results.find((result) => result.error);
+        if (failure) {
+            queryClient.setQueryData(queryKey, previousSublists);
+            toast.error(failure.error, { id: toastId });
+            return;
+        }
+
+        if (results.some((result) => result.queued)) {
+            toast.success("Saved — will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey });
             toast.success('Order updated', { id: toastId });
-        } catch (caughtError) {
-            console.error('Sublist reorder failed:', caughtError);
-            toast.error('Failed to reorder sublist', { id: toastId });
-            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
         }
     }
 
@@ -442,14 +444,21 @@ export default function TaskList({
             if (!isCtrl || keyboardEvent.key !== 'd' || !focusedTaskId) return;
 
             keyboardEvent.preventDefault();
-            duplicateTask(focusedTaskId).then(({ error }) => {
-                if (error) {
-                    toast.error(error);
-                    return;
-                }
-                queryClient.invalidateQueries({ queryKey: ['tasks'] });
-                toast.success('Task duplicated');
-            });
+            const newRootId = crypto.randomUUID();
+            enqueueOrRun('duplicateTask', { taskId: focusedTaskId, newRootId }).then(
+                ({ error, queued }) => {
+                    if (error) {
+                        toast.error(error);
+                        return;
+                    }
+                    if (queued) {
+                        toast.success("Saved — will sync when you're back online");
+                    } else {
+                        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                        toast.success('Task duplicated');
+                    }
+                },
+            );
         }
 
         window.addEventListener('keydown', handleKeyDown);
@@ -460,13 +469,11 @@ export default function TaskList({
         setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
     }
 
-    async function requestDeleteSublist(sublist) {
-        const response = await fetch(`/api/sublists/${sublist.id}`);
-        const counts = await response.json();
+    function requestDeleteSublist(sublist) {
         setDeleteSublistTarget({
             id: sublist.id,
             name: sublist.name,
-            taskCount: response.ok ? counts.task_count : null,
+            taskCount: sublist.task_count ?? null,
         });
     }
 
@@ -475,16 +482,31 @@ export default function TaskList({
 
         setDeletingSublist(true);
         const toastId = toast.loading('Deleting sublist...');
-        const { error } = await deleteSublist(deleteSublistTarget.id);
+
+        const queryKey = ['sublists', listId];
+        const previousSublists = queryClient.getQueryData(queryKey);
+        queryClient.setQueryData(queryKey, (current) =>
+            current?.filter((existingSublist) => existingSublist.id !== deleteSublistTarget.id),
+        );
+
+        const { error, queued } = await enqueueOrRun('deleteSublist', {
+            id: deleteSublistTarget.id,
+        });
         setDeletingSublist(false);
         setDeleteSublistTarget(null);
 
         if (error) {
+            queryClient.setQueryData(queryKey, previousSublists);
             toast.error(error, { id: toastId });
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+        if (queued) {
+            toast.success("Deleted — will sync when you're back online", { id: toastId });
+            return;
+        }
+
+        await queryClient.invalidateQueries({ queryKey });
         await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         toast.success('Sublist deleted', { id: toastId });
     }

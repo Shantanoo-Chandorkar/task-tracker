@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
-import { createSublist, updateSublist } from '@/actions/sublist-actions';
+import { enqueueOrRun } from '@/lib/offline-queue';
 
 /**
  * Modal for creating or editing a Sublist. The parent list is implicit (passed in, not selectable).
@@ -42,17 +43,52 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
         if (!name.trim()) return;
 
         setSubmitting(true);
-        const { error } = isEditing
-            ? await updateSublist(sublist.id, { name: name.trim(), color })
-            : await createSublist({ name: name.trim(), color, list_id: listId });
+
+        const queryKey = ['sublists', listId];
+        const previousSublists = queryClient.getQueryData(queryKey) ?? [];
+        const fields = { name: name.trim(), color };
+
+        let result;
+        if (isEditing) {
+            queryClient.setQueryData(queryKey, (current) =>
+                current?.map((existingSublist) =>
+                    existingSublist.id === sublist.id
+                        ? { ...existingSublist, ...fields }
+                        : existingSublist,
+                ),
+            );
+            result = await enqueueOrRun('updateSublist', { id: sublist.id, fields });
+        } else {
+            const newSublistId = crypto.randomUUID();
+            const position =
+                previousSublists.length > 0
+                    ? Math.max(...previousSublists.map((existingSublist) => existingSublist.position)) + 1
+                    : 0;
+
+            queryClient.setQueryData(queryKey, (current) => [
+                ...(current ?? []),
+                { id: newSublistId, ...fields, list_id: listId, position, task_count: 0 },
+            ]);
+
+            result = await enqueueOrRun('createSublist', {
+                fields: { ...fields, list_id: listId, id: newSublistId },
+            });
+        }
+
         setSubmitting(false);
 
-        if (error) {
-            setError(error);
+        if (result.error) {
+            queryClient.setQueryData(queryKey, previousSublists);
+            setError(result.error);
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+        if (result.queued) {
+            toast.success("Saved — will sync when you're back online");
+        } else {
+            await queryClient.invalidateQueries({ queryKey });
+        }
+
         onClose();
     }
 

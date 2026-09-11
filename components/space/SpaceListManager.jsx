@@ -33,8 +33,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { updateSpace, deleteSpace } from '@/actions/space-actions';
-import { updateList, deleteList } from '@/actions/list-actions';
+import { enqueueOrRun, enqueueReorder } from '@/lib/offline-queue';
 import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
 
@@ -240,18 +239,31 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
     }
 
     /**
-     * Persists new positions (0, 1, 2, ...) for any item whose index changed.
+     * Persists new positions (0, 1, 2, ...) for any item whose index changed, through the
+     * offline outbox, rolling back the optimistic reorder if a real error comes back.
      *
      * @param {object[]} items - Items in their new order
-     * @param {Function} updateFn - updateSpace or updateList
+     * @param {object[]} previousItems - Cache snapshot to restore on a real error
+     * @param {string} queryKey - Query key the items belong to
+     * @param {string} mutationType - 'updateSpace' or 'updateList'
      */
-    async function persistPositions(items, updateFn) {
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].position !== i) {
-                await updateFn(items[i].id, { position: i });
-            }
+    async function persistPositions(items, previousItems, queryKey, mutationType) {
+        const changed = items.filter((item, index) => item.position !== index);
+        const results = await enqueueReorder(changed, mutationType, (item) => ({
+            id: item.id,
+            fields: { position: items.indexOf(item) },
+        }));
+
+        const failure = results.find((result) => result.error);
+        if (failure) {
+            queryClient.setQueryData(queryKey, previousItems);
+            return failure.error;
         }
-        await refetchAll();
+
+        if (!results.some((result) => result.queued)) {
+            await queryClient.invalidateQueries({ queryKey });
+        }
+        return null;
     }
 
     async function handleDragEnd({ active, over }) {
@@ -260,6 +272,7 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
         const toastId = toast.loading('Saving order...');
 
         if (type === 'space') {
+            const previousSpaces = queryClient.getQueryData(['spaces']);
             const oldIndex = spaces.findIndex((space) => space.id === active.id);
             const newIndex = spaces.findIndex((space) => space.id === over.id);
             if (oldIndex === -1 || newIndex === -1) {
@@ -269,8 +282,13 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
 
             const reordered = arrayMove(spaces, oldIndex, newIndex);
             queryClient.setQueryData(['spaces'], reordered);
-            await persistPositions(reordered, updateSpace);
+            const error = await persistPositions(reordered, previousSpaces, ['spaces'], 'updateSpace');
+            if (error) {
+                toast.error(error, { id: toastId });
+                return;
+            }
         } else if (type === 'list') {
+            const previousLists = queryClient.getQueryData(['lists']);
             const spaceId = active.data.current.spaceId;
             const spaceLists = lists.filter((list) => list.space_id === spaceId);
             const oldIndex = spaceLists.findIndex((list) => list.id === active.id);
@@ -283,35 +301,40 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
             const reorderedSpaceLists = arrayMove(spaceLists, oldIndex, newIndex);
             const otherLists = lists.filter((list) => list.space_id !== spaceId);
             queryClient.setQueryData(['lists'], [...otherLists, ...reorderedSpaceLists]);
-            await persistPositions(reorderedSpaceLists, updateList);
+            const error = await persistPositions(
+                reorderedSpaceLists,
+                previousLists,
+                ['lists'],
+                'updateList',
+            );
+            if (error) {
+                toast.error(error, { id: toastId });
+                return;
+            }
         }
 
         toast.dismiss(toastId);
     }
 
-    async function requestDeleteSpace(space) {
+    function requestDeleteSpace(space) {
         setError('');
-        const response = await fetch(`/api/spaces/${space.id}`);
-        const spaceDeleteCounts = await response.json();
+        const spaceLists = lists.filter((list) => list.space_id === space.id);
+        const taskCount = spaceLists.reduce((sum, list) => sum + (list.task_count ?? 0), 0);
         setDeleteTarget({
             type: 'space',
             id: space.id,
             name: space.name,
-            counts: response.ok
-                ? { lists: spaceDeleteCounts.list_count, tasks: spaceDeleteCounts.task_count }
-                : null,
+            counts: { lists: spaceLists.length, tasks: taskCount },
         });
     }
 
-    async function requestDeleteList(list) {
+    function requestDeleteList(list) {
         setError('');
-        const response = await fetch(`/api/lists/${list.id}`);
-        const listDeleteCounts = await response.json();
         setDeleteTarget({
             type: 'list',
             id: list.id,
             name: list.name,
-            counts: response.ok ? { tasks: listDeleteCounts.task_count } : null,
+            counts: { tasks: list.task_count ?? 0 },
         });
     }
 
@@ -322,16 +345,24 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
         const toastId = toast.loading(
             deleteTarget.type === 'space' ? 'Deleting space...' : 'Deleting list...',
         );
-        const { error } =
-            deleteTarget.type === 'space'
-                ? await deleteSpace(deleteTarget.id)
-                : await deleteList(deleteTarget.id);
-        setDeleting(false);
 
+        const queryKey = deleteTarget.type === 'space' ? ['spaces'] : ['lists'];
+        const previousItems = queryClient.getQueryData(queryKey);
+        queryClient.setQueryData(queryKey, (current) =>
+            current?.filter((item) => item.id !== deleteTarget.id),
+        );
+
+        const mutationType = deleteTarget.type === 'space' ? 'deleteSpace' : 'deleteList';
+        const { error, queued } = await enqueueOrRun(mutationType, { id: deleteTarget.id });
+        setDeleting(false);
         setDeleteTarget(null);
+
         if (error) {
+            queryClient.setQueryData(queryKey, previousItems);
             toast.error(error, { id: toastId });
             setError(error);
+        } else if (queued) {
+            toast.success("Deleted — will sync when you're back online", { id: toastId });
         } else {
             await refetchAll();
             toast.success(deleteTarget.type === 'space' ? 'Space deleted' : 'List deleted', {

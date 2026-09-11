@@ -10,6 +10,8 @@ import { revalidateTag } from 'next/cache';
  * @param {object} fields
  * @param {string} fields.name - Required list name
  * @param {string} fields.space_id - Required parent space ID
+ * @param {string} [fields.id] - Client-generated UUID; lets a replayed offline
+ *   create be idempotent instead of inserting a second row
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
@@ -36,6 +38,7 @@ export async function createList(fields) {
         const { data, error } = await supabase
             .from('lists')
             .insert({
+                id: fields.id ?? crypto.randomUUID(),
                 name: fields.name.trim(),
                 space_id: fields.space_id,
                 color: fields.color ?? '#6b7280',
@@ -45,6 +48,16 @@ export async function createList(fields) {
             .single();
 
         if (error) {
+            // A replayed offline create can land after the first attempt's response was
+            // lost — the row already exists, so this isn't a real failure, just an echo.
+            if (error.code === '23505' && fields.id) {
+                const { data: existingList } = await supabase
+                    .from('lists')
+                    .select()
+                    .eq('id', fields.id)
+                    .single();
+                if (existingList) return { data: existingList, error: null };
+            }
             return { data: null, error: 'Failed to create list' };
         }
 

@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
-import { findDescendantIds, deepCloneSubtree } from '@/lib/tree';
+import { findDescendantIds, findAncestors, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
 import { canMarkTaskDone, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
 
@@ -386,18 +386,272 @@ export async function deleteTaskAndReparentChildren(taskId) {
 }
 
 /**
+ * Reparents a task and repositions it after a sibling; cascades depth (and list) to descendants.
+ * Shared by the offline mutation registry and the `/api/tasks/[id]/move` route, which is the only
+ * caller that can reach this from outside a server action (drag-reorder posts JSON to it).
+ *
+ * afterSiblingId: null means "append at the end"; shouldPrependToStart flags "insert at the start"
+ * instead. sublistId only applies to root tasks (newParentId null); omitted on promote, it inherits
+ * the task's original root ancestor's sublist.
+ *
+ * @param {string} taskId - Task to move
+ * @param {object} params
+ * @param {string|null} params.newParentId - New parent, or null to move to root level
+ * @param {string|null} params.afterSiblingId - Sibling to insert after, or null to append at the end
+ * @param {boolean} [params.shouldPrependToStart] - Insert as the new first sibling instead
+ * @param {string} [params.listId] - Target list; defaults to the task's current list
+ * @param {string|null} [params.sublistId] - Target sublist for a root-level move
+ * @returns {{ data: object|null, error: string|null }}
+ */
+export async function moveTask(taskId, params) {
+    if (!taskId) return { data: null, error: 'Task ID is required' };
+
+    const { newParentId, afterSiblingId, shouldPrependToStart, listId, sublistId } = params;
+
+    try {
+        const supabase = await createClient();
+
+        const { data: task, error: taskError } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('id', taskId)
+            .single();
+
+        if (taskError || !task) return { data: null, error: 'Task not found' };
+
+        // Defense in depth — a self/descendant reparent creates a cycle that hangs every tree walker.
+        if (newParentId === taskId) {
+            return { data: null, error: 'A task cannot be its own parent' };
+        }
+        if (newParentId) {
+            const { data: allTasksInList } = await supabase
+                .from('tasks')
+                .select('id, parent_id')
+                .eq('list_id', task.list_id);
+            const descendantIds = findDescendantIds(taskId, allTasksInList || []);
+            if (descendantIds.has(newParentId)) {
+                return { data: null, error: 'Cannot move a task into its own descendant' };
+            }
+        }
+
+        const targetListId = listId ?? task.list_id;
+        const listChanged = targetListId !== task.list_id;
+
+        if (sublistId && newParentId) {
+            return { data: null, error: "A subtask can't belong to a sublist directly" };
+        }
+
+        let newDepth = 0;
+        if (newParentId) {
+            const { data: newParent } = await supabase
+                .from('tasks')
+                .select('depth')
+                .eq('id', newParentId)
+                .single();
+            if (newParent) newDepth = newParent.depth + 1;
+        }
+
+        const depthDelta = newDepth - task.depth;
+
+        // Cap must hold for the deepest descendant of the moved subtree, not just the moved task
+        // itself — reparenting a subtree carries its whole shape with it.
+        // MAX_DEPTH_CONSTANT
+        const nestingMode = await getNestingMode();
+        if (nestingMode === 'finite' && depthDelta > 0) {
+            const { data: allTasksForDepthCheck } = await supabase
+                .from('tasks')
+                .select('id, parent_id, depth')
+                .eq('list_id', task.list_id);
+            const descendantIds = findDescendantIds(taskId, allTasksForDepthCheck || []);
+            const descendantDepths = [...descendantIds].map(
+                (descendantId) =>
+                    allTasksForDepthCheck.find((t) => t.id === descendantId)?.depth ?? task.depth,
+            );
+            const maxCurrentDepth = Math.max(task.depth, ...descendantDepths);
+            if (maxCurrentDepth + depthDelta > FINITE_MAX_DEPTH) {
+                return { data: null, error: 'Move would exceed maximum nesting depth' };
+            }
+        }
+
+        if (depthDelta !== 0 || listChanged) {
+            await updateDescendantDepthAndList(
+                supabase,
+                taskId,
+                depthDelta,
+                task.list_id,
+                listChanged ? targetListId : null,
+            );
+        }
+
+        // Root sublist target: explicit sublistId, else the promoted task's original root ancestor's sublist.
+        let resolvedSublistId = null;
+        if (!newParentId) {
+            if (sublistId !== undefined) {
+                resolvedSublistId = sublistId ?? null;
+            } else if (task.parent_id) {
+                const { data: allTasksInList } = await supabase
+                    .from('tasks')
+                    .select('id, parent_id, sublist_id')
+                    .eq('list_id', task.list_id);
+                const ancestors = findAncestors(taskId, allTasksInList || []);
+                const rootAncestor = ancestors[ancestors.length - 1];
+                resolvedSublistId = rootAncestor?.sublist_id ?? null;
+            } else {
+                resolvedSublistId = task.sublist_id ?? null;
+            }
+
+            if (resolvedSublistId) {
+                const { data: sublist } = await supabase
+                    .from('sublists')
+                    .select('list_id')
+                    .eq('id', resolvedSublistId)
+                    .single();
+                if (!sublist || sublist.list_id !== targetListId) {
+                    return { data: null, error: 'Sublist does not belong to this list' };
+                }
+            }
+        }
+
+        let siblingsQuery;
+        if (newParentId) {
+            siblingsQuery = supabase
+                .from('tasks')
+                .select('id, position')
+                .eq('parent_id', newParentId)
+                .neq('id', taskId)
+                .order('position', { ascending: true });
+        } else {
+            siblingsQuery = supabase
+                .from('tasks')
+                .select('id, position')
+                .eq('list_id', targetListId)
+                .is('parent_id', null)
+                .neq('id', taskId)
+                .order('position', { ascending: true });
+            siblingsQuery = resolvedSublistId
+                ? siblingsQuery.eq('sublist_id', resolvedSublistId)
+                : siblingsQuery.is('sublist_id', null);
+        }
+
+        const { data: siblings } = await siblingsQuery;
+        const newPosition = computeMovePosition(siblings || [], afterSiblingId, shouldPrependToStart);
+
+        const { data: updated, error: updateError } = await supabase
+            .from('tasks')
+            .update({
+                parent_id: newParentId ?? null,
+                sublist_id: newParentId ? null : resolvedSublistId,
+                depth: newDepth,
+                position: newPosition,
+                list_id: targetListId,
+            })
+            .eq('id', taskId)
+            .select()
+            .single();
+
+        if (updateError) return { data: null, error: 'Failed to move task' };
+
+        revalidateTag('task-tree');
+        return { data: updated, error: null };
+    } catch {
+        return { data: null, error: 'Unexpected error moving task' };
+    }
+}
+
+/**
+ * Fetches every task in the subtree's current list and recursively updates each descendant's
+ * depth (by the given delta) and, if the subtree is changing lists, its list_id too.
+ *
+ * @param {object} supabase - Supabase client
+ * @param {string} taskId - Root of the subtree whose descendants need updating
+ * @param {number} depthDelta - Amount to add to each descendant's current depth
+ * @param {string} currentListId - List the subtree currently lives in, before the move
+ * @param {string|null} newListId - List to move descendants into, or null if the list isn't changing
+ */
+async function updateDescendantDepthAndList(supabase, taskId, depthDelta, currentListId, newListId) {
+    const { data: allTasks } = await supabase
+        .from('tasks')
+        .select('id, parent_id, depth')
+        .eq('list_id', currentListId);
+    if (!allTasks) return;
+
+    const descendants = [];
+    const queue = [taskId];
+
+    while (queue.length > 0) {
+        const currentId = queue.shift();
+        const children = allTasks.filter((task) => task.parent_id === currentId);
+        for (const child of children) {
+            descendants.push(child);
+            queue.push(child.id);
+        }
+    }
+
+    // For v1 with typically shallow trees, individual updates are acceptable
+    for (const descendant of descendants) {
+        const updates = { depth: descendant.depth + depthDelta };
+        if (newListId) updates.list_id = newListId;
+        await supabase.from('tasks').update(updates).eq('id', descendant.id);
+    }
+}
+
+/**
+ * Computes the new position for a task being inserted after the given sibling.
+ * Uses fractional indexing so existing positions don't need renumbering.
+ *
+ * @param {{ id: string, position: number }[]} siblings - Sorted sibling list (excluding the moving task)
+ * @param {string|null} afterSiblingId - ID of the sibling to insert after, or null to append at the end
+ * @param {boolean} [shouldPrependToStart] - If true, insert as the new first sibling instead (overrides afterSiblingId)
+ * @returns {number} New position value
+ */
+function computeMovePosition(siblings, afterSiblingId, shouldPrependToStart) {
+    if (shouldPrependToStart) {
+        const firstSibling = siblings[0];
+        return getPositionBetween(null, firstSibling?.position ?? null);
+    }
+
+    if (!afterSiblingId) {
+        const lastSibling = siblings[siblings.length - 1];
+        return getPositionBetween(lastSibling?.position ?? null, null);
+    }
+
+    const afterSiblingIndex = siblings.findIndex((sibling) => sibling.id === afterSiblingId);
+    if (afterSiblingIndex === -1) {
+        const lastSibling = siblings[siblings.length - 1];
+        return getPositionBetween(lastSibling?.position ?? null, null);
+    }
+
+    const beforePosition = siblings[afterSiblingIndex].position;
+    const afterPosition = siblings[afterSiblingIndex + 1]?.position ?? null;
+    return getPositionBetween(beforePosition, afterPosition);
+}
+
+/**
  * Duplicates a task and its whole subtree, inserting the copy as the next
  * sibling right after the original. Generates new UUIDs for every node so
  * the duplicate is fully independent. Appends ' (copy)' to the root title.
  *
  * @param {string} taskId - Task to duplicate
+ * @param {string} [newRootId] - Client-generated id for the duplicated root; lets a replayed
+ *   offline duplicate be idempotent instead of inserting a second copy of the whole subtree
  * @returns {{ error: string|null }}
  */
-export async function duplicateTask(taskId) {
+export async function duplicateTask(taskId, newRootId = null) {
     if (!taskId) return { error: 'Task ID is required' };
 
     try {
         const supabase = await createClient();
+
+        if (newRootId) {
+            const { data: existingRoot } = await supabase
+                .from('tasks')
+                .select('id')
+                .eq('id', newRootId)
+                .single();
+            // A replayed duplicate lands after the first attempt's response was lost — the whole
+            // subtree was already inserted in that single server-side call, so this is a no-op.
+            if (existingRoot) return { error: null };
+        }
 
         const { data: task, error: taskError } = await supabase
             .from('tasks')
@@ -451,6 +705,7 @@ export async function duplicateTask(taskId) {
             task.list_id,
             task.sublist_id,
             newPosition,
+            newRootId,
         );
 
         revalidateTag('task-tree');
@@ -471,6 +726,7 @@ export async function duplicateTask(taskId) {
  * @param {string} listId - List the inserted copy belongs to
  * @param {string|null} [sublistId] - Sublist for the root node only; ignored for children
  * @param {number|null} [explicitPosition] - Exact position to use for the root node, if given
+ * @param {string|null} [explicitId] - Client-generated id to use for the root node, if given
  */
 async function insertSnapshotNode(
     supabase,
@@ -480,6 +736,7 @@ async function insertSnapshotNode(
     listId,
     sublistId = null,
     explicitPosition = null,
+    explicitId = null,
 ) {
     let depth = 0;
     if (parentId) {
@@ -520,7 +777,7 @@ async function insertSnapshotNode(
         position = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
     }
 
-    const newId = crypto.randomUUID();
+    const newId = isRoot && explicitId ? explicitId : crypto.randomUUID();
     const title = isRoot ? `${node.title} (copy)` : node.title;
 
     const { error } = await supabase.from('tasks').insert({

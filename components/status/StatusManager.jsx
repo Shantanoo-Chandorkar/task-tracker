@@ -32,7 +32,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { updateStatus, deleteStatus } from '@/actions/status-actions';
+import { enqueueOrRun, enqueueReorder } from '@/lib/offline-queue';
 import StatusFormDialog from './StatusFormDialog';
 
 /**
@@ -147,22 +147,36 @@ export default function StatusManager({ initialStatuses }) {
     async function handleDragEnd({ active, over }) {
         if (!over || active.id === over.id) return;
 
+        const queryKey = ['statuses'];
+        const previousStatuses = queryClient.getQueryData(queryKey);
+
         const oldIndex = statuses.findIndex((status) => status.id === active.id);
         const newIndex = statuses.findIndex((status) => status.id === over.id);
         const reordered = arrayMove(statuses, oldIndex, newIndex);
 
-        queryClient.setQueryData(['statuses'], reordered);
+        queryClient.setQueryData(queryKey, reordered);
 
         const toastId = toast.loading('Saving order...');
 
-        for (let i = 0; i < reordered.length; i++) {
-            if (reordered[i].position !== i) {
-                await updateStatus(reordered[i].id, { position: i });
-            }
+        const changed = reordered.filter((status, index) => status.position !== index);
+        const results = await enqueueReorder(changed, 'updateStatus', (status) => ({
+            id: status.id,
+            fields: { position: reordered.indexOf(status) },
+        }));
+
+        const failure = results.find((result) => result.error);
+        if (failure) {
+            queryClient.setQueryData(queryKey, previousStatuses);
+            toast.error(failure.error, { id: toastId });
+            return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-        toast.dismiss(toastId);
+        if (results.some((result) => result.queued)) {
+            toast.success("Saved — will sync when you're back online", { id: toastId });
+        } else {
+            await queryClient.invalidateQueries({ queryKey });
+            toast.dismiss(toastId);
+        }
     }
 
     async function handleConfirmDelete() {
@@ -170,15 +184,25 @@ export default function StatusManager({ initialStatuses }) {
 
         setDeleting(true);
         const toastId = toast.loading('Deleting status...');
-        const { error } = await deleteStatus(deleteTarget.id);
+
+        const queryKey = ['statuses'];
+        const previousStatuses = queryClient.getQueryData(queryKey);
+        queryClient.setQueryData(queryKey, (current) =>
+            current?.filter((existingStatus) => existingStatus.id !== deleteTarget.id),
+        );
+
+        const { error, queued } = await enqueueOrRun('deleteStatus', { id: deleteTarget.id });
         setDeleting(false);
         setDeleteTarget(null);
 
         if (error) {
+            queryClient.setQueryData(queryKey, previousStatuses);
             toast.error(error, { id: toastId });
             setError(error);
+        } else if (queued) {
+            toast.success("Deleted — will sync when you're back online", { id: toastId });
         } else {
-            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+            await queryClient.invalidateQueries({ queryKey });
             toast.success('Status deleted', { id: toastId });
         }
     }
