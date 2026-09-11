@@ -34,6 +34,21 @@ function watchForUpdate(registration) {
             }
         });
     });
+
+    // Browsers only auto-check the SW script on a full navigation; this app is a client-side
+    // SPA after first load, so poll explicitly whenever the tab is visible/focused.
+    function checkForUpdate() {
+        if (document.visibilityState === 'visible') registration.update();
+    }
+    document.addEventListener('visibilitychange', checkForUpdate);
+    window.addEventListener('focus', checkForUpdate);
+    const intervalId = setInterval(checkForUpdate, 60 * 1000);
+
+    return () => {
+        document.removeEventListener('visibilitychange', checkForUpdate);
+        window.removeEventListener('focus', checkForUpdate);
+        clearInterval(intervalId);
+    };
 }
 
 /**
@@ -44,9 +59,14 @@ export function useServiceWorkerUpdate() {
     useEffect(() => {
         if (!('serviceWorker' in navigator)) return;
 
+        let cleanup;
         navigator.serviceWorker
-            .register('/sw.js')
-            .then(watchForUpdate)
+            // updateViaCache: 'none' stops the browser HTTP cache (on top of the no-cache
+            // response header) from ever standing between a check and the real sw.js bytes.
+            .register('/sw.js', { updateViaCache: 'none' })
+            .then((registration) => {
+                cleanup = watchForUpdate(registration);
+            })
             .catch((error) => console.warn('Service worker registration failed:', error));
 
         navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -54,6 +74,8 @@ export function useServiceWorkerUpdate() {
             refreshing = true;
             window.location.reload();
         });
+
+        return () => cleanup?.();
     }, []);
 }
 
