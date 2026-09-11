@@ -6,7 +6,8 @@ import {
     DndContext,
     closestCenter,
     KeyboardSensor,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
@@ -177,7 +178,7 @@ function SublistHeader({ sublist, taskCount, isCollapsed, onToggle, onEdit, onDe
             <button
                 {...listeners}
                 {...attributes}
-                className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 p-3 -m-3"
                 aria-label="Drag to reorder"
             >
                 <GripVertical className="h-3.5 w-3.5" />
@@ -323,7 +324,10 @@ export default function TaskList({
     ];
 
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+        // Touch needs its own sensor (not PointerSensor, which would race with it): a short
+        // delay + move tolerance lets a tap or scroll happen without being grabbed as a drag.
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
