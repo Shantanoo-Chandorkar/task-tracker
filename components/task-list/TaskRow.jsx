@@ -13,6 +13,7 @@ import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DepthWarning from './DepthWarning';
 import { useClipboardContext } from '@/providers/ClipboardProvider';
 import { humanReadableLabel } from '@/lib/recurrence';
+import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 
 /**
  * Recursive row component — renders one task and all its children.
@@ -32,7 +33,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: task.id,
-        data: { parentId: task.parent_id },
+        data: { parentId: task.parent_id, sublistId: task.sublist_id ?? null },
     });
 
     const style = {
@@ -42,6 +43,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
 
     const isCut = clipboard.mode === 'cut' && clipboard.taskId === task.id;
     const hasChildren = task.children && task.children.length > 0;
+    const canAddSubtask = !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH);
     const recurringLabel = task.is_recurring ? humanReadableLabel(task.recurrence_rule) : null;
 
     return (
@@ -83,8 +85,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
                     )}
                 </button>
 
-                {/* Task title + recurring badge — the title itself opens the task's own page;
-                    clicking elsewhere in the row just focuses it for keyboard clipboard shortcuts */}
+                {/* Title opens the task page; clicking elsewhere just focuses the row for clipboard shortcuts */}
                 <span className="flex-1 text-sm text-foreground truncate min-w-0 flex items-center gap-1.5">
                     <Link
                         href={`/lists/${listId}/tasks/${task.id}`}
@@ -121,12 +122,12 @@ export default function TaskRow({ task, depth, flatList, listId }) {
                     task={task}
                     flatList={flatList}
                     onAddSubtask={() => setAddSubtaskOpen(true)}
+                    canAddSubtask={canAddSubtask}
                     listId={listId}
                 />
             </div>
 
-            {/* Same create dialog "New Task" and Task Detail's "Add subtask" use — a
-                subtask is just a task, so creating one works the same way everywhere */}
+            {/* A subtask is just a task, so it reuses the same create dialog as "New Task". */}
             <TaskFormDialog
                 open={addSubtaskOpen}
                 onClose={() => setAddSubtaskOpen(false)}

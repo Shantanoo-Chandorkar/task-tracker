@@ -3,28 +3,32 @@ import { createClient } from '@/lib/supabase/server';
 import TaskList from '@/components/task-list/TaskList';
 
 /**
- * List task-tree page — Server Component.
- * Fetches the task tree for one list and all statuses server-side so TanStack
- * Query on the client can hydrate from initialData with zero client-side
- * requests on first load.
+ * List task-tree page (Server Component) — fetches everything server-side for zero-waterfall hydration.
  */
 export default async function ListPage({ params }) {
     const { listId } = await params;
     const supabase = await createClient();
 
-    const [{ data: list }, { data: tasks }, { data: statuses }, { data: spaces }, { data: lists }] =
-        await Promise.all([
-            supabase.from('lists').select('id').eq('id', listId).maybeSingle(),
-            supabase
-                .from('tasks')
-                .select('*, statuses(id, name, color, is_default, position)')
-                .eq('list_id', listId)
-                .order('depth', { ascending: true })
-                .order('position', { ascending: true }),
-            supabase.from('statuses').select('*').order('position', { ascending: true }),
-            supabase.from('spaces').select('*').order('position', { ascending: true }),
-            supabase.from('lists').select('*').order('position', { ascending: true }),
-        ]);
+    const [
+        { data: list },
+        { data: tasks },
+        { data: statuses },
+        { data: spaces },
+        { data: lists },
+        { data: sublists },
+    ] = await Promise.all([
+        supabase.from('lists').select('id').eq('id', listId).maybeSingle(),
+        supabase
+            .from('tasks')
+            .select('*, statuses(id, name, color, is_default, position)')
+            .eq('list_id', listId)
+            .order('depth', { ascending: true })
+            .order('position', { ascending: true }),
+        supabase.from('statuses').select('*').order('position', { ascending: true }),
+        supabase.from('spaces').select('*').order('position', { ascending: true }),
+        supabase.from('lists').select('*').order('position', { ascending: true }),
+        supabase.from('sublists').select('*').eq('list_id', listId).order('position', { ascending: true }),
+    ]);
 
     if (!list) {
         return (
@@ -40,8 +44,7 @@ export default async function ListPage({ params }) {
         );
     }
 
-    // Normalize nested statuses join to flat status_name / status_color fields
-    // so TaskList and useTaskTree don't need to understand the join structure
+    // Flatten the statuses join so callers don't need to know its structure.
     const normalizedTasks = (tasks || []).map((task) => ({
         ...task,
         status_name: task.statuses?.name ?? null,
@@ -56,6 +59,7 @@ export default async function ListPage({ params }) {
                 initialStatuses={statuses || []}
                 initialSpaces={spaces || []}
                 initialLists={lists || []}
+                initialSublists={sublists || []}
             />
         </div>
     );

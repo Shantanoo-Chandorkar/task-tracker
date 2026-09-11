@@ -29,6 +29,7 @@ import { Loader } from '@/components/ui/loader';
  * @param {object|null} [props.task] - Task to edit, or null for create mode
  * @param {string|null} [props.parentId] - Parent ID for new subtask creation
  * @param {string|null} [props.defaultStatusId] - Status to pre-select in create mode
+ * @param {string|null} [props.defaultSublistId] - Sublist to pre-select for root-level create mode
  * @param {string} [props.listId] - List the new task belongs to (create mode only)
  */
 export default function TaskFormDialog({
@@ -37,24 +38,27 @@ export default function TaskFormDialog({
     task = null,
     parentId = null,
     defaultStatusId = null,
+    defaultSublistId = null,
     listId = null,
 }) {
     const queryClient = useQueryClient();
     const isEditing = Boolean(task);
+    const isRootCreate = !isEditing && !parentId;
 
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [statusId, setStatusId] = useState('');
+    const [sublistId, setSublistId] = useState('');
     const [dueDate, setDueDate] = useState('');
     const [isRecurring, setIsRecurring] = useState(false);
     const [recurrenceRule, setRecurrenceRule] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
 
-    // Reset form fields when the dialog opens for a different task/create-target.
-    // Adjusted during render (React's recommended pattern for resetting state on
-    // prop change) instead of an effect, so there's no extra render/flicker.
-    const resetKey = open ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}` : null;
+    // Reset fields during render (not an effect) to avoid an extra render/flicker on prop change.
+    const resetKey = open
+        ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}:${defaultSublistId ?? ''}`
+        : null;
     const [lastResetKey, setLastResetKey] = useState(resetKey);
     if (resetKey !== lastResetKey) {
         setLastResetKey(resetKey);
@@ -62,6 +66,7 @@ export default function TaskFormDialog({
             setTitle(task?.title ?? '');
             setDescription(task?.description ?? '');
             setStatusId(task?.status_id ?? defaultStatusId ?? '');
+            setSublistId(defaultSublistId ?? '');
             setDueDate(task?.due_date ?? '');
             setIsRecurring(task?.is_recurring ?? false);
             setRecurrenceRule(task?.recurrence_rule ?? null);
@@ -78,8 +83,18 @@ export default function TaskFormDialog({
         },
     });
 
-    async function handleSubmit(e) {
-        e.preventDefault();
+    const { data: sublists = [] } = useQuery({
+        queryKey: ['sublists', listId],
+        queryFn: async () => {
+            const response = await fetch(`/api/sublists?list_id=${listId}`);
+            if (!response.ok) throw new Error('Failed to fetch sublists');
+            return response.json();
+        },
+        enabled: isRootCreate && Boolean(listId),
+    });
+
+    async function handleSubmit(event) {
+        event.preventDefault();
 
         if (!title.trim()) {
             setTitleError('Title is required');
@@ -94,7 +109,7 @@ export default function TaskFormDialog({
             status_id: statusId || null,
             due_date: dueDate || null,
             parent_id: isEditing ? task.parent_id : (parentId ?? null),
-            ...(isEditing ? {} : { list_id: listId }),
+            ...(isEditing ? {} : { list_id: listId, sublist_id: isRootCreate ? sublistId || null : null }),
             is_recurring: isRecurring,
             recurrence_rule: isRecurring ? recurrenceRule : null,
         };
@@ -119,8 +134,8 @@ export default function TaskFormDialog({
                 <div className="space-y-1">
                     <Input
                         value={title}
-                        onChange={(e) => {
-                            setTitle(e.target.value);
+                        onChange={(event) => {
+                            setTitle(event.target.value);
                             setTitleError('');
                         }}
                         placeholder="Task title"
@@ -132,7 +147,7 @@ export default function TaskFormDialog({
                 {/* Description */}
                 <Textarea
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(event) => setDescription(event.target.value)}
                     placeholder="Description (optional)"
                     rows={3}
                 />
@@ -157,13 +172,39 @@ export default function TaskFormDialog({
                     </SelectContent>
                 </Select>
 
+                {/* Sublist — root-level tasks only */}
+                {isRootCreate && sublists.length > 0 && (
+                    <Select
+                        value={sublistId || 'none'}
+                        onValueChange={(value) => setSublistId(value === 'none' ? '' : value)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="No sublist" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">No sublist</SelectItem>
+                            {sublists.map((sublist) => (
+                                <SelectItem key={sublist.id} value={sublist.id}>
+                                    <span className="flex items-center gap-2">
+                                        <span
+                                            className="h-2 w-2 rounded-full flex-shrink-0"
+                                            style={{ backgroundColor: sublist.color }}
+                                        />
+                                        {sublist.name}
+                                    </span>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )}
+
                 {/* Due date */}
                 <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Due date</label>
                     <Input
                         type="date"
                         value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
+                        onChange={(event) => setDueDate(event.target.value)}
                         className="w-fit"
                     />
                 </div>
@@ -174,7 +215,7 @@ export default function TaskFormDialog({
                         <input
                             type="checkbox"
                             checked={isRecurring}
-                            onChange={(e) => setIsRecurring(e.target.checked)}
+                            onChange={(event) => setIsRecurring(event.target.checked)}
                             className="rounded border-border"
                         />
                         <span className="text-sm text-foreground">Recurring task</span>

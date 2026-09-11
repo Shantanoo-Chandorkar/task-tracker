@@ -3,6 +3,19 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { computeNextOccurrence } from '@/lib/recurrence';
+import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
+
+/**
+ * Deepest relative depth in a clipboard snapshot's subtree (0 = root with no children).
+ *
+ * @param {object} node - Snapshot node with an optional children array
+ * @returns {number} Deepest relative depth in this subtree
+ */
+function snapshotMaxRelativeDepth(node) {
+    const children = node.children || [];
+    if (children.length === 0) return 0;
+    return 1 + Math.max(...children.map(snapshotMaxRelativeDepth));
+}
 
 /**
  * Creates a new task. Computes depth from parent if provided.
@@ -14,6 +27,7 @@ import { computeNextOccurrence } from '@/lib/recurrence';
  * @param {string} [fields.description]
  * @param {string} [fields.status_id]
  * @param {string|null} [fields.parent_id]
+ * @param {string|null} [fields.sublist_id] - Root tasks only; must belong to the same list
  * @param {number} [fields.position]
  * @param {string|null} [fields.due_date] - ISO date string (YYYY-MM-DD), or null
  * @param {boolean} [fields.is_recurring]
@@ -27,9 +41,23 @@ export async function createTask(fields) {
     if (!fields.list_id) {
         return { data: null, error: 'A list is required' };
     }
+    if (fields.sublist_id && fields.parent_id) {
+        return { data: null, error: "A subtask can't belong to a sublist directly" };
+    }
 
     try {
         const supabase = await createClient();
+
+        if (fields.sublist_id) {
+            const { data: sublist } = await supabase
+                .from('sublists')
+                .select('list_id')
+                .eq('id', fields.sublist_id)
+                .single();
+            if (!sublist || sublist.list_id !== fields.list_id) {
+                return { data: null, error: 'Sublist does not belong to this list' };
+            }
+        }
 
         let depth = 0;
         if (fields.parent_id) {
@@ -41,6 +69,11 @@ export async function createTask(fields) {
             if (parent) depth = parent.depth + 1;
         }
 
+        const nestingMode = await getNestingMode();
+        if (!isDepthAllowed(depth, nestingMode)) {
+            return { data: null, error: 'Maximum nesting depth reached' };
+        }
+
         let position = fields.position;
         if (position === undefined || position === null) {
             const query = supabase
@@ -49,9 +82,15 @@ export async function createTask(fields) {
                 .order('position', { ascending: false })
                 .limit(1);
 
-            const siblingQuery = fields.parent_id
-                ? query.eq('parent_id', fields.parent_id)
-                : query.eq('list_id', fields.list_id).is('parent_id', null);
+            let siblingQuery;
+            if (fields.parent_id) {
+                siblingQuery = query.eq('parent_id', fields.parent_id);
+            } else {
+                siblingQuery = query.eq('list_id', fields.list_id).is('parent_id', null);
+                siblingQuery = fields.sublist_id
+                    ? siblingQuery.eq('sublist_id', fields.sublist_id)
+                    : siblingQuery.is('sublist_id', null);
+            }
 
             const { data: siblings } = await siblingQuery;
             position = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
@@ -63,13 +102,14 @@ export async function createTask(fields) {
             next_occurrence = nextDate ? nextDate.toISOString() : null;
         }
 
-        const { data, error } = await supabase
+        const { data: createdTask, error } = await supabase
             .from('tasks')
             .insert({
                 title: fields.title.trim(),
                 description: fields.description ?? null,
                 status_id: fields.status_id ?? null,
                 parent_id: fields.parent_id ?? null,
+                sublist_id: fields.parent_id ? null : (fields.sublist_id ?? null),
                 list_id: fields.list_id,
                 position,
                 depth,
@@ -86,7 +126,7 @@ export async function createTask(fields) {
         }
 
         revalidateTag('task-tree');
-        return { data, error: null };
+        return { data: createdTask, error: null };
     } catch {
         return { data: null, error: 'Unexpected error creating task' };
     }
@@ -95,17 +135,36 @@ export async function createTask(fields) {
 /**
  * Updates specific fields on an existing task.
  *
- * @param {string} id - Task ID to update
+ * @param {string} taskId - Task ID to update
  * @param {object} fields - Partial task fields to update
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function updateTask(id, fields) {
-    if (!id) return { data: null, error: 'Task ID is required' };
+export async function updateTask(taskId, fields) {
+    if (!taskId) return { data: null, error: 'Task ID is required' };
 
     try {
         const supabase = await createClient();
 
         const updates = { ...fields };
+
+        if ('sublist_id' in updates && updates.sublist_id) {
+            const { data: existingTask } = await supabase
+                .from('tasks')
+                .select('parent_id, list_id')
+                .eq('id', taskId)
+                .single();
+            if (existingTask?.parent_id) {
+                return { data: null, error: "A subtask can't belong to a sublist directly" };
+            }
+            const { data: sublist } = await supabase
+                .from('sublists')
+                .select('list_id')
+                .eq('id', updates.sublist_id)
+                .single();
+            if (!sublist || sublist.list_id !== existingTask?.list_id) {
+                return { data: null, error: 'Sublist does not belong to this list' };
+            }
+        }
 
         if (updates.is_recurring && updates.recurrence_rule) {
             const nextDate = computeNextOccurrence(updates.recurrence_rule);
@@ -114,10 +173,10 @@ export async function updateTask(id, fields) {
             updates.next_occurrence = null;
         }
 
-        const { data, error } = await supabase
+        const { data: updatedTask, error } = await supabase
             .from('tasks')
             .update(updates)
-            .eq('id', id)
+            .eq('id', taskId)
             .select()
             .single();
 
@@ -126,7 +185,7 @@ export async function updateTask(id, fields) {
         }
 
         revalidateTag('task-tree');
-        return { data, error: null };
+        return { data: updatedTask, error: null };
     } catch {
         return { data: null, error: 'Unexpected error updating task' };
     }
@@ -270,15 +329,45 @@ export async function deleteTaskAndReparentChildren(taskId) {
  * @param {object} snapshot - Deep clone of the subtree from the clipboard
  * @param {string|null} parentId - Parent task ID to paste under, or null for root
  * @param {string} listId - List the pasted copy belongs to (the list currently being viewed)
+ * @param {string|null} [sublistId] - Sublist to paste the root into, only used when parentId is null
  * @returns {{ error: string|null }}
  */
-export async function pasteTask(snapshot, parentId, listId) {
+export async function pasteTask(snapshot, parentId, listId, sublistId = null) {
     if (!snapshot) return { error: 'No snapshot to paste' };
     if (!listId) return { error: 'A list is required' };
 
+    const nestingMode = await getNestingMode();
+    if (nestingMode === 'finite') {
+        let targetDepth = 0;
+        if (parentId) {
+            const supabase = await createClient();
+            const { data: parent } = await supabase
+                .from('tasks')
+                .select('depth')
+                .eq('id', parentId)
+                .single();
+            if (parent) targetDepth = parent.depth + 1;
+        }
+        if (targetDepth + snapshotMaxRelativeDepth(snapshot) > FINITE_MAX_DEPTH) {
+            return { error: 'Pasting here would exceed the maximum nesting depth' };
+        }
+    }
+
+    if (!parentId && sublistId) {
+        const supabase = await createClient();
+        const { data: sublist } = await supabase
+            .from('sublists')
+            .select('list_id')
+            .eq('id', sublistId)
+            .single();
+        if (!sublist || sublist.list_id !== listId) {
+            return { error: 'Sublist does not belong to this list' };
+        }
+    }
+
     try {
         const supabase = await createClient();
-        await insertSnapshotNode(supabase, snapshot, parentId, true, listId);
+        await insertSnapshotNode(supabase, snapshot, parentId, true, listId, sublistId);
         revalidateTag('task-tree');
         return { error: null };
     } catch {
@@ -295,8 +384,9 @@ export async function pasteTask(snapshot, parentId, listId) {
  * @param {string|null} parentId - Parent ID for this insertion
  * @param {boolean} isRoot - Whether this is the root of the paste operation
  * @param {string} listId - List the inserted copy belongs to
+ * @param {string|null} [sublistId] - Sublist for the root node only; ignored for children
  */
-async function insertSnapshotNode(supabase, node, parentId, isRoot, listId) {
+async function insertSnapshotNode(supabase, node, parentId, isRoot, listId, sublistId = null) {
     let depth = 0;
     if (parentId) {
         const { data: parent } = await supabase
@@ -307,20 +397,26 @@ async function insertSnapshotNode(supabase, node, parentId, isRoot, listId) {
         if (parent) depth = parent.depth + 1;
     }
 
-    const siblingQuery = parentId
-        ? supabase
-              .from('tasks')
-              .select('position')
-              .eq('parent_id', parentId)
-              .order('position', { ascending: false })
-              .limit(1)
-        : supabase
-              .from('tasks')
-              .select('position')
-              .eq('list_id', listId)
-              .is('parent_id', null)
-              .order('position', { ascending: false })
-              .limit(1);
+    let siblingQuery;
+    if (parentId) {
+        siblingQuery = supabase
+            .from('tasks')
+            .select('position')
+            .eq('parent_id', parentId)
+            .order('position', { ascending: false })
+            .limit(1);
+    } else {
+        siblingQuery = supabase
+            .from('tasks')
+            .select('position')
+            .eq('list_id', listId)
+            .is('parent_id', null)
+            .order('position', { ascending: false })
+            .limit(1);
+        siblingQuery = sublistId
+            ? siblingQuery.eq('sublist_id', sublistId)
+            : siblingQuery.is('sublist_id', null);
+    }
 
     const { data: siblings } = await siblingQuery;
     const position = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
@@ -334,6 +430,7 @@ async function insertSnapshotNode(supabase, node, parentId, isRoot, listId) {
         description: node.description ?? null,
         status_id: node.status_id ?? null,
         parent_id: parentId ?? null,
+        sublist_id: parentId ? null : (isRoot ? (sublistId ?? null) : null),
         list_id: listId,
         position,
         depth,

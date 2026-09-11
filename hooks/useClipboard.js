@@ -2,7 +2,7 @@
 
 import { toast } from 'sonner';
 import { useClipboardContext } from '@/providers/ClipboardProvider';
-import { deepCloneSubtree } from '@/lib/tree';
+import { deepCloneSubtree, findDescendantIds } from '@/lib/tree';
 import { pasteTask } from '@/actions/task-actions';
 
 /**
@@ -48,9 +48,28 @@ export function useClipboard() {
      * @param {string|null} targetParentId - Parent to paste under, or null for root
      * @param {import('@tanstack/react-query').QueryClient} queryClient
      * @param {string} listId - List the paste target belongs to (the list currently being viewed)
+     * @param {object[]} [flatList] - Current flat task list, needed for cut-mode's cycle guard
      */
-    async function pasteTaskToParent(targetParentId, queryClient, listId) {
+    async function pasteTaskToParent(targetParentId, queryClient, listId, flatList) {
         if (!clipboard.mode || !clipboard.taskId) return;
+
+        // Reparenting onto self/a descendant would make the row its own ancestor — a cycle.
+        if (clipboard.mode === 'cut' && flatList) {
+            if (targetParentId === clipboard.taskId) {
+                toast.error("Can't paste a task into itself");
+                return;
+            }
+            const descendantIds = findDescendantIds(clipboard.taskId, flatList);
+            if (targetParentId && descendantIds.has(targetParentId)) {
+                toast.error("Can't paste a task into its own subtask");
+                return;
+            }
+            const clipboardTask = flatList.find((task) => task.id === clipboard.taskId);
+            if (clipboardTask && (clipboardTask.parent_id ?? null) === (targetParentId ?? null)) {
+                toast('Already there');
+                return;
+            }
+        }
 
         try {
             if (clipboard.mode === 'copy') {
@@ -79,8 +98,8 @@ export function useClipboard() {
 
             clearClipboard();
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        } catch (err) {
-            console.error('Paste operation failed:', err);
+        } catch (caughtError) {
+            console.error('Paste operation failed:', caughtError);
             toast.error('Failed to paste task');
         }
     }

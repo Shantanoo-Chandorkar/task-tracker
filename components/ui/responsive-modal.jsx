@@ -1,14 +1,23 @@
 'use client';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 
 /**
- * Shared modal container for every create/edit surface (Task, Space, List).
- * Renders a centered Dialog at `lg` (1024px) and above, a bottom Sheet below
- * it — the container-level behavior (animation, sizing, breakpoint) lives
- * here once, so every form using it changes together.
+ * Shared modal container for every create/edit form — centered Dialog at `lg`+, bottom Sheet below it.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the modal is open
@@ -25,6 +34,7 @@ export default function ResponsiveModal({ open, onClose, title, children }) {
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
                         <DialogTitle>{title}</DialogTitle>
+                        <DialogDescription className="sr-only">{title}</DialogDescription>
                     </DialogHeader>
                     {children}
                 </DialogContent>
@@ -37,6 +47,7 @@ export default function ResponsiveModal({ open, onClose, title, children }) {
             <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
                 <SheetHeader>
                     <SheetTitle>{title}</SheetTitle>
+                    <SheetDescription className="sr-only">{title}</SheetDescription>
                 </SheetHeader>
                 {children}
             </SheetContent>
