@@ -28,8 +28,8 @@ import {
     deleteTaskAndReparentChildren,
     updateTask,
     completeTaskAndDescendants,
+    duplicateTask,
 } from '@/actions/task-actions';
-import { useClipboard } from '@/hooks/useClipboard';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 import { findAncestors, findDescendantIds, findIncompleteDescendants } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
@@ -39,7 +39,7 @@ import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 
 /**
  * Action bar for a task row — a single, always-visible `···` dropdown with
- * the full action set (edit, delete, add subtask, copy/cut/paste, promote,
+ * the full action set (edit, delete, add subtask, duplicate, promote,
  * move to).
  *
  * @param {object} props
@@ -47,7 +47,7 @@ import MoveDestinationList from '@/components/task-list/MoveDestinationList';
  * @param {object[]} props.flatList - Full flat list for move/promote/delete lookups
  * @param {Function} props.onAddSubtask - Called when "Add Subtask" is selected
  * @param {boolean} [props.canAddSubtask] - Whether depth allows a subtask; default true
- * @param {string} props.listId - The list this task belongs to (for paste target scoping)
+ * @param {string} props.listId - The list this task belongs to
  * @param {Function} [props.onDeleted] - Called after delete, so a task's own detail page can navigate away
  */
 export default function TaskRowActions({
@@ -59,7 +59,6 @@ export default function TaskRowActions({
     onDeleted,
 }) {
     const queryClient = useQueryClient();
-    const { clipboard, copyTask, cutTask, pasteTask } = useClipboard();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
@@ -97,7 +96,6 @@ export default function TaskRowActions({
     const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);
     const grandparentId = parent?.parent_id ?? null;
     const canPromote = Boolean(task.parent_id);
-    const hasPaste = Boolean(clipboard.mode && clipboard.taskId);
 
     // Valid reparent targets exclude the task itself, its current parent, and any descendants (cycle).
     const descendantIds = findDescendantIds(task.id, flatList);
@@ -252,13 +250,19 @@ export default function TaskRowActions({
         toast.dismiss(toastId);
     }
 
-    async function handlePaste() {
+    async function handleDuplicate() {
         setPending(true);
-        const toastId = toast.loading('Pasting task...');
-        // pasteTask already toasts its own errors — just clear the loading toast, don't claim success.
-        await pasteTask(task.id, queryClient, listId, flatList);
-        toast.dismiss(toastId);
+        const toastId = toast.loading('Duplicating task...');
+        const { error } = await duplicateTask(task.id);
         setPending(false);
+
+        if (error) {
+            toast.error(error, { id: toastId });
+            return;
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        toast.success('Task duplicated', { id: toastId });
     }
 
     return (
@@ -299,19 +303,7 @@ export default function TaskRowActions({
                             Add Subtask
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => copyTask(task.id, flatList)}>
-                            Copy
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => cutTask(task.id, flatList)}>
-                            Cut
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={handlePaste}
-                            disabled={!hasPaste}
-                            className={!hasPaste ? 'opacity-40' : ''}
-                        >
-                            Paste here
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleDuplicate}>Duplicate</DropdownMenuItem>
                         <DropdownMenuSeparator />
 
                         {/* Promote — only for non-root tasks */}

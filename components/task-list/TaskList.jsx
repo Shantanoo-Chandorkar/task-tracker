@@ -32,7 +32,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { flatToTree, findDescendantIds } from '@/lib/tree';
-import { useClipboard } from '@/hooks/useClipboard';
+import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow from './TaskRow';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
@@ -96,7 +96,7 @@ function StatusGroup({
     if (tasks.length === 0) return null;
 
     return (
-        <section className="space-y-0.5 pl-4 md:pl-8 [--row-indent:16px] md:[--row-indent:24px]">
+        <section className="space-y-0.5 pl-4 md:pl-8 [--row-indent:8px] md:[--row-indent:24px]">
             <button
                 className="flex items-center gap-2 w-full py-2 text-left group/header"
                 onClick={onToggle}
@@ -218,7 +218,7 @@ function SublistHeader({ sublist, taskCount, isCollapsed, onToggle, onEdit, onDe
 
 /**
  * Root task list — groups root tasks by sublist, then by status, all collapsible.
- * Handles DnD reordering (tasks and sublists) and Ctrl+C/X/V clipboard shortcuts.
+ * Handles DnD reordering (tasks and sublists) and the Ctrl+D duplicate shortcut.
  *
  * @param {object} props
  * @param {string} props.listId - The list this task tree belongs to
@@ -237,7 +237,6 @@ export default function TaskList({
     initialSublists,
 }) {
     const queryClient = useQueryClient();
-    const { clipboard, copyTask, cutTask, pasteTask } = useClipboard();
 
     const [focusedTaskId, setFocusedTaskId] = useState(null);
     const [createDialog, setCreateDialog] = useState({ open: false, parentId: null, sublistId: null });
@@ -436,27 +435,26 @@ export default function TaskList({
         return handleTaskDragEnd({ active, over });
     }
 
-    // Clipboard shortcuts act on whichever task row was last clicked/focused
+    // Ctrl/Cmd+D duplicates whichever task row was last clicked/focused
     useEffect(() => {
         function handleKeyDown(keyboardEvent) {
             const isCtrl = keyboardEvent.ctrlKey || keyboardEvent.metaKey;
-            if (!isCtrl) return;
+            if (!isCtrl || keyboardEvent.key !== 'd' || !focusedTaskId) return;
 
-            if (keyboardEvent.key === 'c' && focusedTaskId) {
-                keyboardEvent.preventDefault();
-                copyTask(focusedTaskId, flatList);
-            } else if (keyboardEvent.key === 'x' && focusedTaskId) {
-                keyboardEvent.preventDefault();
-                cutTask(focusedTaskId, flatList);
-            } else if (keyboardEvent.key === 'v' && clipboard.mode) {
-                keyboardEvent.preventDefault();
-                pasteTask(focusedTaskId ?? null, queryClient, listId, flatList);
-            }
+            keyboardEvent.preventDefault();
+            duplicateTask(focusedTaskId).then(({ error }) => {
+                if (error) {
+                    toast.error(error);
+                    return;
+                }
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                toast.success('Task duplicated');
+            });
         }
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [focusedTaskId, flatList, clipboard, copyTask, cutTask, pasteTask, queryClient, listId]);
+    }, [focusedTaskId, queryClient]);
 
     function toggleGroup(key) {
         setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));

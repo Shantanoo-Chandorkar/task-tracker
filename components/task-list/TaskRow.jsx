@@ -11,7 +11,6 @@ import StatusPicker from '@/components/status/StatusPicker';
 import TaskRowActions from './TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DepthWarning from './DepthWarning';
-import { useClipboardContext } from '@/providers/ClipboardProvider';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 
@@ -29,7 +28,6 @@ import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 export default function TaskRow({ task, depth, flatList, listId }) {
     const [isExpanded, setIsExpanded] = useState(true);
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
-    const { clipboard } = useClipboardContext();
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: task.id,
@@ -41,7 +39,6 @@ export default function TaskRow({ task, depth, flatList, listId }) {
         transition,
     };
 
-    const isCut = clipboard.mode === 'cut' && clipboard.taskId === task.id;
     const hasChildren = task.children && task.children.length > 0;
     // MAX_DEPTH_CONSTANT
     const canAddSubtask = !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH);
@@ -56,8 +53,8 @@ export default function TaskRow({ task, depth, flatList, listId }) {
         >
             {/* Task row — flat, hairline-separated: no per-row card background or radius */}
             <div
-                className={`group flex items-center gap-1.5 py-2 px-2 border-b border-border/60 motion-safe:transition-colors duration-150 hover:bg-muted/50 cursor-default ${isCut ? 'opacity-40' : ''}`}
-                style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth} + 8px)` }}
+                className="group flex items-center gap-1.5 py-2 px-2 border-b border-border/60 motion-safe:transition-colors duration-150 hover:bg-muted/50 cursor-default"
+                style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth})` }}
             >
                 {/* Drag handle — always visible (mobile has no hover to reveal it on) */}
                 <button
@@ -86,7 +83,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
                     )}
                 </button>
 
-                {/* Title opens the task page; clicking elsewhere just focuses the row for clipboard shortcuts */}
+                {/* Title opens the task page; clicking elsewhere just focuses the row for keyboard shortcuts */}
                 <span className="flex-1 text-sm text-foreground truncate min-w-0 flex items-center gap-1.5">
                     <Link
                         href={`/lists/${listId}/tasks/${task.id}`}
