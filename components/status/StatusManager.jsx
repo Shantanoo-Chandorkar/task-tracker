@@ -103,7 +103,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
                     status.is_default
                         ? 'Cannot delete the default status'
                         : status.code
-                          ? 'Built-in status — can’t be deleted'
+                          ? 'Built-in status - can’t be deleted'
                           : isOnly
                             ? 'Cannot delete the only status'
                             : 'Delete status'
@@ -116,7 +116,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
 }
 
 /**
- * Full status management UI — create, rename, recolor, reorder, and delete statuses.
+ * Full status management UI - create, rename, recolor, reorder, and delete statuses.
  * Create/edit go through StatusFormDialog, the same modal container Task/List/Sublist use.
  *
  * @param {object} props
@@ -172,7 +172,7 @@ export default function StatusManager({ initialStatuses }) {
         }
 
         if (results.some((result) => result.queued)) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey });
             toast.dismiss(toastId);
@@ -200,7 +200,7 @@ export default function StatusManager({ initialStatuses }) {
             toast.error(error, { id: toastId });
             setError(error);
         } else if (queued) {
-            toast.success("Deleted — will sync when you're back online", { id: toastId });
+            toast.success("Deleted - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey });
             toast.success('Status deleted', { id: toastId });

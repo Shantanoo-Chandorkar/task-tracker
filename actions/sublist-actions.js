@@ -48,7 +48,7 @@ export async function createSublist(fields) {
 
         if (error) {
             // A replayed offline create can land after the first attempt's response was
-            // lost — the row already exists, so this isn't a real failure, just an echo.
+            // lost - the row already exists, so this isn't a real failure, just an echo.
             if (error.code === '23505' && fields.id) {
                 const { data: existingSublist } = await supabase
                     .from('sublists')
@@ -99,7 +99,7 @@ export async function updateSublist(sublistId, fields) {
 }
 
 /**
- * Deletes a sublist, cascading to its tasks — callers should warn with the task count first.
+ * Deletes a sublist, cascading to its tasks - callers should warn with the task count first.
  *
  * @param {string} sublistId - Sublist ID to delete
  * @returns {{ error: string|null }}

@@ -42,7 +42,7 @@ export async function createSpace(fields) {
 
         if (error) {
             // A replayed offline create can land after the first attempt's response was
-            // lost — the row already exists, so this isn't a real failure, just an echo.
+            // lost - the row already exists, so this isn't a real failure, just an echo.
             if (error.code === '23505' && fields.id) {
                 const { data: existingSpace } = await supabase
                     .from('spaces')

@@ -118,7 +118,7 @@ export default function TaskFormDialog({
 
         let result;
         if (isEditing) {
-            // Optimistic patch — the edit is visible immediately regardless of connectivity.
+            // Optimistic patch - the edit is visible immediately regardless of connectivity.
             queryClient.setQueryData(queryKey, (current) =>
                 current?.map((existingTask) =>
                     existingTask.id === task.id ? { ...existingTask, ...fields } : existingTask,
@@ -169,7 +169,7 @@ export default function TaskFormDialog({
         setSubmitting(false);
 
         if (result.error) {
-            // A genuine rejection (not a network-level queue) never actually applied —
+            // A genuine rejection (not a network-level queue) never actually applied -
             // don't leave the optimistic change showing something that didn't happen.
             queryClient.setQueryData(queryKey, previousTasks);
             setTitleError(result.error);
@@ -177,7 +177,7 @@ export default function TaskFormDialog({
         }
 
         if (result.queued) {
-            toast.success("Saved — will sync when you're back online");
+            toast.success("Saved - will sync when you're back online");
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         }
@@ -230,7 +230,7 @@ export default function TaskFormDialog({
                     </SelectContent>
                 </Select>
 
-                {/* Sublist — root-level tasks only */}
+                {/* Sublist - root-level tasks only */}
                 {isRootCreate && sublists.length > 0 && (
                     <Select
                         value={sublistId || 'none'}
@@ -279,7 +279,7 @@ export default function TaskFormDialog({
                         <span className="text-sm text-foreground">Recurring task</span>
                     </label>
 
-                    {/* RecurrenceBuilder — shown only when recurring is enabled */}
+                    {/* RecurrenceBuilder - shown only when recurring is enabled */}
                     {isRecurring && (
                         <RecurrenceBuilder value={recurrenceRule} onChange={setRecurrenceRule} />
                     )}

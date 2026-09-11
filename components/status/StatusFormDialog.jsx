@@ -73,7 +73,7 @@ export default function StatusFormDialog({ open, onClose, status = null }) {
         setSubmitting(false);
 
         if (result.error) {
-            // A genuine rejection never actually applied — don't leave the optimistic
+            // A genuine rejection never actually applied - don't leave the optimistic
             // change showing something that didn't happen.
             queryClient.setQueryData(queryKey, previousStatuses);
             setError(result.error);
@@ -81,7 +81,7 @@ export default function StatusFormDialog({ open, onClose, status = null }) {
         }
 
         if (result.queued) {
-            toast.success("Saved — will sync when you're back online");
+            toast.success("Saved - will sync when you're back online");
         } else {
             await queryClient.invalidateQueries({ queryKey: ['statuses'] });
         }

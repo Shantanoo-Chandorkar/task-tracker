@@ -10,7 +10,7 @@ import { findIncompleteDescendants } from '@/lib/tree';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 
 /**
- * Recursive nested subtask list — each row links to its own task page, with a done/undone checkbox.
+ * Recursive nested subtask list - each row links to its own task page, with a done/undone checkbox.
  *
  * @param {object} props
  * @param {object[]} props.nodes - Task nodes (from flatToTree) with a `children` array
@@ -37,7 +37,7 @@ export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
 
     /**
      * Toggles a subtask's status between the built-in "done" status and the
-     * default status, in place — checking a subtask doesn't navigate to it.
+     * default status, in place - checking a subtask doesn't navigate to it.
      *
      * @param {object} node - The subtask being toggled
      * @param {boolean} checked - Whether the box was just checked
@@ -63,7 +63,7 @@ export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.dismiss(toastId);
@@ -84,7 +84,7 @@ export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.dismiss(toastId);

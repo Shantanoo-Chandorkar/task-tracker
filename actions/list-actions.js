@@ -49,7 +49,7 @@ export async function createList(fields) {
 
         if (error) {
             // A replayed offline create can land after the first attempt's response was
-            // lost — the row already exists, so this isn't a real failure, just an echo.
+            // lost - the row already exists, so this isn't a real failure, just an echo.
             if (error.code === '23505' && fields.id) {
                 const { data: existingList } = await supabase
                     .from('lists')
@@ -100,7 +100,7 @@ export async function updateList(id, fields) {
 }
 
 /**
- * Deletes a list. Cascades to its tasks (ON DELETE CASCADE) — callers are
+ * Deletes a list. Cascades to its tasks (ON DELETE CASCADE) - callers are
  * expected to warn the user with the task count before calling this.
  *
  * @param {string} id - List ID to delete

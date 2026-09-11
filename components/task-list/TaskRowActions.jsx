@@ -33,7 +33,7 @@ import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 
 /**
- * Action bar for a task row — a single, always-visible `···` dropdown with
+ * Action bar for a task row - a single, always-visible `···` dropdown with
  * the full action set (edit, delete, add subtask, duplicate, promote,
  * move to).
  *
@@ -126,7 +126,7 @@ export default function TaskRowActions({
         setPending(true);
         const toastId = toast.loading('Deleting task...');
 
-        // Optimistic removal — mirrors the DB cascade for plain delete. For the
+        // Optimistic removal - mirrors the DB cascade for plain delete. For the
         // reparent strategy, children are hidden too until the sync confirms the
         // real reparent; they reappear correctly once that lands.
         const queryKey = ['tasks', listId];
@@ -147,7 +147,7 @@ export default function TaskRowActions({
         }
 
         if (queued) {
-            toast.success("Deleted — will sync when you're back online", { id: toastId });
+            toast.success("Deleted - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.success('Task deleted', { id: toastId });
@@ -159,7 +159,7 @@ export default function TaskRowActions({
      * Applies a reparent to the cached task list the same way the server would: recomputes
      * the task's own depth from its new parent, cascades the delta to its descendants, and
      * appends it at the end of its new sibling group. Position is an approximation (exact
-     * order settles once the move syncs and the list next refetches) — same tradeoff already
+     * order settles once the move syncs and the list next refetches) - same tradeoff already
      * accepted for offline creates.
      *
      * @param {object[]} currentTasks - Cached flat task list to patch
@@ -226,7 +226,7 @@ export default function TaskRowActions({
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.success('Task moved', { id: toastId });
@@ -274,7 +274,7 @@ export default function TaskRowActions({
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.dismiss(toastId);
@@ -294,7 +294,7 @@ export default function TaskRowActions({
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.dismiss(toastId);
@@ -314,7 +314,7 @@ export default function TaskRowActions({
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.success('Task duplicated', { id: toastId });
@@ -323,7 +323,7 @@ export default function TaskRowActions({
 
     return (
         <>
-            {/* Edit/Delete live only in this menu — always visible since mobile has no hover. */}
+            {/* Edit/Delete live only in this menu - always visible since mobile has no hover. */}
             <div className="flex items-center gap-0.5 flex-shrink-0">
                 {/* ··· context menu */}
                 <DropdownMenu>
@@ -362,7 +362,7 @@ export default function TaskRowActions({
                         <DropdownMenuItem onClick={handleDuplicate}>Duplicate</DropdownMenuItem>
                         <DropdownMenuSeparator />
 
-                        {/* Promote — only for non-root tasks */}
+                        {/* Promote - only for non-root tasks */}
                         {canPromote && (
                             <DropdownMenuItem onClick={handlePromote}>
                                 Promote to sibling
@@ -391,7 +391,7 @@ export default function TaskRowActions({
                                 </DropdownMenuItem>
                             ))}
 
-                        {/* Root tasks only — subtasks always render nested, never in a sublist. */}
+                        {/* Root tasks only - subtasks always render nested, never in a sublist. */}
                         {isRootTask && sublists.length > 0 && (
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>Move to sublist...</DropdownMenuSubTrigger>
@@ -436,7 +436,7 @@ export default function TaskRowActions({
                 onConfirm={handleDeleteConfirm}
             />
 
-            {/* Cascade-complete confirmation — only shown when subtasks are still incomplete */}
+            {/* Cascade-complete confirmation - only shown when subtasks are still incomplete */}
             <CompleteTaskDialog
                 open={completeConfirmOpen}
                 onClose={() => setCompleteConfirmOpen(false)}
@@ -445,7 +445,7 @@ export default function TaskRowActions({
                 onConfirm={handleCascadeComplete}
             />
 
-            {/* Move-to destination picker — mobile only; desktop uses the DropdownMenuSub flyout above */}
+            {/* Move-to destination picker - mobile only; desktop uses the DropdownMenuSub flyout above */}
             <Sheet open={moveSheetOpen} onOpenChange={(open) => !open && setMoveSheetOpen(false)}>
                 <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
                     <SheetHeader>

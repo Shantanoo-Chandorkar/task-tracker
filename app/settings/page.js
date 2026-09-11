@@ -4,7 +4,7 @@ import InstallAppCard from '@/components/nav/InstallAppCard';
 import SyncIssuesCard from '@/components/settings/SyncIssuesCard';
 
 /**
- * Settings page — Server Component.
+ * Settings page - Server Component.
  * Fetches statuses server-side to pass as initialData to StatusManager,
  * so the settings page has zero client-side waterfall on first load.
  */

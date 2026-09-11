@@ -24,8 +24,8 @@ export default function OfflineBanner() {
                 {isOnline
                     ? `Syncing ${pendingCount} change${pendingCount === 1 ? '' : 's'}...`
                     : pendingCount > 0
-                      ? `You're offline — ${pendingCount} change${pendingCount === 1 ? '' : 's'} will sync when you're back`
-                      : "You're offline — changes will sync when you're back"}
+                      ? `You're offline - ${pendingCount} change${pendingCount === 1 ? '' : 's'} will sync when you're back`
+                      : "You're offline - changes will sync when you're back"}
             </span>
         </div>
     );

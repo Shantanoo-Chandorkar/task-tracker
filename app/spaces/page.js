@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import SpaceListManager from '@/components/space/SpaceListManager';
 
 /**
- * Spaces page — Server Component.
+ * Spaces page - Server Component.
  * Fetches spaces and lists server-side to pass as initialData to
  * SpaceListManager, so the page has zero client-side waterfall on first load.
  */

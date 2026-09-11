@@ -8,7 +8,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import SyncIssueBadge from '@/components/nav/SyncIssueBadge';
 
 /**
- * Shared nav content: Spaces link, Space-grouped Lists, and Settings — framed by the caller.
+ * Shared nav content: Spaces link, Space-grouped Lists, and Settings - framed by the caller.
  *
  * @param {object} props
  * @param {Function} [props.onNavigate] - Called after a link is clicked (used to close the mobile drawer)

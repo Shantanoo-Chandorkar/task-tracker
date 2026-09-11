@@ -84,7 +84,7 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
         }
 
         if (result.queued) {
-            toast.success("Saved — will sync when you're back online");
+            toast.success("Saved - will sync when you're back online");
         } else {
             await queryClient.invalidateQueries({ queryKey });
         }

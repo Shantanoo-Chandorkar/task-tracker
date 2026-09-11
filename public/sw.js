@@ -2,7 +2,7 @@
 const CACHE_NAME = 'task-tracker-shell-v1';
 
 // Fixed, known-ahead-of-time assets only. Page HTML and API responses are
-// cached at runtime instead — Next's chunk filenames are content-hashed and
+// cached at runtime instead - Next's chunk filenames are content-hashed and
 // unknown here, and there's no fixed set of "pages" to precache in an app
 // where every route is server-rendered per-request.
 const SHELL_ASSETS = [
@@ -41,7 +41,7 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
 
     // Never touch mutations (POST/PATCH/DELETE to /api/*, Next Server Actions
-    // are POSTs too) or cross-origin requests — only same-origin GETs are cached.
+    // are POSTs too) or cross-origin requests - only same-origin GETs are cached.
     if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) {
         return;
     }

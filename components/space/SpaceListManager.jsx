@@ -194,7 +194,7 @@ function SpaceSection({
 }
 
 /**
- * Full Space/List management UI — create, rename, recolor, reorder, and delete both.
+ * Full Space/List management UI - create, rename, recolor, reorder, and delete both.
  *
  * @param {object} props
  * @param {object[]} props.initialSpaces - SSR-fetched spaces for initial hydration
@@ -362,7 +362,7 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
             toast.error(error, { id: toastId });
             setError(error);
         } else if (queued) {
-            toast.success("Deleted — will sync when you're back online", { id: toastId });
+            toast.success("Deleted - will sync when you're back online", { id: toastId });
         } else {
             await refetchAll();
             toast.success(deleteTarget.type === 'space' ? 'Space deleted' : 'List deleted', {

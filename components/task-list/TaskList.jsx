@@ -43,7 +43,7 @@ import { Loader } from '@/components/ui/loader';
 
 /**
  * Collision detection scoped to the dragged row's own siblings (parent_id + sublist_id).
- * Sublist headers fall back to plain closestCenter — they're already one flat list.
+ * Sublist headers fall back to plain closestCenter - they're already one flat list.
  *
  * @param {object} args - dnd-kit collision detection arguments
  * @returns {object[]} Collisions, scoped to siblings when possible
@@ -146,7 +146,7 @@ function StatusGroup({
 }
 
 /**
- * Collapsible sublist section header — drag handle, color swatch, name, edit, delete.
+ * Collapsible sublist section header - drag handle, color swatch, name, edit, delete.
  *
  * @param {object} props
  * @param {object} props.sublist
@@ -216,7 +216,7 @@ function SublistHeader({ sublist, taskCount, isCollapsed, onToggle, onEdit, onDe
 }
 
 /**
- * Root task list — groups root tasks by sublist, then by status, all collapsible.
+ * Root task list - groups root tasks by sublist, then by status, all collapsible.
  * Handles DnD reordering (tasks and sublists) and the Ctrl+D duplicate shortcut.
  *
  * @param {object} props
@@ -278,7 +278,7 @@ export default function TaskList({
     const tree = flatToTree(flatList);
     const rootTasks = tree; // flatToTree already returns only root nodes
 
-    // Counts include every depth, not just root tasks — a subtask's status can differ from its parent's.
+    // Counts include every depth, not just root tasks - a subtask's status can differ from its parent's.
     const countsByStatusId = {};
     for (const status of statuses) {
         countsByStatusId[status.id] = flatList.filter(
@@ -334,7 +334,7 @@ export default function TaskList({
         if (!activeTask) return;
 
         // flatList is ordered by (depth, position), so same-(parent, sublist) tasks stay in
-        // relative order here — no separate sibling lookup, and non-root tasks always have sublist_id null.
+        // relative order here - no separate sibling lookup, and non-root tasks always have sublist_id null.
         const siblingIds = flatList
             .filter(
                 (task) =>
@@ -351,7 +351,7 @@ export default function TaskList({
         const isMovingToStart = newIndex === 0;
         const afterSiblingId = oldIndex < newIndex ? over.id : (siblingIds[newIndex - 1] ?? null);
 
-        // Optimistic reorder — lands in the new slot immediately, without waiting on the persist round-trip.
+        // Optimistic reorder - lands in the new slot immediately, without waiting on the persist round-trip.
         const queryKey = ['tasks', listId];
         const previousTasks = queryClient.getQueryData(queryKey);
         const reorderedSiblingIds = arrayMove(siblingIds, oldIndex, newIndex);
@@ -388,7 +388,7 @@ export default function TaskList({
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.success('Order updated', { id: toastId });
@@ -422,7 +422,7 @@ export default function TaskList({
         }
 
         if (results.some((result) => result.queued)) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey });
             toast.success('Order updated', { id: toastId });
@@ -452,7 +452,7 @@ export default function TaskList({
                         return;
                     }
                     if (queued) {
-                        toast.success("Saved — will sync when you're back online");
+                        toast.success("Saved - will sync when you're back online");
                     } else {
                         queryClient.invalidateQueries({ queryKey: ['tasks'] });
                         toast.success('Task duplicated');
@@ -502,7 +502,7 @@ export default function TaskList({
         }
 
         if (queued) {
-            toast.success("Deleted — will sync when you're back online", { id: toastId });
+            toast.success("Deleted - will sync when you're back online", { id: toastId });
             return;
         }
 

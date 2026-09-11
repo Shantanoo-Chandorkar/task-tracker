@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 
 /**
- * Ancestor reparent dropdown — shows all ancestors of the current task
+ * Ancestor reparent dropdown - shows all ancestors of the current task
  * as move targets. Selecting an ancestor makes this task the last child
  * of that ancestor. Only renders if the task has at least one ancestor.
  *

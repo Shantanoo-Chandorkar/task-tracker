@@ -11,7 +11,7 @@ function isIosDevice() {
 
 /**
  * Settings-page install control. Additive to the browser's own native
- * "Add to Home Screen" affordance, not a replacement for it — this just
+ * "Add to Home Screen" affordance, not a replacement for it - this just
  * gives the same action a visible, discoverable home in-app.
  */
 export default function InstallAppCard() {

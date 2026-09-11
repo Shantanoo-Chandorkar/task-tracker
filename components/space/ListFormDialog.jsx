@@ -18,7 +18,7 @@ import { enqueueOrRun } from '@/lib/offline-queue';
 
 /**
  * Modal for creating or editing a List, rendered through the shared
- * ResponsiveModal container — same container as Task/Space creation.
+ * ResponsiveModal container - same container as Task/Space creation.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open
@@ -102,7 +102,7 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
         }
 
         if (result.queued) {
-            toast.success("Saved — will sync when you're back online");
+            toast.success("Saved - will sync when you're back online");
         } else {
             await queryClient.invalidateQueries({ queryKey });
         }

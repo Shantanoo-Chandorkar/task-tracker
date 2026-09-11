@@ -6,7 +6,7 @@ import { findDescendantIds } from '@/lib/tree';
 
 /**
  * Shared optimistic status-change logic for the three places a task's status can be
- * changed (row menu, subtask checkbox, status dropdown) — each applies the same
+ * changed (row menu, subtask checkbox, status dropdown) - each applies the same
  * snapshot/patch/rollback pattern around the offline outbox, so it lives here once.
  *
  * @param {string} listId - The list whose cached task data should be patched

@@ -130,7 +130,7 @@ export async function createTask(fields) {
 
         if (error) {
             // A replayed offline create can land after the first attempt's response was
-            // lost — the row already exists, so this isn't a real failure, just an echo.
+            // lost - the row already exists, so this isn't a real failure, just an echo.
             if (error.code === '23505' && fields.id) {
                 const { data: existingTask } = await supabase
                     .from('tasks')
@@ -220,7 +220,7 @@ export async function updateTask(taskId, fields) {
 
 /**
  * Marks a task and all its descendants (any depth) as done in one update. Used when
- * completing a parent that still has incomplete subtasks — the user has already
+ * completing a parent that still has incomplete subtasks - the user has already
  * confirmed the cascade via a UI dialog before this is called.
  *
  * @param {string} taskId - Root task to complete along with its descendants
@@ -283,7 +283,7 @@ export async function deleteTask(id) {
 /**
  * Deletes a task and re-parents its direct children to the deleted task's parent.
  * Children are spliced into the sibling list at the exact position where the deleted task sat.
- * Grandchildren (and deeper) remain attached to their own parents — only the top-level link is re-wired.
+ * Grandchildren (and deeper) remain attached to their own parents - only the top-level link is re-wired.
  *
  * Must re-parent BEFORE deleting to prevent the DB cascade from wiping the children first.
  *
@@ -419,7 +419,7 @@ export async function moveTask(taskId, params) {
 
         if (taskError || !task) return { data: null, error: 'Task not found' };
 
-        // Defense in depth — a self/descendant reparent creates a cycle that hangs every tree walker.
+        // Defense in depth - a self/descendant reparent creates a cycle that hangs every tree walker.
         if (newParentId === taskId) {
             return { data: null, error: 'A task cannot be its own parent' };
         }
@@ -454,7 +454,7 @@ export async function moveTask(taskId, params) {
         const depthDelta = newDepth - task.depth;
 
         // Cap must hold for the deepest descendant of the moved subtree, not just the moved task
-        // itself — reparenting a subtree carries its whole shape with it.
+        // itself - reparenting a subtree carries its whole shape with it.
         // MAX_DEPTH_CONSTANT
         const nestingMode = await getNestingMode();
         if (nestingMode === 'finite' && depthDelta > 0) {
@@ -648,7 +648,7 @@ export async function duplicateTask(taskId, newRootId = null) {
                 .select('id')
                 .eq('id', newRootId)
                 .single();
-            // A replayed duplicate lands after the first attempt's response was lost — the whole
+            // A replayed duplicate lands after the first attempt's response was lost - the whole
             // subtree was already inserted in that single server-side call, so this is a no-op.
             if (existingRoot) return { error: null };
         }
@@ -668,7 +668,7 @@ export async function duplicateTask(taskId, newRootId = null) {
         const snapshot = deepCloneSubtree(taskId, listTasks || []);
         if (!snapshot) return { error: 'Task not found' };
 
-        // MAX_DEPTH_CONSTANT — duplicate lands at the same depth as the original, but a deep
+        // MAX_DEPTH_CONSTANT - duplicate lands at the same depth as the original, but a deep
         // subtree could still push its descendants past the limit.
         const nestingMode = await getNestingMode();
         if (
@@ -717,7 +717,7 @@ export async function duplicateTask(taskId, newRootId = null) {
 
 /**
  * Recursively inserts a single snapshot node and its descendants.
- * Called by duplicateTask — not exported.
+ * Called by duplicateTask - not exported.
  *
  * @param {object} supabase - Supabase client
  * @param {object} node - Snapshot node with optional children array

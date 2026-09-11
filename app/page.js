@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import SpaceListManager from '@/components/space/SpaceListManager';
 
 /**
- * Root page — Server Component.
+ * Root page - Server Component.
  * Redirects to the first available list (ordered by space, then list,
  * position). With no lists yet, shows the Space/List manager inline so a
  * first-time user can create one without a separate onboarding flow.

@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 /**
  * GET /api/sublists?list_id=<id>
  * Returns the sublists for one list, ordered by position, each with a task_count.
- * list_id is required — sublists only ever make sense scoped to one list.
+ * list_id is required - sublists only ever make sense scoped to one list.
  */
 export async function GET(request) {
     try {

@@ -42,7 +42,7 @@ export default function RootLayout({ children }) {
                     <div className="flex">
                         <DesktopSidebar />
                         {/* <body> is the real scrolling element (native pull-to-refresh needs
-                            the document itself to scroll) — the sidebar and mobile top bar
+                            the document itself to scroll) - the sidebar and mobile top bar
                             stay pinned via sticky/fixed instead of trapping scroll in here. */}
                         <div className="flex flex-1 flex-col min-w-0">
                             <MobileTopBar />

@@ -64,7 +64,7 @@ export default function StatusPicker({ task, flatList, listId }) {
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online");
+            toast.success("Saved - will sync when you're back online");
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         }
@@ -83,7 +83,7 @@ export default function StatusPicker({ task, flatList, listId }) {
         }
 
         if (queued) {
-            toast.success("Saved — will sync when you're back online", { id: toastId });
+            toast.success("Saved - will sync when you're back online", { id: toastId });
         } else {
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.dismiss(toastId);

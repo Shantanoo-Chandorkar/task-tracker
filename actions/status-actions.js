@@ -42,7 +42,7 @@ export async function createStatus(fields) {
 
         if (error) {
             // A replayed offline create can land after the first attempt's response was
-            // lost — the row already exists, so this isn't a real failure, just an echo.
+            // lost - the row already exists, so this isn't a real failure, just an echo.
             if (error.code === '23505' && fields.id) {
                 const { data: existingStatus } = await supabase
                     .from('statuses')
@@ -64,7 +64,7 @@ export async function createStatus(fields) {
 
 /**
  * Updates specific fields on a status (name, color, position).
- * `code` is deliberately not accepted here — it identifies the 3 built-in
+ * `code` is deliberately not accepted here - it identifies the 3 built-in
  * statuses and must never be settable from the client, even indirectly.
  *
  * @param {string} id - Status ID to update

@@ -8,7 +8,7 @@ import QuickCreateFab from './QuickCreateFab';
 import SyncIssueBadge from './SyncIssueBadge';
 
 /**
- * Mobile bottom navigation — Tasks / Spaces / Settings, with a center-FAB quick-create.
+ * Mobile bottom navigation - Tasks / Spaces / Settings, with a center-FAB quick-create.
  */
 export default function BottomNav() {
     const pathname = usePathname();
