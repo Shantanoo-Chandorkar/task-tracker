@@ -23,7 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
-import { deleteTask, deleteTaskAndReparentChildren } from '@/actions/task-actions';
+import { deleteTask, deleteTaskAndReparentChildren, updateTask } from '@/actions/task-actions';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 import { findAncestors, findDescendantIds } from '@/lib/tree';
@@ -70,6 +70,19 @@ export default function TaskRowActions({
         },
         enabled: isRootTask,
     });
+
+    const { data: statuses = [] } = useQuery({
+        queryKey: ['statuses'],
+        queryFn: async () => {
+            const response = await fetch('/api/statuses');
+            if (!response.ok) throw new Error('Failed to fetch statuses');
+            return response.json();
+        },
+    });
+
+    const doneStatus = statuses.find((status) => status.code === 'done');
+    const defaultStatus = statuses.find((status) => status.is_default);
+    const isDone = task.status_id === doneStatus?.id;
 
     const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);
     const grandparentId = parent?.parent_id ?? null;
@@ -190,6 +203,24 @@ export default function TaskRowActions({
         toast.success('Task moved', { id: toastId });
     }
 
+    async function handleToggleComplete() {
+        const targetStatus = isDone ? defaultStatus : doneStatus;
+        if (!targetStatus) return;
+
+        setPending(true);
+        const toastId = toast.loading(isDone ? 'Marking incomplete...' : 'Marking complete...');
+        const { error } = await updateTask(task.id, { status_id: targetStatus.id });
+        setPending(false);
+
+        if (error) {
+            toast.error(error, { id: toastId });
+            return;
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        toast.dismiss(toastId);
+    }
+
     async function handlePaste() {
         setPending(true);
         const toastId = toast.loading('Pasting task...');
@@ -222,6 +253,13 @@ export default function TaskRowActions({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-40">
                         <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={handleToggleComplete}
+                            disabled={!doneStatus || !defaultStatus}
+                            className={!doneStatus || !defaultStatus ? 'opacity-40' : ''}
+                        >
+                            {isDone ? 'Mark as incomplete' : 'Mark as complete'}
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={onAddSubtask}
                             disabled={!canAddSubtask}
