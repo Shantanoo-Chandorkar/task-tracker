@@ -4,11 +4,12 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
-import { findDescendantIds } from '@/lib/tree';
+import { findDescendantIds, deepCloneSubtree } from '@/lib/tree';
+import { getPositionBetween } from '@/lib/fractional-index';
 import { canMarkTaskDone, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
 
 /**
- * Deepest relative depth in a clipboard snapshot's subtree (0 = root with no children).
+ * Deepest relative depth in a subtree snapshot (0 = root with no children).
  *
  * @param {object} node - Snapshot node with an optional children array
  * @returns {number} Deepest relative depth in this subtree
@@ -71,6 +72,7 @@ export async function createTask(fields) {
             if (parent) depth = parent.depth + 1;
         }
 
+        // MAX_DEPTH_CONSTANT
         const nestingMode = await getNestingMode();
         if (!isDepthAllowed(depth, nestingMode)) {
             return { data: null, error: 'Maximum nesting depth reached' };
@@ -371,71 +373,101 @@ export async function deleteTaskAndReparentChildren(taskId) {
 }
 
 /**
- * Recursively inserts a snapshot subtree under a new parent.
- * Generates new UUIDs for every node so the paste creates independent copies.
- * Appends ' (copy)' to the root task's title.
+ * Duplicates a task and its whole subtree, inserting the copy as the next
+ * sibling right after the original. Generates new UUIDs for every node so
+ * the duplicate is fully independent. Appends ' (copy)' to the root title.
  *
- * @param {object} snapshot - Deep clone of the subtree from the clipboard
- * @param {string|null} parentId - Parent task ID to paste under, or null for root
- * @param {string} listId - List the pasted copy belongs to (the list currently being viewed)
- * @param {string|null} [sublistId] - Sublist to paste the root into, only used when parentId is null
+ * @param {string} taskId - Task to duplicate
  * @returns {{ error: string|null }}
  */
-export async function pasteTask(snapshot, parentId, listId, sublistId = null) {
-    if (!snapshot) return { error: 'No snapshot to paste' };
-    if (!listId) return { error: 'A list is required' };
-
-    const nestingMode = await getNestingMode();
-    if (nestingMode === 'finite') {
-        let targetDepth = 0;
-        if (parentId) {
-            const supabase = await createClient();
-            const { data: parent } = await supabase
-                .from('tasks')
-                .select('depth')
-                .eq('id', parentId)
-                .single();
-            if (parent) targetDepth = parent.depth + 1;
-        }
-        if (targetDepth + snapshotMaxRelativeDepth(snapshot) > FINITE_MAX_DEPTH) {
-            return { error: 'Pasting here would exceed the maximum nesting depth' };
-        }
-    }
-
-    if (!parentId && sublistId) {
-        const supabase = await createClient();
-        const { data: sublist } = await supabase
-            .from('sublists')
-            .select('list_id')
-            .eq('id', sublistId)
-            .single();
-        if (!sublist || sublist.list_id !== listId) {
-            return { error: 'Sublist does not belong to this list' };
-        }
-    }
+export async function duplicateTask(taskId) {
+    if (!taskId) return { error: 'Task ID is required' };
 
     try {
         const supabase = await createClient();
-        await insertSnapshotNode(supabase, snapshot, parentId, true, listId, sublistId);
+
+        const { data: task, error: taskError } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('id', taskId)
+            .single();
+        if (taskError || !task) return { error: 'Task not found' };
+
+        const { data: listTasks } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('list_id', task.list_id);
+
+        const snapshot = deepCloneSubtree(taskId, listTasks || []);
+        if (!snapshot) return { error: 'Task not found' };
+
+        // MAX_DEPTH_CONSTANT — duplicate lands at the same depth as the original, but a deep
+        // subtree could still push its descendants past the limit.
+        const nestingMode = await getNestingMode();
+        if (
+            nestingMode === 'finite' &&
+            task.depth + snapshotMaxRelativeDepth(snapshot) > FINITE_MAX_DEPTH
+        ) {
+            return { error: 'Duplicating this task would exceed the maximum nesting depth' };
+        }
+
+        let siblingsQuery = supabase
+            .from('tasks')
+            .select('id, position')
+            .eq('list_id', task.list_id)
+            .neq('id', taskId)
+            .order('position', { ascending: true });
+        siblingsQuery = task.parent_id
+            ? siblingsQuery.eq('parent_id', task.parent_id)
+            : siblingsQuery.is('parent_id', null);
+        if (!task.parent_id) {
+            siblingsQuery = task.sublist_id
+                ? siblingsQuery.eq('sublist_id', task.sublist_id)
+                : siblingsQuery.is('sublist_id', null);
+        }
+
+        const { data: siblings = [] } = await siblingsQuery;
+        const nextSibling = siblings.find((sibling) => sibling.position > task.position);
+        const newPosition = getPositionBetween(task.position, nextSibling?.position ?? null);
+
+        await insertSnapshotNode(
+            supabase,
+            snapshot,
+            task.parent_id,
+            true,
+            task.list_id,
+            task.sublist_id,
+            newPosition,
+        );
+
         revalidateTag('task-tree');
         return { error: null };
     } catch {
-        return { error: 'Failed to paste task' };
+        return { error: 'Failed to duplicate task' };
     }
 }
 
 /**
  * Recursively inserts a single snapshot node and its descendants.
- * Called by pasteTask — not exported.
+ * Called by duplicateTask — not exported.
  *
  * @param {object} supabase - Supabase client
  * @param {object} node - Snapshot node with optional children array
  * @param {string|null} parentId - Parent ID for this insertion
- * @param {boolean} isRoot - Whether this is the root of the paste operation
+ * @param {boolean} isRoot - Whether this is the root of the duplicated subtree
  * @param {string} listId - List the inserted copy belongs to
  * @param {string|null} [sublistId] - Sublist for the root node only; ignored for children
+ * @param {number|null} [explicitPosition] - Exact position to use for the root node, if given
  */
-async function insertSnapshotNode(supabase, node, parentId, isRoot, listId, sublistId = null) {
+async function insertSnapshotNode(
+    supabase,
+    node,
+    parentId,
+    isRoot,
+    listId,
+    sublistId = null,
+    explicitPosition = null,
+) {
     let depth = 0;
     if (parentId) {
         const { data: parent } = await supabase
@@ -446,29 +478,34 @@ async function insertSnapshotNode(supabase, node, parentId, isRoot, listId, subl
         if (parent) depth = parent.depth + 1;
     }
 
-    let siblingQuery;
-    if (parentId) {
-        siblingQuery = supabase
-            .from('tasks')
-            .select('position')
-            .eq('parent_id', parentId)
-            .order('position', { ascending: false })
-            .limit(1);
+    let position;
+    if (isRoot && explicitPosition !== null) {
+        position = explicitPosition;
     } else {
-        siblingQuery = supabase
-            .from('tasks')
-            .select('position')
-            .eq('list_id', listId)
-            .is('parent_id', null)
-            .order('position', { ascending: false })
-            .limit(1);
-        siblingQuery = sublistId
-            ? siblingQuery.eq('sublist_id', sublistId)
-            : siblingQuery.is('sublist_id', null);
-    }
+        let siblingQuery;
+        if (parentId) {
+            siblingQuery = supabase
+                .from('tasks')
+                .select('position')
+                .eq('parent_id', parentId)
+                .order('position', { ascending: false })
+                .limit(1);
+        } else {
+            siblingQuery = supabase
+                .from('tasks')
+                .select('position')
+                .eq('list_id', listId)
+                .is('parent_id', null)
+                .order('position', { ascending: false })
+                .limit(1);
+            siblingQuery = sublistId
+                ? siblingQuery.eq('sublist_id', sublistId)
+                : siblingQuery.is('sublist_id', null);
+        }
 
-    const { data: siblings } = await siblingQuery;
-    const position = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
+        const { data: siblings } = await siblingQuery;
+        position = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
+    }
 
     const newId = crypto.randomUUID();
     const title = isRoot ? `${node.title} (copy)` : node.title;

@@ -14,7 +14,7 @@ Key features:
 - **Status groups** — tasks are grouped by status with collapsible sections; only groups that have tasks are shown
 - **Drag and drop** — reorder sibling tasks by dragging
 - **Rearrangement** — promote a task to its parent's level, or move it to any valid destination in the tree via a searchable dropdown with breadcrumb paths
-- **Copy / Cut / Paste** — clipboard operations work on entire subtrees, with keyboard shortcuts (Ctrl+C / Ctrl+X / Ctrl+V)
+- **Duplicate** — clones a task and its whole subtree as a sibling right below it, with a keyboard shortcut (Ctrl+D)
 - **Recurring tasks** — configure daily, weekly, monthly, or yearly recurrence with custom intervals and end conditions; a daily cron job spawns new task instances automatically
 - **Settings** — create, rename, reorder, and delete statuses with custom colours
 - **Light / Dark theme** — toggle from the header
@@ -42,7 +42,7 @@ Key features:
 ```
 task-tracker/
 ├── app/
-│   ├── layout.js              # Root layout — wraps QueryProvider and ClipboardProvider
+│   ├── layout.js              # Root layout — wraps QueryProvider
 │   ├── page.js                # Server Component — SSR fetch, hydrates TanStack Query
 │   ├── loading.js             # Suspense skeleton shown while page.js fetches
 │   ├── error.js               # Error boundary
@@ -60,7 +60,7 @@ task-tracker/
 │   ├── task-list/
 │   │   ├── TaskList.jsx            # Root list container; groups tasks by status
 │   │   ├── TaskRow.jsx             # Recursive row — renders itself and its children
-│   │   ├── TaskRowActions.jsx      # Hover action bar: edit, delete, copy/cut/paste, move
+│   │   ├── TaskRowActions.jsx      # Hover action bar: edit, delete, duplicate, move
 │   │   ├── DeleteTaskDialog.jsx    # Confirmation dialog with subtask reparent option
 │   │   ├── TaskRowInlineAdd.jsx    # Inline subtask creation on Enter
 │   │   ├── DepthWarning.jsx        # Amber warning banner at depth 4+
@@ -77,11 +77,10 @@ task-tracker/
 │       └── ParentDropdown.jsx      # Ancestor select dropdown
 │
 ├── actions/
-│   ├── task-actions.js         # Server Actions: create, update, delete, paste, reparent-delete
+│   ├── task-actions.js         # Server Actions: create, update, delete, duplicate, reparent-delete
 │   └── status-actions.js       # Server Actions: create, update, delete status
 │
 ├── hooks/
-│   ├── useClipboard.js         # Copy / cut / paste logic with localStorage persistence
 │   └── useTaskTree.js          # TanStack Query fetch — returns flat list and nested tree
 │
 ├── lib/
@@ -94,8 +93,7 @@ task-tracker/
 │       └── middleware.js       # Middleware Supabase client (reserved for future auth)
 │
 ├── providers/
-│   ├── QueryProvider.jsx       # TanStack Query client setup
-│   └── ClipboardProvider.jsx   # Clipboard context + localStorage sync
+│   └── QueryProvider.jsx       # TanStack Query client setup
 │
 └── vercel.json                 # Vercel cron schedule (daily at midnight UTC)
 ```
