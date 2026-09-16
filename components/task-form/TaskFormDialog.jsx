@@ -16,6 +16,7 @@ import {
 import RecurrenceBuilder from './RecurrenceBuilder';
 import { createTask, updateTask } from '@/actions/task-actions';
 import { Loader } from '@/components/ui/loader';
+import { toast } from 'sonner';
 
 /**
  * Modal for creating or editing a task, via the shared ResponsiveModal container.
@@ -117,9 +118,11 @@ export default function TaskFormDialog({
 
         if (error) {
             setTitleError(error);
+            toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
             return;
         }
 
+        toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
         await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         onClose();
     }
