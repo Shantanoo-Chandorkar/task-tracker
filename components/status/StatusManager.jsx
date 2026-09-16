@@ -7,7 +7,8 @@ import {
     DndContext,
     closestCenter,
     KeyboardSensor,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
@@ -66,7 +67,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
         >
             <button
                 {...listeners}
-                className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
+                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
                 aria-label="Drag to reorder"
             >
                 <GripVertical className="h-4 w-4" />
@@ -140,7 +141,9 @@ export default function StatusManager({ initialStatuses }) {
     });
 
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+        // TouchSensor (not PointerSensor) with delay/tolerance, so a tap or scroll isn't grabbed as a drag.
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
@@ -157,12 +160,17 @@ export default function StatusManager({ initialStatuses }) {
 
         for (let i = 0; i < reordered.length; i++) {
             if (reordered[i].position !== i) {
-                await updateStatus(reordered[i].id, { position: i });
+                const { error } = await updateStatus(reordered[i].id, { position: i });
+                if (error) {
+                    await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+                    toast.error(error, { id: toastId });
+                    return;
+                }
             }
         }
 
         await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-        toast.dismiss(toastId);
+        toast.success('Order saved', { id: toastId });
     }
 
     async function handleConfirmDelete() {
