@@ -8,6 +8,7 @@ import { ChevronDown, ChevronRight, Circle } from 'lucide-react';
 import { updateTask, completeTaskAndDescendants } from '@/actions/task-actions';
 import { findIncompleteDescendants } from '@/lib/tree';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
+import { useUIState } from '@/providers/UIStateProvider';
 
 /**
  * Recursive nested subtask list — each row links to its own task page, with a done/undone checkbox.
@@ -116,8 +117,6 @@ export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
 /**
  * A single subtask row plus its collapsed-by-default children, mirroring TaskRow.jsx's chevron.
  *
- * Local `isExpanded` state, since each node is its own component instance here.
- *
  * @param {object} props
  * @param {object} props.node - Task node (from flatToTree) with a `children` array
  * @param {string} props.listId - The list these tasks belong to, for building links
@@ -128,14 +127,16 @@ export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
  * @param {Function} props.onToggle - Called with (node, checked) when the checkbox changes
  */
 function SubtaskTreeNode({ node, listId, flatList, depth, doneStatus, defaultStatus, onToggle }) {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const { flags, toggleFlag } = useUIState();
+    const expandKey = `subtask-node:${node.id}`;
+    const isExpanded = Boolean(flags[expandKey]);
     const hasChildren = node.children.length > 0;
 
     return (
         <div>
             <div className="flex items-center gap-2 py-1.5">
                 <button
-                    onClick={() => setIsExpanded((prev) => !prev)}
+                    onClick={() => toggleFlag(expandKey)}
                     className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground"
                     aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
                 >

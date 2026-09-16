@@ -39,6 +39,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { flatToTree, findDescendantIds } from '@/lib/tree';
+import { useUIState } from '@/providers/UIStateProvider';
 import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow from './TaskRow';
@@ -255,7 +256,7 @@ export default function TaskList({
 
     const [focusedTaskId, setFocusedTaskId] = useState(null);
     const [createDialog, setCreateDialog] = useState({ open: false, parentId: null, sublistId: null });
-    const [collapsedGroups, setCollapsedGroups] = useState({});
+    const { flags: collapsedGroups, toggleFlag: toggleGroup } = useUIState();
     const [activeStatusId, setActiveStatusId] = useState(null);
     const [sublistDialog, setSublistDialog] = useState({ open: false, sublist: null });
     const [deleteSublistTarget, setDeleteSublistTarget] = useState(null);
@@ -470,10 +471,6 @@ export default function TaskList({
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [focusedTaskId, queryClient]);
-
-    function toggleGroup(key) {
-        setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-    }
 
     async function requestDeleteSublist(sublist) {
         const response = await fetch(`/api/sublists/${sublist.id}`);

@@ -13,6 +13,7 @@ import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DepthWarning from './DepthWarning';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
+import { useUIState } from '@/providers/UIStateProvider';
 
 /**
  * Recursive row component — renders one task and all its children.
@@ -26,8 +27,10 @@ import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
  * @param {string} props.listId - The list this task tree belongs to
  */
 export default function TaskRow({ task, depth, flatList, listId }) {
-    const [isExpanded, setIsExpanded] = useState(false);
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
+    const { flags, toggleFlag, setFlag } = useUIState();
+    const expandKey = `task-row:${task.id}`;
+    const isExpanded = Boolean(flags[expandKey]);
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: task.id,
@@ -68,7 +71,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
 
                 {/* Expand/collapse toggle */}
                 <button
-                    onClick={() => setIsExpanded((prev) => !prev)}
+                    onClick={() => toggleFlag(expandKey)}
                     className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground motion-safe:transition-colors"
                     aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
                 >
@@ -120,7 +123,7 @@ export default function TaskRow({ task, depth, flatList, listId }) {
                     task={task}
                     flatList={flatList}
                     onAddSubtask={() => {
-                        setIsExpanded(true);
+                        setFlag(expandKey, true);
                         setAddSubtaskOpen(true);
                     }}
                     canAddSubtask={canAddSubtask}
