@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
+import { getNextPosition } from '@/lib/position';
 
 /**
  * Creates a new status. Appends it after the last existing status.
@@ -19,13 +20,7 @@ export async function createStatus(fields) {
     try {
         const supabase = await createClient();
 
-        const { data: existing } = await supabase
-            .from('statuses')
-            .select('position')
-            .order('position', { ascending: false })
-            .limit(1);
-
-        const position = existing && existing.length > 0 ? existing[0].position + 1 : 0;
+        const position = await getNextPosition(supabase, 'statuses', {});
 
         const { data, error } = await supabase
             .from('statuses')

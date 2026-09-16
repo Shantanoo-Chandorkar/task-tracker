@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
+import { getNextPosition } from '@/lib/position';
 
 /**
  * Creates a new space. Appends it after the last existing space.
@@ -19,13 +20,7 @@ export async function createSpace(fields) {
     try {
         const supabase = await createClient();
 
-        const { data: existing } = await supabase
-            .from('spaces')
-            .select('position')
-            .order('position', { ascending: false })
-            .limit(1);
-
-        const position = existing && existing.length > 0 ? existing[0].position + 1 : 0;
+        const position = await getNextPosition(supabase, 'spaces', {});
 
         const { data, error } = await supabase
             .from('spaces')
