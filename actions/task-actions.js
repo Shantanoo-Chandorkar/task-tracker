@@ -6,7 +6,8 @@ import { computeNextOccurrence } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
 import { findDescendantIds, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
-import { canMarkTaskDone, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
+import { getNextPosition } from '@/lib/position';
+import { canMarkTaskDone, getDefaultStatusId, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
 
 /**
  * Deepest relative depth in a subtree snapshot (0 = root with no children).
@@ -80,24 +81,10 @@ export async function createTask(fields) {
 
         let position = fields.position;
         if (position === undefined || position === null) {
-            const query = supabase
-                .from('tasks')
-                .select('position')
-                .order('position', { ascending: false })
-                .limit(1);
-
-            let siblingQuery;
-            if (fields.parent_id) {
-                siblingQuery = query.eq('parent_id', fields.parent_id);
-            } else {
-                siblingQuery = query.eq('list_id', fields.list_id).is('parent_id', null);
-                siblingQuery = fields.sublist_id
-                    ? siblingQuery.eq('sublist_id', fields.sublist_id)
-                    : siblingQuery.is('sublist_id', null);
-            }
-
-            const { data: siblings } = await siblingQuery;
-            position = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
+            const filters = fields.parent_id
+                ? { parent_id: fields.parent_id }
+                : { list_id: fields.list_id, parent_id: null, sublist_id: fields.sublist_id ?? null };
+            position = await getNextPosition(supabase, 'tasks', filters, 1);
         }
 
         let next_occurrence = null;
@@ -239,6 +226,42 @@ export async function completeTaskAndDescendants(taskId) {
         return { error: null };
     } catch {
         return { error: 'Unexpected error completing tasks' };
+    }
+}
+
+/**
+ * Marks a task and all its descendants as the default (not-done) status in one update.
+ * Assumes the cascade-confirm dialog already ran — this just performs the write.
+ *
+ * @param {string} taskId - Root task to uncomplete along with its descendants
+ * @returns {{ error: string|null }}
+ */
+export async function uncompleteTaskAndDescendants(taskId) {
+    if (!taskId) return { error: 'Task ID is required' };
+
+    try {
+        const supabase = await createClient();
+
+        const { task, listTasks } = await getTaskListTree(supabase, taskId);
+        if (!task) return { error: 'Task not found' };
+
+        const defaultStatusId = await getDefaultStatusId(supabase);
+        if (!defaultStatusId) return { error: 'No default status configured' };
+
+        const descendantIds = Array.from(findDescendantIds(taskId, listTasks));
+        const idsToUncomplete = [taskId, ...descendantIds];
+
+        const { error } = await supabase
+            .from('tasks')
+            .update({ status_id: defaultStatusId })
+            .in('id', idsToUncomplete);
+
+        if (error) return { error: 'Failed to mark tasks incomplete' };
+
+        revalidateTag('task-tree');
+        return { error: null };
+    } catch {
+        return { error: 'Unexpected error uncompleting tasks' };
     }
 }
 
@@ -482,29 +505,10 @@ async function insertSnapshotNode(
     if (isRoot && explicitPosition !== null) {
         position = explicitPosition;
     } else {
-        let siblingQuery;
-        if (parentId) {
-            siblingQuery = supabase
-                .from('tasks')
-                .select('position')
-                .eq('parent_id', parentId)
-                .order('position', { ascending: false })
-                .limit(1);
-        } else {
-            siblingQuery = supabase
-                .from('tasks')
-                .select('position')
-                .eq('list_id', listId)
-                .is('parent_id', null)
-                .order('position', { ascending: false })
-                .limit(1);
-            siblingQuery = sublistId
-                ? siblingQuery.eq('sublist_id', sublistId)
-                : siblingQuery.is('sublist_id', null);
-        }
-
-        const { data: siblings } = await siblingQuery;
-        position = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
+        const filters = parentId
+            ? { parent_id: parentId }
+            : { list_id: listId, parent_id: null, sublist_id: sublistId ?? null };
+        position = await getNextPosition(supabase, 'tasks', filters, 1);
     }
 
     const newId = crypto.randomUUID();
