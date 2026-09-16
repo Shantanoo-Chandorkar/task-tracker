@@ -8,11 +8,7 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-    DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
     Sheet,
@@ -23,7 +19,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
-import { MoreHorizontal, CornerDownRight } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import {
     deleteTask,
     deleteTaskAndReparentChildren,
@@ -31,7 +27,6 @@ import {
     completeTaskAndDescendants,
     duplicateTask,
 } from '@/actions/task-actions';
-import { useIsDesktop } from '@/hooks/useIsDesktop';
 import { findAncestors, findDescendantIds, findIncompleteDescendants, flattenTreeDepthFirst } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
@@ -65,7 +60,6 @@ export default function TaskRowActions({
     const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
     const [pending, setPending] = useState(false);
-    const isDesktop = useIsDesktop();
     const isRootTask = !task.parent_id;
 
     const { data: sublists = [] } = useQuery({
@@ -126,7 +120,6 @@ export default function TaskRowActions({
         group.targets.push(target);
     });
 
-    // canMoveToRoot is computed once here and reused by the desktop flyout and mobile Sheet below.
     const sortedGroups = [
         targetGroups.find((g) => g.id === currentSublistId),
         ...targetGroups.filter((g) => g.id !== currentSublistId),
@@ -138,7 +131,6 @@ export default function TaskRowActions({
         }))
         .filter((group) => group.canMoveToRoot || group.targets.length > 0);
 
-    // Flatten for mobile Sheet
     const moveDestinations = sortedGroups.flatMap((group) => {
         const groupDestinations = [
             { id: `label-${group.id || 'main'}`, label: group.name, isLabel: true },
@@ -336,46 +328,11 @@ export default function TaskRowActions({
                             </DropdownMenuItem>
                         )}
 
-                        {/* Nested flyouts don't fit mobile widths, so this opens a bottom Sheet there instead. */}
-                        {moveDestinations.length > 0 &&
-                            (isDesktop ? (
-                                <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger>Move to...</DropdownMenuSubTrigger>
-                                    <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
-                                        {sortedGroups.map((group, index) => (
-                                            <div key={group.id || 'main'}>
-                                                {index > 0 && <DropdownMenuSeparator />}
-                                                <DropdownMenuLabel>{group.name}</DropdownMenuLabel>
-
-                                                {group.canMoveToRoot && (
-                                                    <DropdownMenuItem onClick={() => handleMoveToSublist(group.id)}>
-                                                        <CornerDownRight className="h-3 w-3 text-muted-foreground" />
-                                                        Move to {group.name}
-                                                    </DropdownMenuItem>
-                                                )}
-
-                                                {group.targets.map((target) => (
-                                                    <DropdownMenuItem
-                                                        key={target.id}
-                                                        onClick={() => handleMoveTo(target.id)}
-                                                        className={target.depth > 0 ? 'text-muted-foreground' : ''}
-                                                        style={{ paddingLeft: `calc(0.375rem + ${target.depth} * 1rem)` }}
-                                                    >
-                                                        {target.depth > 0 && (
-                                                            <CornerDownRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                                        )}
-                                                        {target.title}
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </div>
-                                        ))}
-                                    </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-                            ) : (
-                                <DropdownMenuItem onClick={() => setMoveSheetOpen(true)}>
-                                    Move to...
-                                </DropdownMenuItem>
-                            ))}
+                        {moveDestinations.length > 0 && (
+                            <DropdownMenuItem onClick={() => setMoveSheetOpen(true)}>
+                                Move to...
+                            </DropdownMenuItem>
+                        )}
 
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -409,7 +366,7 @@ export default function TaskRowActions({
                 onConfirm={handleCascadeComplete}
             />
 
-            {/* Move-to destination picker — mobile only; desktop uses the DropdownMenuSub flyout above */}
+            {/* Move-to destination picker — same bottom sheet on every breakpoint */}
             <Sheet open={moveSheetOpen} onOpenChange={(open) => !open && setMoveSheetOpen(false)}>
                 <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
                     <SheetHeader>
