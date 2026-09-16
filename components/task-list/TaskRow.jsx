@@ -26,7 +26,7 @@ import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
  * @param {string} props.listId - The list this task tree belongs to
  */
 export default function TaskRow({ task, depth, flatList, listId }) {
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -119,7 +119,10 @@ export default function TaskRow({ task, depth, flatList, listId }) {
                 <TaskRowActions
                     task={task}
                     flatList={flatList}
-                    onAddSubtask={() => setAddSubtaskOpen(true)}
+                    onAddSubtask={() => {
+                        setIsExpanded(true);
+                        setAddSubtaskOpen(true);
+                    }}
                     canAddSubtask={canAddSubtask}
                     listId={listId}
                 />
