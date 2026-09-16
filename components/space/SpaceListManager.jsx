@@ -8,7 +8,8 @@ import {
     DndContext,
     closestCenter,
     KeyboardSensor,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
@@ -68,7 +69,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
             <button
                 {...listeners}
                 {...attributes}
-                className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
                 aria-label="Drag to reorder"
             >
                 <GripVertical className="h-3.5 w-3.5" />
@@ -139,7 +140,7 @@ function SpaceSection({
                 <button
                     {...listeners}
                     {...attributes}
-                    className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                    className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
                     aria-label="Drag to reorder"
                 >
                     <GripVertical className="h-3.5 w-3.5" />
@@ -230,7 +231,9 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
     });
 
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+        // TouchSensor (not PointerSensor) with delay/tolerance, so a tap or scroll isn't grabbed as a drag.
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
@@ -244,20 +247,27 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
      *
      * @param {object[]} items - Items in their new order
      * @param {Function} updateFn - updateSpace or updateList
+     * @returns {string|null} Error message if a position update failed, else null
      */
     async function persistPositions(items, updateFn) {
         for (let i = 0; i < items.length; i++) {
             if (items[i].position !== i) {
-                await updateFn(items[i].id, { position: i });
+                const { error } = await updateFn(items[i].id, { position: i });
+                if (error) {
+                    await refetchAll();
+                    return error;
+                }
             }
         }
         await refetchAll();
+        return null;
     }
 
     async function handleDragEnd({ active, over }) {
         if (!over || active.id === over.id) return;
         const type = active.data.current?.type;
         const toastId = toast.loading('Saving order...');
+        let persistError;
 
         if (type === 'space') {
             const oldIndex = spaces.findIndex((space) => space.id === active.id);
@@ -269,7 +279,7 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
 
             const reordered = arrayMove(spaces, oldIndex, newIndex);
             queryClient.setQueryData(['spaces'], reordered);
-            await persistPositions(reordered, updateSpace);
+            persistError = await persistPositions(reordered, updateSpace);
         } else if (type === 'list') {
             const spaceId = active.data.current.spaceId;
             const spaceLists = lists.filter((list) => list.space_id === spaceId);
@@ -283,10 +293,13 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
             const reorderedSpaceLists = arrayMove(spaceLists, oldIndex, newIndex);
             const otherLists = lists.filter((list) => list.space_id !== spaceId);
             queryClient.setQueryData(['lists'], [...otherLists, ...reorderedSpaceLists]);
-            await persistPositions(reorderedSpaceLists, updateList);
+            persistError = await persistPositions(reorderedSpaceLists, updateList);
+        } else {
+            toast.dismiss(toastId);
+            return;
         }
 
-        toast.dismiss(toastId);
+        toast[persistError ? 'error' : 'success'](persistError ?? 'Order saved', { id: toastId });
     }
 
     async function requestDeleteSpace(space) {

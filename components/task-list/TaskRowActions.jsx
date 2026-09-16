@@ -8,9 +8,6 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -30,8 +27,7 @@ import {
     completeTaskAndDescendants,
     duplicateTask,
 } from '@/actions/task-actions';
-import { useIsDesktop } from '@/hooks/useIsDesktop';
-import { findAncestors, findDescendantIds, findIncompleteDescendants } from '@/lib/tree';
+import { findAncestors, findDescendantIds, findIncompleteDescendants, flattenTreeDepthFirst } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
@@ -64,7 +60,6 @@ export default function TaskRowActions({
     const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
     const [pending, setPending] = useState(false);
-    const isDesktop = useIsDesktop();
     const isRootTask = !task.parent_id;
 
     const { data: sublists = [] } = useQuery({
@@ -74,7 +69,6 @@ export default function TaskRowActions({
             if (!response.ok) throw new Error('Failed to fetch sublists');
             return response.json();
         },
-        enabled: isRootTask,
     });
 
     const { data: statuses = [] } = useQuery({
@@ -97,33 +91,71 @@ export default function TaskRowActions({
     const grandparentId = parent?.parent_id ?? null;
     const canPromote = Boolean(task.parent_id);
 
-    // Valid reparent targets exclude the task itself, its current parent, and any descendants (cycle).
+    // Descendants are excluded to avoid a reparent cycle.
+    // Depth-first order keeps each subtask directly after its real parent — a flat sort would scatter them.
     const descendantIds = findDescendantIds(task.id, flatList);
-    const validTargets = flatList
-        .filter(
-            (flatTask) =>
-                flatTask.id !== task.id &&
-                flatTask.id !== task.parent_id &&
-                !descendantIds.has(flatTask.id),
-        )
-        .sort((taskA, taskB) => taskA.depth - taskB.depth || taskA.title.localeCompare(taskB.title));
+    const validTargets = flattenTreeDepthFirst(flatList).filter(
+        (flatTask) =>
+            flatTask.id !== task.id &&
+            flatTask.id !== task.parent_id &&
+            !descendantIds.has(flatTask.id),
+    );
 
-    /**
-     * Builds a breadcrumb label for a target task so duplicate titles are unambiguous.
-     * e.g. "Project › Design › Wireframes"
-     *
-     * @param {object} target - Task to build a breadcrumb for
-     * @returns {string} Breadcrumb-style label
-     */
-    function getBreadcrumb(target) {
-        const ancestors = findAncestors(target.id, flatList).reverse();
-        return [...ancestors.map((ancestor) => ancestor.title), target.title].join(' › ');
+    function getSublistIdForTarget(targetId) {
+        const ancestors = findAncestors(targetId, flatList);
+        const root = ancestors.length > 0 ? ancestors[ancestors.length - 1] : flatList.find((t) => t.id === targetId);
+        return root?.sublist_id ?? null;
     }
 
-    const moveDestinations = validTargets.map((target) => ({
-        id: target.id,
-        label: getBreadcrumb(target),
-    }));
+    const currentSublistId = getSublistIdForTarget(task.id);
+
+    const targetGroups = [
+        { id: null, name: 'Main List', targets: [] },
+        ...sublists.map((sl) => ({ id: sl.id, name: sl.name, targets: [] }))
+    ];
+
+    validTargets.forEach((target) => {
+        const sublistId = getSublistIdForTarget(target.id);
+        const group = targetGroups.find((g) => g.id === sublistId) || targetGroups[0];
+        group.targets.push(target);
+    });
+
+    const sortedGroups = [
+        targetGroups.find((g) => g.id === currentSublistId),
+        ...targetGroups.filter((g) => g.id !== currentSublistId),
+    ]
+        .filter(Boolean)
+        .map((group) => ({
+            ...group,
+            canMoveToRoot: isRootTask && group.id !== task.sublist_id,
+        }))
+        .filter((group) => group.canMoveToRoot || group.targets.length > 0);
+
+    const moveDestinations = sortedGroups.flatMap((group) => {
+        const groupDestinations = [
+            { id: `label-${group.id || 'main'}`, label: group.name, isLabel: true },
+        ];
+
+        if (group.canMoveToRoot) {
+            groupDestinations.push({
+                id: `sublist-${group.id || 'main'}`,
+                label: `Move to ${group.name}`,
+                isSublist: true,
+                sublistId: group.id,
+            });
+        }
+
+        group.targets.forEach((target) => {
+            groupDestinations.push({
+                id: target.id,
+                label: target.title,
+                depth: target.depth,
+                isTask: true,
+                targetId: target.id,
+            });
+        });
+        return groupDestinations;
+    });
 
     async function handleDeleteConfirm(strategy) {
         setDeleteOpen(false);
@@ -145,70 +177,53 @@ export default function TaskRowActions({
         onDeleted?.();
     }
 
-    async function handlePromote() {
+    /**
+     * Posts a reparent/reposition request and reports the outcome via toast.
+     *
+     * Shared by promote, move-to-task, and move-to-sublist to avoid repeating this fetch+toast logic three times.
+     *
+     * @param {object} body - Request body for POST /api/tasks/[id]/move
+     * @param {string} successMessage - Toast text shown once the move succeeds
+     */
+    async function performMove(body, successMessage) {
         setPending(true);
         const toastId = toast.loading('Moving task...');
         const response = await fetch(`/api/tasks/${task.id}/move`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                newParentId: grandparentId,
-                afterSiblingId: task.parent_id,
-                listId,
-            }),
+            body: JSON.stringify(body),
         });
+        const moveResponseBody = await response.json().catch(() => null);
         setPending(false);
 
         if (!response.ok) {
-            toast.error('Failed to move task', { id: toastId });
+            toast.error(moveResponseBody?.error || 'Failed to move task', { id: toastId });
             return;
         }
 
         await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task moved', { id: toastId });
+        toast.success(successMessage, { id: toastId });
     }
 
-    async function handleMoveTo(targetId) {
-        setPending(true);
-        const toastId = toast.loading('Moving task...');
-        const response = await fetch(`/api/tasks/${task.id}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ newParentId: targetId, afterSiblingId: null, listId }),
-        });
-        setPending(false);
-
-        if (!response.ok) {
-            toast.error('Failed to move task', { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task moved', { id: toastId });
+    function handlePromote() {
+        return performMove(
+            { newParentId: grandparentId, afterSiblingId: task.parent_id, listId },
+            'Task moved',
+        );
     }
 
-    async function handleMoveToSublist(targetSublistId) {
-        setPending(true);
-        const toastId = toast.loading('Moving task...');
-        const response = await fetch(`/api/tasks/${task.id}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                newParentId: null,
-                sublistId: targetSublistId,
-                afterSiblingId: null,
-                listId,
-            }),
-        });
-        setPending(false);
+    function handleMoveTo(targetId) {
+        return performMove(
+            { newParentId: targetId, afterSiblingId: null, listId },
+            'Task moved',
+        );
+    }
 
-        if (!response.ok) {
-            toast.error('Failed to move task', { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.success('Task moved', { id: toastId });
+    function handleMoveToSublist(targetSublistId) {
+        return performMove(
+            { newParentId: null, sublistId: targetSublistId, afterSiblingId: null, listId },
+            'Task moved',
+        );
     }
 
     async function handleToggleComplete() {
@@ -313,48 +328,10 @@ export default function TaskRowActions({
                             </DropdownMenuItem>
                         )}
 
-                        {/* Nested flyouts don't fit mobile widths, so this opens a bottom Sheet there instead. */}
-                        {validTargets.length > 0 &&
-                            (isDesktop ? (
-                                <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger>Move to...</DropdownMenuSubTrigger>
-                                    <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
-                                        {validTargets.map((target) => (
-                                            <DropdownMenuItem
-                                                key={target.id}
-                                                onClick={() => handleMoveTo(target.id)}
-                                            >
-                                                {getBreadcrumb(target)}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-                            ) : (
-                                <DropdownMenuItem onClick={() => setMoveSheetOpen(true)}>
-                                    Move to...
-                                </DropdownMenuItem>
-                            ))}
-
-                        {/* Root tasks only — subtasks always render nested, never in a sublist. */}
-                        {isRootTask && sublists.length > 0 && (
-                            <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>Move to sublist...</DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
-                                    <DropdownMenuItem onClick={() => handleMoveToSublist(null)}>
-                                        No sublist
-                                    </DropdownMenuItem>
-                                    {sublists
-                                        .filter((sublist) => sublist.id !== task.sublist_id)
-                                        .map((sublist) => (
-                                            <DropdownMenuItem
-                                                key={sublist.id}
-                                                onClick={() => handleMoveToSublist(sublist.id)}
-                                            >
-                                                {sublist.name}
-                                            </DropdownMenuItem>
-                                        ))}
-                                </DropdownMenuSubContent>
-                            </DropdownMenuSub>
+                        {moveDestinations.length > 0 && (
+                            <DropdownMenuItem onClick={() => setMoveSheetOpen(true)}>
+                                Move to...
+                            </DropdownMenuItem>
                         )}
 
                         <DropdownMenuSeparator />
@@ -389,7 +366,7 @@ export default function TaskRowActions({
                 onConfirm={handleCascadeComplete}
             />
 
-            {/* Move-to destination picker — mobile only; desktop uses the DropdownMenuSub flyout above */}
+            {/* Move-to destination picker — same bottom sheet on every breakpoint */}
             <Sheet open={moveSheetOpen} onOpenChange={(open) => !open && setMoveSheetOpen(false)}>
                 <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
                     <SheetHeader>
@@ -403,6 +380,10 @@ export default function TaskRowActions({
                         onSelect={(targetId) => {
                             setMoveSheetOpen(false);
                             handleMoveTo(targetId);
+                        }}
+                        onSelectSublist={(sublistId) => {
+                            setMoveSheetOpen(false);
+                            handleMoveToSublist(sublistId);
                         }}
                     />
                 </SheetContent>

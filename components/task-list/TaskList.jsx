@@ -19,7 +19,14 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronRight, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, GripVertical, Plus, MoreHorizontal } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import {
     AlertDialog,
@@ -32,6 +39,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { flatToTree, findDescendantIds } from '@/lib/tree';
+import { useUIState } from '@/providers/UIStateProvider';
 import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow from './TaskRow';
@@ -157,7 +165,7 @@ function StatusGroup({
  * @param {Function} props.onEdit
  * @param {Function} props.onDelete
  */
-function SublistHeader({ sublist, taskCount, isCollapsed, onToggle, onEdit, onDelete }) {
+function SublistHeader({ sublist, taskCount, isCollapsed, onToggle, onEdit, onDelete, onAddTask }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: sublist.id,
         data: { type: 'sublist' },
@@ -196,22 +204,30 @@ function SublistHeader({ sublist, taskCount, isCollapsed, onToggle, onEdit, onDe
                 <span className="text-sm font-semibold text-foreground">{sublist.name}</span>
                 <span className="text-xs text-muted-foreground/60">({taskCount})</span>
             </button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                onClick={onEdit}
-            >
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={onDelete}
-            >
-                <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                        aria-label="Sublist actions"
+                    >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-40">
+                    <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+                    <DropdownMenuItem onClick={onAddTask}>Add task</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onClick={onDelete}
+                        className="text-destructive focus:text-destructive"
+                    >
+                        Delete
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
     );
 }
@@ -240,7 +256,7 @@ export default function TaskList({
 
     const [focusedTaskId, setFocusedTaskId] = useState(null);
     const [createDialog, setCreateDialog] = useState({ open: false, parentId: null, sublistId: null });
-    const [collapsedGroups, setCollapsedGroups] = useState({});
+    const { flags: collapsedGroups, toggleFlag: toggleGroup } = useUIState();
     const [activeStatusId, setActiveStatusId] = useState(null);
     const [sublistDialog, setSublistDialog] = useState({ open: false, sublist: null });
     const [deleteSublistTarget, setDeleteSublistTarget] = useState(null);
@@ -456,10 +472,6 @@ export default function TaskList({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [focusedTaskId, queryClient]);
 
-    function toggleGroup(key) {
-        setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-    }
-
     async function requestDeleteSublist(sublist) {
         const response = await fetch(`/api/sublists/${sublist.id}`);
         const counts = await response.json();
@@ -560,6 +572,13 @@ export default function TaskList({
                                             setSublistDialog({ open: true, sublist: bucket.sublist })
                                         }
                                         onDelete={() => requestDeleteSublist(bucket.sublist)}
+                                        onAddTask={() =>
+                                            setCreateDialog({
+                                                open: true,
+                                                parentId: null,
+                                                sublistId: bucket.sublist.id,
+                                            })
+                                        }
                                     />
                                     {!isCollapsed && (
                                         <button
@@ -597,6 +616,13 @@ export default function TaskList({
                                             setSublistDialog({ open: true, sublist: bucket.sublist })
                                         }
                                         onDelete={() => requestDeleteSublist(bucket.sublist)}
+                                        onAddTask={() =>
+                                            setCreateDialog({
+                                                open: true,
+                                                parentId: null,
+                                                sublistId: bucket.sublist.id,
+                                            })
+                                        }
                                     />
                                 )}
                                 {!isSublistCollapsed && (

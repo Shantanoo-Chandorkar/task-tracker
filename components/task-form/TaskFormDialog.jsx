@@ -16,6 +16,7 @@ import {
 import RecurrenceBuilder from './RecurrenceBuilder';
 import { createTask, updateTask } from '@/actions/task-actions';
 import { Loader } from '@/components/ui/loader';
+import { toast } from 'sonner';
 
 /**
  * Modal for creating or editing a task, via the shared ResponsiveModal container.
@@ -52,25 +53,6 @@ export default function TaskFormDialog({
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
 
-    // Reset fields during render (not an effect) to avoid an extra render/flicker on prop change.
-    const resetKey = open
-        ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}:${defaultSublistId ?? ''}`
-        : null;
-    const [lastResetKey, setLastResetKey] = useState(resetKey);
-    if (resetKey !== lastResetKey) {
-        setLastResetKey(resetKey);
-        if (open) {
-            setTitle(task?.title ?? '');
-            setDescription(task?.description ?? '');
-            setStatusId(task?.status_id ?? defaultStatusId ?? '');
-            setSublistId(defaultSublistId ?? '');
-            setDueDate(task?.due_date ?? '');
-            setIsRecurring(task?.is_recurring ?? false);
-            setRecurrenceRule(task?.recurrence_rule ?? null);
-            setTitleError('');
-        }
-    }
-
     const { data: statuses = [] } = useQuery({
         queryKey: ['statuses'],
         queryFn: async () => {
@@ -79,6 +61,26 @@ export default function TaskFormDialog({
             return response.json();
         },
     });
+
+    // Reset fields during render (not an effect) to avoid an extra render/flicker on prop change.
+    const resetKey = open
+        ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}:${defaultSublistId ?? ''}`
+        : null;
+    const [lastResetKey, setLastResetKey] = useState(resetKey);
+    if (resetKey !== lastResetKey) {
+        setLastResetKey(resetKey);
+        if (open) {
+            const fallbackStatus = statuses.find((status) => status.is_default);
+            setTitle(task?.title ?? '');
+            setDescription(task?.description ?? '');
+            setStatusId(task?.status_id ?? defaultStatusId ?? fallbackStatus?.id ?? '');
+            setSublistId(defaultSublistId ?? '');
+            setDueDate(task?.due_date ?? '');
+            setIsRecurring(task?.is_recurring ?? false);
+            setRecurrenceRule(task?.recurrence_rule ?? null);
+            setTitleError('');
+        }
+    }
 
     const { data: sublists = [] } = useQuery({
         queryKey: ['sublists', listId],
@@ -117,9 +119,11 @@ export default function TaskFormDialog({
 
         if (error) {
             setTitleError(error);
+            toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
             return;
         }
 
+        toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
         await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         onClose();
     }
@@ -136,7 +140,6 @@ export default function TaskFormDialog({
                             setTitleError('');
                         }}
                         placeholder="Task title"
-                        autoFocus
                     />
                     {titleError && <p className="text-xs text-destructive">{titleError}</p>}
                 </div>
