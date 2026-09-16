@@ -53,25 +53,6 @@ export default function TaskFormDialog({
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
 
-    // Reset fields during render (not an effect) to avoid an extra render/flicker on prop change.
-    const resetKey = open
-        ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}:${defaultSublistId ?? ''}`
-        : null;
-    const [lastResetKey, setLastResetKey] = useState(resetKey);
-    if (resetKey !== lastResetKey) {
-        setLastResetKey(resetKey);
-        if (open) {
-            setTitle(task?.title ?? '');
-            setDescription(task?.description ?? '');
-            setStatusId(task?.status_id ?? defaultStatusId ?? '');
-            setSublistId(defaultSublistId ?? '');
-            setDueDate(task?.due_date ?? '');
-            setIsRecurring(task?.is_recurring ?? false);
-            setRecurrenceRule(task?.recurrence_rule ?? null);
-            setTitleError('');
-        }
-    }
-
     const { data: statuses = [] } = useQuery({
         queryKey: ['statuses'],
         queryFn: async () => {
@@ -80,6 +61,26 @@ export default function TaskFormDialog({
             return response.json();
         },
     });
+
+    // Reset fields during render (not an effect) to avoid an extra render/flicker on prop change.
+    const resetKey = open
+        ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}:${defaultSublistId ?? ''}`
+        : null;
+    const [lastResetKey, setLastResetKey] = useState(resetKey);
+    if (resetKey !== lastResetKey) {
+        setLastResetKey(resetKey);
+        if (open) {
+            const fallbackStatus = statuses.find((status) => status.is_default);
+            setTitle(task?.title ?? '');
+            setDescription(task?.description ?? '');
+            setStatusId(task?.status_id ?? defaultStatusId ?? fallbackStatus?.id ?? '');
+            setSublistId(defaultSublistId ?? '');
+            setDueDate(task?.due_date ?? '');
+            setIsRecurring(task?.is_recurring ?? false);
+            setRecurrenceRule(task?.recurrence_rule ?? null);
+            setTitleError('');
+        }
+    }
 
     const { data: sublists = [] } = useQuery({
         queryKey: ['sublists', listId],
