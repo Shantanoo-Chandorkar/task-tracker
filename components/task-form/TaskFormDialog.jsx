@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,14 +55,7 @@ export default function TaskFormDialog({
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
 
-    const { data: statuses = [] } = useQuery({
-        queryKey: ['statuses'],
-        queryFn: async () => {
-            const response = await fetch('/api/statuses');
-            if (!response.ok) throw new Error('Failed to fetch statuses');
-            return response.json();
-        },
-    });
+    const { data: statuses = [] } = useStatusesQuery();
 
     // Reset fields during render (not an effect) to avoid an extra render/flicker on prop change.
     const resetKey = open
@@ -82,13 +77,7 @@ export default function TaskFormDialog({
         }
     }
 
-    const { data: sublists = [] } = useQuery({
-        queryKey: ['sublists', listId],
-        queryFn: async () => {
-            const response = await fetch(`/api/sublists?list_id=${listId}`);
-            if (!response.ok) throw new Error('Failed to fetch sublists');
-            return response.json();
-        },
+    const { data: sublists = [] } = useSublistsQuery(listId, {
         enabled: isRootCreate && Boolean(listId),
     });
 
@@ -124,8 +113,9 @@ export default function TaskFormDialog({
         }
 
         toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         onClose();
+        // Not awaited — the dialog closes immediately instead of blocking on this refetch.
+        queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
     }
 
     return (

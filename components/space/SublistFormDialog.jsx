@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useColorNameForm } from '@/hooks/useColorNameForm';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,43 +17,16 @@ import { createSublist, updateSublist } from '@/actions/sublist-actions';
  * @param {string} props.listId - The list this sublist belongs to
  */
 export default function SublistFormDialog({ open, onClose, sublist = null, listId }) {
-    const queryClient = useQueryClient();
-    const isEditing = Boolean(sublist);
-
-    const [name, setName] = useState('');
-    const [color, setColor] = useState('#6b7280');
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState('');
-
-    const resetKey = open ? (sublist?.id ?? 'create') : null;
-    const [lastResetKey, setLastResetKey] = useState(resetKey);
-    if (resetKey !== lastResetKey) {
-        setLastResetKey(resetKey);
-        if (open) {
-            setName(sublist?.name ?? '');
-            setColor(sublist?.color ?? '#6b7280');
-            setError('');
-        }
-    }
-
-    async function handleSubmit(event) {
-        event.preventDefault();
-        if (!name.trim()) return;
-
-        setSubmitting(true);
-        const { error } = isEditing
-            ? await updateSublist(sublist.id, { name: name.trim(), color })
-            : await createSublist({ name: name.trim(), color, list_id: listId });
-        setSubmitting(false);
-
-        if (error) {
-            setError(error);
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-        onClose();
-    }
+    const { isEditing, name, setName, color, setColor, submitting, error, handleSubmit } =
+        useColorNameForm({
+            open,
+            entity: sublist,
+            create: createSublist,
+            update: updateSublist,
+            buildFields: () => ({ list_id: listId }),
+            invalidateQueryKey: ['sublists', listId],
+            onClose,
+        });
 
     return (
         <ResponsiveModal

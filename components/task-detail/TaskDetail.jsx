@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -8,6 +8,7 @@ import { format, parseISO } from 'date-fns';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { findAncestors, findDescendantIds, flatToTree } from '@/lib/tree';
 import { humanReadableLabel } from '@/lib/recurrence';
+import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import StatusBadge from '@/components/status/StatusBadge';
 import TaskRowActions from '@/components/task-list/TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
@@ -21,8 +22,9 @@ import { Button } from '@/components/ui/button';
  * @param {string} props.listId - List this task belongs to
  * @param {string} props.taskId - Task being viewed
  * @param {object[]} props.initialTasks - SSR-fetched flat task list for this list (hydrates the query)
+ * @param {object[]} [props.initialStatuses] - Seeds the query cache so SubtaskTree's checkboxes don't hydrate-mismatch
  */
-export default function TaskDetail({ listId, taskId, initialTasks }) {
+export default function TaskDetail({ listId, taskId, initialTasks, initialStatuses }) {
     const router = useRouter();
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
 
@@ -36,7 +38,22 @@ export default function TaskDetail({ listId, taskId, initialTasks }) {
         initialData: initialTasks,
     });
 
+    // Seeds the shared ['statuses'] cache so SubtaskTree's checkboxes don't hydrate-mismatch on mount.
+    useStatusesQuery({ initialData: initialStatuses });
+
     const task = flatList.find((task) => task.id === taskId);
+
+    // Root-first order for the breadcrumb trail
+    const ancestors = useMemo(() => findAncestors(taskId, flatList).reverse(), [taskId, flatList]);
+
+    // The task's parent is outside this filtered set, so flatToTree makes the task the root.
+    const children = useMemo(() => {
+        const descendantIds = findDescendantIds(taskId, flatList);
+        const subtreeFlat = flatList.filter(
+            (flatTask) => flatTask.id === taskId || descendantIds.has(flatTask.id),
+        );
+        return flatToTree(subtreeFlat)[0]?.children ?? [];
+    }, [taskId, flatList]);
 
     if (!task || task.list_id !== listId) {
         return (
@@ -51,16 +68,6 @@ export default function TaskDetail({ listId, taskId, initialTasks }) {
             </div>
         );
     }
-
-    // Root-first order for the breadcrumb trail
-    const ancestors = findAncestors(taskId, flatList).reverse();
-
-    // The task's parent is outside this filtered set, so flatToTree makes the task the root.
-    const descendantIds = findDescendantIds(taskId, flatList);
-    const subtreeFlat = flatList.filter(
-        (flatTask) => flatTask.id === taskId || descendantIds.has(flatTask.id),
-    );
-    const children = flatToTree(subtreeFlat)[0]?.children ?? [];
 
     const recurringLabel = task.is_recurring ? humanReadableLabel(task.recurrence_rule) : null;
 

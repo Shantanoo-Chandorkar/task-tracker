@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useSpacesQuery } from '@/hooks/useSpacesQuery';
+import { useListsQuery } from '@/hooks/useListsQuery';
 import { ListChecks, LayoutGrid, Settings } from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
 
@@ -14,23 +15,8 @@ export default function BottomNav() {
     const params = useParams();
     const listId = params?.listId;
 
-    const { data: spaces } = useQuery({
-        queryKey: ['spaces'],
-        queryFn: async () => {
-            const response = await fetch('/api/spaces');
-            if (!response.ok) throw new Error('Failed to fetch spaces');
-            return response.json();
-        },
-    });
-
-    const { data: lists } = useQuery({
-        queryKey: ['lists'],
-        queryFn: async () => {
-            const response = await fetch('/api/lists');
-            if (!response.ok) throw new Error('Failed to fetch lists');
-            return response.json();
-        },
-    });
+    const { data: spaces } = useSpacesQuery();
+    const { data: lists } = useListsQuery();
 
     const firstSpaceWithList = (spaces || []).find((space) =>
         (lists || []).some((list) => list.space_id === space.id),

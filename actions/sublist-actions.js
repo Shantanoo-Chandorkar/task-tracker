@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
+import { getNextPosition } from '@/lib/position';
 
 /**
  * Creates a new sublist under a list. Appends it after the last existing sublist in that list.
@@ -23,14 +24,7 @@ export async function createSublist(fields) {
     try {
         const supabase = await createClient();
 
-        const { data: existing } = await supabase
-            .from('sublists')
-            .select('position')
-            .eq('list_id', fields.list_id)
-            .order('position', { ascending: false })
-            .limit(1);
-
-        const position = existing && existing.length > 0 ? existing[0].position + 1 : 0;
+        const position = await getNextPosition(supabase, 'sublists', { list_id: fields.list_id });
 
         const { data: createdSublist, error } = await supabase
             .from('sublists')

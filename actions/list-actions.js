@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
+import { getNextPosition } from '@/lib/position';
 
 /**
  * Creates a new list under a space. Appends it after the last existing list
@@ -24,14 +25,7 @@ export async function createList(fields) {
     try {
         const supabase = await createClient();
 
-        const { data: existing } = await supabase
-            .from('lists')
-            .select('position')
-            .eq('space_id', fields.space_id)
-            .order('position', { ascending: false })
-            .limit(1);
-
-        const position = existing && existing.length > 0 ? existing[0].position + 1 : 0;
+        const position = await getNextPosition(supabase, 'lists', { space_id: fields.space_id });
 
         const { data, error } = await supabase
             .from('lists')

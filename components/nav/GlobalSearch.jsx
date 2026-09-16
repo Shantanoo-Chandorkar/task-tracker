@@ -52,7 +52,7 @@ export default function GlobalSearch() {
     const router = useRouter();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState(EMPTY_RESULTS);
-    const [isFetching, setIsFetching] = useState(false);
+    const [completedQuery, setCompletedQuery] = useState(null);
     const trimmedQuery = query.trim();
     const debouncedQuery = useDebouncedValue(trimmedQuery, 250);
 
@@ -80,21 +80,17 @@ export default function GlobalSearch() {
 
     // `cancelled` guards against a slower earlier response landing after a later one.
     useEffect(() => {
-        if (!open || !debouncedQuery) {
-            setResults(EMPTY_RESULTS);
-            return;
-        }
+        if (!open || !debouncedQuery) return;
 
         let cancelled = false;
-        setIsFetching(true);
 
         fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`)
             .then((response) => (response.ok ? response.json() : EMPTY_RESULTS))
+            .catch(() => EMPTY_RESULTS)
             .then((data) => {
-                if (!cancelled) setResults(data);
-            })
-            .finally(() => {
-                if (!cancelled) setIsFetching(false);
+                if (cancelled) return;
+                setResults(data);
+                setCompletedQuery(debouncedQuery);
             });
 
         return () => {
@@ -108,7 +104,8 @@ export default function GlobalSearch() {
     }
 
     // Covers the debounce gap too, not just the fetch, so results are never shown stale.
-    const isLoading = Boolean(trimmedQuery) && (trimmedQuery !== debouncedQuery || isFetching);
+    const isLoading =
+        Boolean(trimmedQuery) && (trimmedQuery !== debouncedQuery || debouncedQuery !== completedQuery);
     const displayResults = trimmedQuery && !isLoading ? results : EMPTY_RESULTS;
     const hasResults =
         displayResults.tasks.length > 0 ||

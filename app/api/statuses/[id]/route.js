@@ -1,84 +1,22 @@
-import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
-import { NextResponse } from 'next/server';
+import { updateStatus, deleteStatus } from '@/actions/status-actions';
+import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
 
 /**
  * PATCH /api/statuses/[id]
  * Updates a status's name, color, or position. Returns the updated status.
+ * `code` can never be set through this route — `updateStatus` whitelists fields.
  */
-export async function PATCH(request, { params }) {
+export const PATCH = withApiErrorHandling(async function PATCH(request, { params }) {
     const { id } = await params;
-
-    try {
-        const supabase = await createClient();
-        const body = await request.json();
-
-        const { data, error } = await supabase
-            .from('statuses')
-            .update(body)
-            .eq('id', id)
-            .select()
-            .single();
-
-        if (error) {
-            if (error.code === 'PGRST116') {
-                return NextResponse.json({ error: 'Status not found' }, { status: 404 });
-            }
-            return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });
-        }
-
-        revalidateTag('statuses');
-        revalidateTag('task-tree');
-        return NextResponse.json(data);
-    } catch {
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-}
+    const body = await request.json();
+    return actionResponse(await updateStatus(id, body));
+});
 
 /**
  * DELETE /api/statuses/[id]
- * Deletes a status. Refuses with 400 if it is the only status or the default status.
+ * Deletes a status; refuses the last remaining, default, or built-in one (`deleteStatus` enforces all three).
  */
-export async function DELETE(request, { params }) {
+export const DELETE = withApiErrorHandling(async function DELETE(request, { params }) {
     const { id } = await params;
-
-    try {
-        const supabase = await createClient();
-
-        const { count } = await supabase
-            .from('statuses')
-            .select('*', { count: 'exact', head: true });
-
-        if (count <= 1) {
-            return NextResponse.json(
-                { error: 'Cannot delete the last remaining status' },
-                { status: 400 },
-            );
-        }
-
-        const { data: target } = await supabase
-            .from('statuses')
-            .select('is_default')
-            .eq('id', id)
-            .single();
-
-        if (target?.is_default) {
-            return NextResponse.json(
-                { error: 'Cannot delete the default status' },
-                { status: 400 },
-            );
-        }
-
-        const { error } = await supabase.from('statuses').delete().eq('id', id);
-
-        if (error) {
-            return NextResponse.json({ error: 'Failed to delete status' }, { status: 500 });
-        }
-
-        revalidateTag('statuses');
-        revalidateTag('task-tree');
-        return NextResponse.json({ success: true });
-    } catch {
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
-}
+    return actionResponse(await deleteStatus(id));
+});
