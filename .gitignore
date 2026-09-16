@@ -18,6 +18,9 @@
 /.next/
 /out/
 
+# perf measurement output (bucket 4)
+/perf-reports/
+
 # production
 /build
 
