@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSpacesQuery } from '@/hooks/useSpacesQuery';
+import { useListsQuery } from '@/hooks/useListsQuery';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import {
@@ -38,6 +40,10 @@ import { updateSpace, deleteSpace } from '@/actions/space-actions';
 import { updateList, deleteList } from '@/actions/list-actions';
 import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
+
+// Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
+const MOUSE_ACTIVATION = { distance: 5 };
+const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
 
 /**
  * Drag-reorderable row for a single list. Click the name to navigate into it.
@@ -210,30 +216,13 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
     const [deleteTarget, setDeleteTarget] = useState(null); // { type, id, name, counts }
     const [deleting, setDeleting] = useState(false);
 
-    const { data: spaces = [] } = useQuery({
-        queryKey: ['spaces'],
-        queryFn: async () => {
-            const response = await fetch('/api/spaces');
-            if (!response.ok) throw new Error('Failed to fetch spaces');
-            return response.json();
-        },
-        initialData: initialSpaces,
-    });
-
-    const { data: lists = [] } = useQuery({
-        queryKey: ['lists'],
-        queryFn: async () => {
-            const response = await fetch('/api/lists');
-            if (!response.ok) throw new Error('Failed to fetch lists');
-            return response.json();
-        },
-        initialData: initialLists,
-    });
+    const { data: spaces = [] } = useSpacesQuery({ initialData: initialSpaces });
+    const { data: lists = [] } = useListsQuery({ initialData: initialLists });
 
     const sensors = useSensors(
-        useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
         // TouchSensor (not PointerSensor) with delay/tolerance, so a tap or scroll isn't grabbed as a drag.
-        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+        useSensor(TouchSensor, { activationConstraint: TOUCH_ACTIVATION }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
@@ -243,24 +232,22 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
     }
 
     /**
-     * Persists new positions (0, 1, 2, ...) for any item whose index changed.
+     * Persists new positions (0, 1, 2, ...) for any row whose index changed.
      *
-     * @param {object[]} items - Items in their new order
+     * @param {object[]} rows - Space or list rows in their new order
      * @param {Function} updateFn - updateSpace or updateList
      * @returns {string|null} Error message if a position update failed, else null
      */
-    async function persistPositions(items, updateFn) {
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].position !== i) {
-                const { error } = await updateFn(items[i].id, { position: i });
-                if (error) {
-                    await refetchAll();
-                    return error;
-                }
-            }
-        }
+    async function persistPositions(rows, updateFn) {
+        const results = await Promise.all(
+            rows
+                .map((row, i) => ({ row, i }))
+                .filter(({ row, i }) => row.position !== i)
+                .map(({ row, i }) => updateFn(row.id, { position: i })),
+        );
         await refetchAll();
-        return null;
+        const failed = results.find((updateOutcome) => updateOutcome.error);
+        return failed ? failed.error : null;
     }
 
     async function handleDragEnd({ active, over }) {

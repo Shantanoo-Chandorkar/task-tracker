@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useSpacesQuery } from '@/hooks/useSpacesQuery';
+import { useListsQuery } from '@/hooks/useListsQuery';
 import { LayoutGrid, Settings } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 
@@ -18,23 +19,8 @@ export default function SidebarNav({ onNavigate }) {
     const currentListId = params?.listId;
     const isSpacesActive = pathname.startsWith('/spaces');
 
-    const { data: spaces = [] } = useQuery({
-        queryKey: ['spaces'],
-        queryFn: async () => {
-            const response = await fetch('/api/spaces');
-            if (!response.ok) throw new Error('Failed to fetch spaces');
-            return response.json();
-        },
-    });
-
-    const { data: lists = [] } = useQuery({
-        queryKey: ['lists'],
-        queryFn: async () => {
-            const response = await fetch('/api/lists');
-            if (!response.ok) throw new Error('Failed to fetch lists');
-            return response.json();
-        },
-    });
+    const { data: spaces = [] } = useSpacesQuery();
+    const { data: lists = [] } = useListsQuery();
 
     return (
         <nav className="flex flex-1 flex-col overflow-y-auto">

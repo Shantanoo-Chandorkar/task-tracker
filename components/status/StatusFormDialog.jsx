@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useColorNameForm } from '@/hooks/useColorNameForm';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,43 +16,15 @@ import { createStatus, updateStatus } from '@/actions/status-actions';
  * @param {object|null} [props.status] - Status to edit, or null for create mode
  */
 export default function StatusFormDialog({ open, onClose, status = null }) {
-    const queryClient = useQueryClient();
-    const isEditing = Boolean(status);
-
-    const [name, setName] = useState('');
-    const [color, setColor] = useState('#6b7280');
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState('');
-
-    const resetKey = open ? (status?.id ?? 'create') : null;
-    const [lastResetKey, setLastResetKey] = useState(resetKey);
-    if (resetKey !== lastResetKey) {
-        setLastResetKey(resetKey);
-        if (open) {
-            setName(status?.name ?? '');
-            setColor(status?.color ?? '#6b7280');
-            setError('');
-        }
-    }
-
-    async function handleSubmit(event) {
-        event.preventDefault();
-        if (!name.trim()) return;
-
-        setSubmitting(true);
-        const { error } = isEditing
-            ? await updateStatus(status.id, { name: name.trim(), color })
-            : await createStatus({ name: name.trim(), color });
-        setSubmitting(false);
-
-        if (error) {
-            setError(error);
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-        onClose();
-    }
+    const { isEditing, name, setName, color, setColor, submitting, error, handleSubmit } =
+        useColorNameForm({
+            open,
+            entity: status,
+            create: createStatus,
+            update: updateStatus,
+            invalidateQueryKey: ['statuses'],
+            onClose,
+        });
 
     return (
         <ResponsiveModal

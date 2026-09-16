@@ -1,7 +1,8 @@
 'use client';
 
 import { usePathname, useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useSpacesQuery } from '@/hooks/useSpacesQuery';
+import { useListsQuery } from '@/hooks/useListsQuery';
 import { Search } from 'lucide-react';
 import MobileNavDrawer from './MobileNavDrawer';
 import { openSearch } from './GlobalSearch';
@@ -16,25 +17,8 @@ export default function MobileTopBar() {
     const params = useParams();
     const listId = params?.listId;
 
-    const { data: spaces = [] } = useQuery({
-        queryKey: ['spaces'],
-        queryFn: async () => {
-            const response = await fetch('/api/spaces');
-            if (!response.ok) throw new Error('Failed to fetch spaces');
-            return response.json();
-        },
-        enabled: Boolean(listId),
-    });
-
-    const { data: lists = [] } = useQuery({
-        queryKey: ['lists'],
-        queryFn: async () => {
-            const response = await fetch('/api/lists');
-            if (!response.ok) throw new Error('Failed to fetch lists');
-            return response.json();
-        },
-        enabled: Boolean(listId),
-    });
+    const { data: spaces = [] } = useSpacesQuery({ enabled: Boolean(listId) });
+    const { data: lists = [] } = useListsQuery({ enabled: Boolean(listId) });
 
     const currentList = listId ? lists.find((list) => list.id === listId) : null;
     const currentSpace = currentList

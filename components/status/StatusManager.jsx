@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { toast } from 'sonner';
 import {
     DndContext,
@@ -35,6 +36,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
+
+// Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
+const MOUSE_ACTIVATION = { distance: 5 };
+const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
 
 /**
  * Sortable row for a single status entry in the settings page.
@@ -130,20 +135,12 @@ export default function StatusManager({ initialStatuses }) {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
 
-    const { data: statuses = [] } = useQuery({
-        queryKey: ['statuses'],
-        queryFn: async () => {
-            const response = await fetch('/api/statuses');
-            if (!response.ok) throw new Error('Failed to fetch statuses');
-            return response.json();
-        },
-        initialData: initialStatuses,
-    });
+    const { data: statuses = [] } = useStatusesQuery({ initialData: initialStatuses });
 
     const sensors = useSensors(
-        useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
         // TouchSensor (not PointerSensor) with delay/tolerance, so a tap or scroll isn't grabbed as a drag.
-        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+        useSensor(TouchSensor, { activationConstraint: TOUCH_ACTIVATION }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
@@ -158,15 +155,17 @@ export default function StatusManager({ initialStatuses }) {
 
         const toastId = toast.loading('Saving order...');
 
-        for (let i = 0; i < reordered.length; i++) {
-            if (reordered[i].position !== i) {
-                const { error } = await updateStatus(reordered[i].id, { position: i });
-                if (error) {
-                    await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-                    toast.error(error, { id: toastId });
-                    return;
-                }
-            }
+        const results = await Promise.all(
+            reordered
+                .map((status, i) => ({ status, i }))
+                .filter(({ status, i }) => status.position !== i)
+                .map(({ status, i }) => updateStatus(status.id, { position: i })),
+        );
+        const failed = results.find((updateOutcome) => updateOutcome.error);
+        if (failed) {
+            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+            toast.error(failed.error, { id: toastId });
+            return;
         }
 
         await queryClient.invalidateQueries({ queryKey: ['statuses'] });

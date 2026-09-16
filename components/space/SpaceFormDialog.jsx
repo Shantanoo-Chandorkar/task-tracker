@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useColorNameForm } from '@/hooks/useColorNameForm';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,43 +17,15 @@ import { createSpace, updateSpace } from '@/actions/space-actions';
  * @param {object|null} [props.space] - Space to edit, or null for create mode
  */
 export default function SpaceFormDialog({ open, onClose, space = null }) {
-    const queryClient = useQueryClient();
-    const isEditing = Boolean(space);
-
-    const [name, setName] = useState('');
-    const [color, setColor] = useState('#6b7280');
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState('');
-
-    const resetKey = open ? (space?.id ?? 'create') : null;
-    const [lastResetKey, setLastResetKey] = useState(resetKey);
-    if (resetKey !== lastResetKey) {
-        setLastResetKey(resetKey);
-        if (open) {
-            setName(space?.name ?? '');
-            setColor(space?.color ?? '#6b7280');
-            setError('');
-        }
-    }
-
-    async function handleSubmit(e) {
-        e.preventDefault();
-        if (!name.trim()) return;
-
-        setSubmitting(true);
-        const { error } = isEditing
-            ? await updateSpace(space.id, { name: name.trim(), color })
-            : await createSpace({ name: name.trim(), color });
-        setSubmitting(false);
-
-        if (error) {
-            setError(error);
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['spaces'] });
-        onClose();
-    }
+    const { isEditing, name, setName, color, setColor, submitting, error, handleSubmit } =
+        useColorNameForm({
+            open,
+            entity: space,
+            create: createSpace,
+            update: updateSpace,
+            invalidateQueryKey: ['spaces'],
+            onClose,
+        });
 
     return (
         <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit Space' : 'New Space'}>

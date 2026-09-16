@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 import { toast } from 'sonner';
 import {
     Select,
@@ -13,15 +15,10 @@ import {
 import { Loader } from '@/components/ui/loader';
 import StatusBadge from './StatusBadge';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
-import { completeTaskAndDescendants } from '@/actions/task-actions';
-import { findIncompleteDescendants } from '@/lib/tree';
 
 /**
  * Inline status dropdown for changing a task's status directly from the task row.
- * When the status changes for a root task, TanStack Query refetch re-groups it
- * under the correct status header automatically. Picking the "done" status while
- * subtasks are still incomplete prompts the same cascade-confirm dialog as the
- * checkbox/"Mark as complete" entry points, instead of failing server-side.
+ * Picking a status that changes done-ness routes through the shared cascade-confirm flow, both directions.
  *
  * @param {object} props
  * @param {object} props.task - The task whose status is being shown/changed
@@ -30,25 +27,19 @@ import { findIncompleteDescendants } from '@/lib/tree';
 export default function StatusPicker({ task, flatList }) {
     const queryClient = useQueryClient();
     const [pending, setPending] = useState(false);
-    const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
-
-    const { data: statuses = [] } = useQuery({
-        queryKey: ['statuses'],
-        queryFn: async () => {
-            const response = await fetch('/api/statuses');
-            if (!response.ok) throw new Error('Failed to fetch statuses');
-            return response.json();
-        },
-    });
-
-    const doneStatus = statuses.find((status) => status.code === 'done');
-    const incompleteDescendants = doneStatus
-        ? findIncompleteDescendants(task.id, flatList ?? [], doneStatus.id)
-        : [];
+    const { data: statuses = [] } = useStatusesQuery();
+    const { doneStatus, defaultStatus, setComplete, confirmState, closeConfirm, confirmCascade } =
+        useTaskCompletion();
 
     async function handleChange(newStatusId) {
-        if (doneStatus && newStatusId === doneStatus.id && incompleteDescendants.length > 0) {
-            setCompleteConfirmOpen(true);
+        const isCompleteTransition = doneStatus && newStatusId === doneStatus.id;
+        const isIncompleteTransition =
+            doneStatus && defaultStatus && newStatusId === defaultStatus.id && task.status_id === doneStatus.id;
+
+        if (isCompleteTransition || isIncompleteTransition) {
+            setPending(true);
+            await setComplete(task, flatList, task.list_id, isCompleteTransition);
+            setPending(false);
             return;
         }
 
@@ -66,29 +57,13 @@ export default function StatusPicker({ task, flatList }) {
                 return;
             }
 
-            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            await queryClient.invalidateQueries({ queryKey: ['tasks', task.list_id] });
         } catch (err) {
             console.error('Status update failed:', err);
             toast.error('Failed to update task status');
         } finally {
             setPending(false);
         }
-    }
-
-    async function handleCascadeComplete() {
-        setCompleteConfirmOpen(false);
-        setPending(true);
-        const toastId = toast.loading('Marking complete...');
-        const { error } = await completeTaskAndDescendants(task.id);
-        setPending(false);
-
-        if (error) {
-            toast.error(error, { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.dismiss(toastId);
     }
 
     const currentStatus = statuses.find((status) => status.id === task.status_id);
@@ -123,11 +98,12 @@ export default function StatusPicker({ task, flatList }) {
             </Select>
 
             <CompleteTaskDialog
-                open={completeConfirmOpen}
-                onClose={() => setCompleteConfirmOpen(false)}
-                task={task}
-                incompleteCount={incompleteDescendants.length}
-                onConfirm={handleCascadeComplete}
+                open={!!confirmState}
+                onClose={closeConfirm}
+                task={confirmState?.task}
+                isComplete={confirmState?.isComplete}
+                descendantCount={confirmState?.descendantCount ?? 0}
+                onConfirm={confirmCascade}
             />
         </>
     );

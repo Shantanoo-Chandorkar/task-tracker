@@ -12,17 +12,20 @@ import {
 } from '@/components/ui/alert-dialog';
 
 /**
- * Confirms cascading completion to a task's incomplete subtasks before marking it done.
+ * Confirms cascading a task's complete/incomplete status to its descendants before applying it.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is visible
  * @param {Function} props.onClose - Called when dismissed without confirming
- * @param {object} props.task - The task being marked complete
- * @param {number} props.incompleteCount - Number of incomplete descendants that will also be marked done
+ * @param {object} props.task - The task whose status is changing
+ * @param {boolean} props.isComplete - Whether this is a complete (true) or incomplete (false) cascade
+ * @param {number} props.descendantCount - Number of descendants that will also change status
  * @param {Function} props.onConfirm - Called when the user confirms the cascade
  */
-export default function CompleteTaskDialog({ open, onClose, task, incompleteCount, onConfirm }) {
+export default function CompleteTaskDialog({ open, onClose, task, isComplete, descendantCount, onConfirm }) {
     if (!task) return null;
+
+    const verb = isComplete ? 'complete' : 'incomplete';
 
     return (
         <AlertDialog
@@ -33,15 +36,14 @@ export default function CompleteTaskDialog({ open, onClose, task, incompleteCoun
         >
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Mark &ldquo;{task.title}&rdquo; complete?</AlertDialogTitle>
+                    <AlertDialogTitle>Mark &ldquo;{task.title}&rdquo; {verb}?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will also mark {incompleteCount} subtask
-                        {incompleteCount !== 1 ? 's' : ''} as done.
+                        This will also mark {descendantCount} subtask{descendantCount !== 1 ? 's' : ''} as {verb}.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={onConfirm}>Mark complete</AlertDialogAction>
+                    <AlertDialogAction onClick={onConfirm}>Mark {verb}</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

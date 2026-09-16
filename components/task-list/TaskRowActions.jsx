@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTaskCompletion } from '@/hooks/useTaskCompletion';
+import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { toast } from 'sonner';
 import {
     DropdownMenu,
@@ -23,11 +25,9 @@ import { MoreHorizontal } from 'lucide-react';
 import {
     deleteTask,
     deleteTaskAndReparentChildren,
-    updateTask,
-    completeTaskAndDescendants,
     duplicateTask,
 } from '@/actions/task-actions';
-import { findAncestors, findDescendantIds, findIncompleteDescendants, flattenTreeDepthFirst } from '@/lib/tree';
+import { findAncestors, findDescendantIds, flattenTreeDepthFirst } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
@@ -57,35 +57,15 @@ export default function TaskRowActions({
     const queryClient = useQueryClient();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const isRootTask = !task.parent_id;
 
-    const { data: sublists = [] } = useQuery({
-        queryKey: ['sublists', listId],
-        queryFn: async () => {
-            const response = await fetch(`/api/sublists?list_id=${listId}`);
-            if (!response.ok) throw new Error('Failed to fetch sublists');
-            return response.json();
-        },
-    });
+    const { data: sublists = [] } = useSublistsQuery(listId);
 
-    const { data: statuses = [] } = useQuery({
-        queryKey: ['statuses'],
-        queryFn: async () => {
-            const response = await fetch('/api/statuses');
-            if (!response.ok) throw new Error('Failed to fetch statuses');
-            return response.json();
-        },
-    });
-
-    const doneStatus = statuses.find((status) => status.code === 'done');
-    const defaultStatus = statuses.find((status) => status.is_default);
-    const isDone = task.status_id === doneStatus?.id;
-    const incompleteDescendants = doneStatus
-        ? findIncompleteDescendants(task.id, flatList, doneStatus.id)
-        : [];
+    const { doneStatus, defaultStatus, isDone, setComplete, confirmState, closeConfirm, confirmCascade } =
+        useTaskCompletion();
+    const taskIsDone = isDone(task);
 
     const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);
     const grandparentId = parent?.parent_id ?? null;
@@ -172,7 +152,7 @@ export default function TaskRowActions({
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
         toast.success('Task deleted', { id: toastId });
         onDeleted?.();
     }
@@ -201,7 +181,7 @@ export default function TaskRowActions({
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
         toast.success(successMessage, { id: toastId });
     }
 
@@ -227,42 +207,9 @@ export default function TaskRowActions({
     }
 
     async function handleToggleComplete() {
-        if (!isDone && incompleteDescendants.length > 0) {
-            setCompleteConfirmOpen(true);
-            return;
-        }
-
-        const targetStatus = isDone ? defaultStatus : doneStatus;
-        if (!targetStatus) return;
-
         setPending(true);
-        const toastId = toast.loading(isDone ? 'Marking incomplete...' : 'Marking complete...');
-        const { error } = await updateTask(task.id, { status_id: targetStatus.id });
+        await setComplete(task, flatList, listId, !taskIsDone);
         setPending(false);
-
-        if (error) {
-            toast.error(error, { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.dismiss(toastId);
-    }
-
-    async function handleCascadeComplete() {
-        setCompleteConfirmOpen(false);
-        setPending(true);
-        const toastId = toast.loading('Marking complete...');
-        const { error } = await completeTaskAndDescendants(task.id);
-        setPending(false);
-
-        if (error) {
-            toast.error(error, { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        toast.dismiss(toastId);
     }
 
     async function handleDuplicate() {
@@ -276,7 +223,7 @@ export default function TaskRowActions({
             return;
         }
 
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
         toast.success('Task duplicated', { id: toastId });
     }
 
@@ -308,7 +255,7 @@ export default function TaskRowActions({
                             disabled={!doneStatus || !defaultStatus}
                             className={!doneStatus || !defaultStatus ? 'opacity-40' : ''}
                         >
-                            {isDone ? 'Mark as incomplete' : 'Mark as complete'}
+                            {taskIsDone ? 'Mark as incomplete' : 'Mark as complete'}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={onAddSubtask}
@@ -357,13 +304,14 @@ export default function TaskRowActions({
                 onConfirm={handleDeleteConfirm}
             />
 
-            {/* Cascade-complete confirmation — only shown when subtasks are still incomplete */}
+            {/* Cascade complete/incomplete confirmation — only shown when descendants would also change */}
             <CompleteTaskDialog
-                open={completeConfirmOpen}
-                onClose={() => setCompleteConfirmOpen(false)}
-                task={task}
-                incompleteCount={incompleteDescendants.length}
-                onConfirm={handleCascadeComplete}
+                open={!!confirmState}
+                onClose={closeConfirm}
+                task={confirmState?.task}
+                isComplete={confirmState?.isComplete}
+                descendantCount={confirmState?.descendantCount ?? 0}
+                onConfirm={confirmCascade}
             />
 
             {/* Move-to destination picker — same bottom sheet on every breakpoint */}

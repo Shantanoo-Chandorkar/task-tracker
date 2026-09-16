@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -13,7 +13,7 @@ import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DepthWarning from './DepthWarning';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
-import { useUIState } from '@/providers/UIStateProvider';
+import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 
 /**
  * Recursive row component — renders one task and all its children.
@@ -26,11 +26,10 @@ import { useUIState } from '@/providers/UIStateProvider';
  * @param {object[]} props.flatList - Full flat task list passed through for rearrange operations
  * @param {string} props.listId - The list this task tree belongs to
  */
-export default function TaskRow({ task, depth, flatList, listId }) {
+function TaskRow({ task, depth, flatList, listId }) {
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
-    const { flags, toggleFlag, setFlag } = useUIState();
     const expandKey = `task-row:${task.id}`;
-    const isExpanded = Boolean(flags[expandKey]);
+    const isExpanded = useUIFlag(expandKey);
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: task.id,
@@ -45,7 +44,10 @@ export default function TaskRow({ task, depth, flatList, listId }) {
     const hasChildren = task.children && task.children.length > 0;
     // MAX_DEPTH_CONSTANT
     const canAddSubtask = !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH);
-    const recurringLabel = task.is_recurring ? humanReadableLabel(task.recurrence_rule) : null;
+    const recurringLabel = useMemo(
+        () => (task.is_recurring ? humanReadableLabel(task.recurrence_rule) : null),
+        [task.is_recurring, task.recurrence_rule],
+    );
 
     return (
         <div
@@ -167,3 +169,5 @@ export default function TaskRow({ task, depth, flatList, listId }) {
         </div>
     );
 }
+
+export default memo(TaskRow);

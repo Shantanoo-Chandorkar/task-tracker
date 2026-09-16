@@ -1,42 +1,71 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
-const UIStateContext = createContext(null);
+// Module-level singleton (not React state) so useUIFlag subscribers can skip unrelated toggles.
+let flags = {};
+const listeners = new Set();
 
-/**
- * Shared client-only store of boolean UI flags (expand/collapse state), keyed by caller strings.
- * Mounted once in the root layout, so it survives SPA route changes but resets on hard refresh.
- *
- * @param {object} props
- * @param {React.ReactNode} props.children
- */
-export function UIStateProvider({ children }) {
-    const [flags, setFlags] = useState({});
+function subscribe(listener) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+}
 
-    const toggleFlag = useCallback((key) => {
-        setFlags((prev) => ({ ...prev, [key]: !prev[key] }));
-    }, []);
-
-    const setFlag = useCallback((key, value) => {
-        setFlags((prev) => ({ ...prev, [key]: value }));
-    }, []);
-
-    return (
-        <UIStateContext.Provider value={{ flags, toggleFlag, setFlag }}>
-            {children}
-        </UIStateContext.Provider>
-    );
+function setFlags(next) {
+    flags = next;
+    listeners.forEach((listener) => listener());
 }
 
 /**
- * Reads/writes the shared UI flag store.
+ * Toggles a boolean UI flag (expand/collapse state), keyed by caller strings.
  * Keys must be namespaced by callers (e.g. `task-row:${id}`) to avoid collisions.
+ *
+ * @param {string} key - The flag's namespaced key
+ */
+export function toggleFlag(key) {
+    setFlags({ ...flags, [key]: !flags[key] });
+}
+
+/**
+ * Sets a boolean UI flag to an explicit value.
+ *
+ * @param {string} key - The flag's namespaced key
+ * @param {boolean} value - The value to set the flag to
+ */
+export function setFlag(key, value) {
+    setFlags({ ...flags, [key]: value });
+}
+
+/**
+ * Passthrough wrapper — the store is module-level now, so this no longer needs to hold React state.
+ *
+ * @param {object} props
+ * @param {React.ReactNode} props.children - Content to render inside the provider
+ */
+export function UIStateProvider({ children }) {
+    return children;
+}
+
+/**
+ * Reads/writes the shared UI flag store, subscribed to every key (use `useUIFlag` for just one).
  *
  * @returns {{flags: Object<string, boolean>, toggleFlag: Function, setFlag: Function}}
  */
 export function useUIState() {
-    const context = useContext(UIStateContext);
-    if (!context) throw new Error('useUIState must be used within UIStateProvider');
-    return context;
+    const snapshot = useSyncExternalStore(subscribe, () => flags, () => flags);
+    return { flags: snapshot, toggleFlag, setFlag };
+}
+
+/**
+ * Reads a single UI flag, re-rendering only when that specific key changes.
+ *
+ * @param {string} key - The flag's namespaced key
+ * @returns {boolean}
+ */
+export function useUIFlag(key) {
+    return useSyncExternalStore(
+        subscribe,
+        () => Boolean(flags[key]),
+        () => false,
+    );
 }

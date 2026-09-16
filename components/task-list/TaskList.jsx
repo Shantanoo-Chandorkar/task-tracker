@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
@@ -40,6 +40,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { flatToTree, findDescendantIds } from '@/lib/tree';
 import { useUIState } from '@/providers/UIStateProvider';
+import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow from './TaskRow';
@@ -49,6 +51,10 @@ import StatusCountTiles from './StatusCountTiles';
 import ListHeader from './ListHeader';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
+
+// Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
+const MOUSE_ACTIVATION = { distance: 5 };
+const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
 
 /**
  * Collision detection scoped to the dragged row's own siblings (parent_id + sublist_id).
@@ -272,77 +278,71 @@ export default function TaskList({
         initialData: initialTasks,
     });
 
-    const { data: statuses = [] } = useQuery({
-        queryKey: ['statuses'],
-        queryFn: async () => {
-            const response = await fetch('/api/statuses');
-            if (!response.ok) throw new Error('Failed to fetch statuses');
-            return response.json();
-        },
-        initialData: initialStatuses,
-    });
+    const { data: statuses = [] } = useStatusesQuery({ initialData: initialStatuses });
 
-    const { data: sublists = [] } = useQuery({
-        queryKey: ['sublists', listId],
-        queryFn: async () => {
-            const response = await fetch(`/api/sublists?list_id=${listId}`);
-            if (!response.ok) throw new Error('Failed to fetch sublists');
-            return response.json();
-        },
-        initialData: initialSublists,
-    });
+    const { data: sublists = [] } = useSublistsQuery(listId, { initialData: initialSublists });
 
-    const tree = flatToTree(flatList);
+    const tree = useMemo(() => flatToTree(flatList), [flatList]);
     const rootTasks = tree; // flatToTree already returns only root nodes
 
     // Counts include every depth, not just root tasks — a subtask's status can differ from its parent's.
-    const countsByStatusId = {};
-    for (const status of statuses) {
-        countsByStatusId[status.id] = flatList.filter(
-            (task) => task.status_id === status.id,
-        ).length;
-    }
+    const countsByStatusId = useMemo(() => {
+        const nextCountsByStatusId = {};
+        for (const status of statuses) {
+            nextCountsByStatusId[status.id] = flatList.filter((task) => task.status_id === status.id).length;
+        }
+        return nextCountsByStatusId;
+    }, [statuses, flatList]);
 
     function handleSelectStatus(statusId) {
         setActiveStatusId((prev) => (prev === statusId ? null : statusId));
     }
 
-    /**
-     * A root task passes the active status filter if it or any descendant carries that status.
-     *
-     * @param {object} rootTask - Root-level task node
-     * @returns {boolean} Whether this root should render under the current filter
-     */
-    function rootMatchesActiveStatus(rootTask) {
-        if (!activeStatusId) return true;
-        if (rootTask.status_id === activeStatusId) return true;
-        const descendantIds = findDescendantIds(rootTask.id, flatList);
-        return flatList.some(
-            (task) => descendantIds.has(task.id) && task.status_id === activeStatusId,
-        );
-    }
+    // Grouped via a single Map pass per bucket instead of a filter-per-status — O(n), not O(n·statuses).
+    const buckets = useMemo(() => {
+        function rootMatchesActiveStatus(rootTask) {
+            if (!activeStatusId) return true;
+            if (rootTask.status_id === activeStatusId) return true;
+            const descendantIds = findDescendantIds(rootTask.id, flatList);
+            return flatList.some(
+                (task) => descendantIds.has(task.id) && task.status_id === activeStatusId,
+            );
+        }
 
-    // Root tasks grouped by sublist: direct tasks (sublist_id null) first,
-    // then each of this list's sublists, in position order.
-    const bucketedRootTasks = activeStatusId
-        ? rootTasks.filter(rootMatchesActiveStatus)
-        : rootTasks;
+        function groupByStatus(tasks) {
+            const tasksByStatusId = new Map();
+            for (const task of tasks) {
+                const key = task.status_id ?? 'none';
+                if (!tasksByStatusId.has(key)) tasksByStatusId.set(key, []);
+                tasksByStatusId.get(key).push(task);
+            }
+            return tasksByStatusId;
+        }
 
-    const directTasks = bucketedRootTasks.filter((task) => !task.sublist_id);
-    const buckets = [
-        { key: 'direct', sublist: null, tasks: directTasks },
-        ...sublists.map((sublist) => ({
-            key: sublist.id,
-            sublist,
-            tasks: bucketedRootTasks.filter((task) => task.sublist_id === sublist.id),
-        })),
-    ];
+        const bucketedRootTasks = activeStatusId
+            ? rootTasks.filter(rootMatchesActiveStatus)
+            : rootTasks;
+        const directTasks = bucketedRootTasks.filter((task) => !task.sublist_id);
+
+        return [
+            {
+                key: 'direct',
+                sublist: null,
+                tasks: directTasks,
+                tasksByStatusId: groupByStatus(directTasks),
+            },
+            ...sublists.map((sublist) => {
+                const sublistTasks = bucketedRootTasks.filter((task) => task.sublist_id === sublist.id);
+                return { key: sublist.id, sublist, tasks: sublistTasks, tasksByStatusId: groupByStatus(sublistTasks) };
+            }),
+        ];
+    }, [rootTasks, sublists, activeStatusId, flatList]);
 
     const sensors = useSensors(
-        useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
         // Touch needs its own sensor (not PointerSensor, which would race with it): a short
         // delay + move tolerance lets a tap or scroll happen without being grabbed as a drag.
-        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+        useSensor(TouchSensor, { activationConstraint: TOUCH_ACTIVATION }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
@@ -401,16 +401,16 @@ export default function TaskList({
             if (!response.ok) {
                 console.error('Drag reorder failed');
                 toast.error('Failed to reorder task', { id: toastId });
-                await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
                 return;
             }
 
-            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
             toast.success('Order updated', { id: toastId });
         } catch (caughtError) {
             console.error('Drag reorder failed:', caughtError);
             toast.error('Failed to reorder task', { id: toastId });
-            await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
         }
     }
 
@@ -424,15 +424,17 @@ export default function TaskList({
 
         const toastId = toast.loading('Saving order...');
         try {
-            for (let i = 0; i < reordered.length; i++) {
-                if (reordered[i].position !== i) {
-                    const { error } = await updateSublist(reordered[i].id, { position: i });
-                    if (error) {
-                        toast.error(error, { id: toastId });
-                        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-                        return;
-                    }
-                }
+            const results = await Promise.all(
+                reordered
+                    .map((sublist, i) => ({ sublist, i }))
+                    .filter(({ sublist, i }) => sublist.position !== i)
+                    .map(({ sublist, i }) => updateSublist(sublist.id, { position: i })),
+            );
+            const failed = results.find((updateOutcome) => updateOutcome.error);
+            if (failed) {
+                toast.error(failed.error, { id: toastId });
+                await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                return;
             }
             await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
             toast.success('Order updated', { id: toastId });
@@ -463,14 +465,14 @@ export default function TaskList({
                     toast.error(error);
                     return;
                 }
-                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
                 toast.success('Task duplicated');
             });
         }
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [focusedTaskId, queryClient]);
+    }, [focusedTaskId, listId, queryClient]);
 
     async function requestDeleteSublist(sublist) {
         const response = await fetch(`/api/sublists/${sublist.id}`);
@@ -497,7 +499,7 @@ export default function TaskList({
         }
 
         await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
         toast.success('Sublist deleted', { id: toastId });
     }
 
@@ -631,9 +633,7 @@ export default function TaskList({
                                             <StatusGroup
                                                 key={status.id}
                                                 status={status}
-                                                tasks={bucket.tasks.filter(
-                                                    (task) => task.status_id === status.id,
-                                                )}
+                                                tasks={bucket.tasksByStatusId.get(status.id) ?? []}
                                                 isCollapsed={
                                                     collapsedGroups[`${bucket.key}:${status.id}`]
                                                 }
@@ -653,7 +653,7 @@ export default function TaskList({
                                         ))}
                                         <StatusGroup
                                             status={null}
-                                            tasks={bucket.tasks.filter((task) => !task.status_id)}
+                                            tasks={bucket.tasksByStatusId.get('none') ?? []}
                                             isCollapsed={collapsedGroups[`${bucket.key}:none`]}
                                             onToggle={() => toggleGroup(`${bucket.key}:none`)}
                                             flatList={flatList}

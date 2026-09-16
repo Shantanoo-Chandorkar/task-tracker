@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useColorNameForm } from '@/hooks/useColorNameForm';
+import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,54 +27,21 @@ import { createList, updateList } from '@/actions/list-actions';
  * @param {string|null} [props.defaultSpaceId] - Space to pre-select in create mode
  */
 export default function ListFormDialog({ open, onClose, list = null, defaultSpaceId = null }) {
-    const queryClient = useQueryClient();
-    const isEditing = Boolean(list);
-
-    const [name, setName] = useState('');
-    const [color, setColor] = useState('#6b7280');
     const [spaceId, setSpaceId] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState('');
+    const { data: spaces = [] } = useSpacesQuery();
 
-    const resetKey = open ? (list?.id ?? 'create') : null;
-    const [lastResetKey, setLastResetKey] = useState(resetKey);
-    if (resetKey !== lastResetKey) {
-        setLastResetKey(resetKey);
-        if (open) {
-            setName(list?.name ?? '');
-            setColor(list?.color ?? '#6b7280');
-            setSpaceId(list?.space_id ?? defaultSpaceId ?? '');
-            setError('');
-        }
-    }
-
-    const { data: spaces = [] } = useQuery({
-        queryKey: ['spaces'],
-        queryFn: async () => {
-            const response = await fetch('/api/spaces');
-            if (!response.ok) throw new Error('Failed to fetch spaces');
-            return response.json();
-        },
-    });
-
-    async function handleSubmit(e) {
-        e.preventDefault();
-        if (!name.trim() || !spaceId) return;
-
-        setSubmitting(true);
-        const { error } = isEditing
-            ? await updateList(list.id, { name: name.trim(), color, space_id: spaceId })
-            : await createList({ name: name.trim(), color, space_id: spaceId });
-        setSubmitting(false);
-
-        if (error) {
-            setError(error);
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['lists'] });
-        onClose();
-    }
+    const { isEditing, name, setName, color, setColor, submitting, error, handleSubmit } =
+        useColorNameForm({
+            open,
+            entity: list,
+            onReset: (entity) => setSpaceId(entity?.space_id ?? defaultSpaceId ?? ''),
+            isValid: () => Boolean(spaceId),
+            create: createList,
+            update: updateList,
+            buildFields: () => ({ space_id: spaceId }),
+            invalidateQueryKey: ['lists'],
+            onClose,
+        });
 
     return (
         <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit List' : 'New List'}>
