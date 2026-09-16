@@ -11,7 +11,9 @@
         "format:check": "prettier --check .",
         "perf:analyze": "cross-env ANALYZE=true next build --webpack",
         "perf:lighthouse:local": "lighthouse http://localhost:3000 --preset=perf --form-factor=mobile --screenEmulation.mobile --output=html --output=json --output-path=./perf-reports/lighthouse-local",
-        "perf:lighthouse:prod": "lighthouse https://task-tracker-ashy-one.vercel.app --preset=perf --form-factor=mobile --screenEmulation.mobile --output=html --output=json --output-path=./perf-reports/lighthouse-prod"
+        "perf:lighthouse:prod": "lighthouse https://task-tracker-ashy-one.vercel.app --preset=perf --form-factor=mobile --screenEmulation.mobile --output=html --output=json --output-path=./perf-reports/lighthouse-prod",
+        "perf:realload:local": "node scripts/perf-realload.mjs http://localhost:3000/lists/e92f917d-721e-40ee-978e-65c34f739f66",
+        "perf:realload:prod": "node scripts/perf-realload.mjs https://task-tracker-ashy-one.vercel.app/lists/e92f917d-721e-40ee-978e-65c34f739f66"
     },
     "dependencies": {
         "@dnd-kit/core": "^6.3.1",
@@ -49,6 +51,7 @@
         "eslint-config-next": "16.2.4",
         "jsdom": "^29.0.2",
         "lighthouse": "^12.8.2",
+        "playwright": "^1.63.0",
         "tailwindcss": "^4",
         "vitest": "^5.0.0"
     }
