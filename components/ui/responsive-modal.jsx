@@ -31,7 +31,10 @@ export default function ResponsiveModal({ open, onClose, title, children }) {
     if (isDesktop) {
         return (
             <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-                <DialogContent className="max-w-lg">
+                <DialogContent
+                    className="max-w-lg"
+                    onOpenAutoFocus={(event) => event.preventDefault()}
+                >
                     <DialogHeader>
                         <DialogTitle>{title}</DialogTitle>
                         <DialogDescription className="sr-only">{title}</DialogDescription>
@@ -44,7 +47,11 @@ export default function ResponsiveModal({ open, onClose, title, children }) {
 
     return (
         <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-            <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
+            <SheetContent
+                side="bottom"
+                className="max-h-[90vh] overflow-y-auto"
+                onOpenAutoFocus={(event) => event.preventDefault()}
+            >
                 <SheetHeader>
                     <SheetTitle>{title}</SheetTitle>
                     <SheetDescription className="sr-only">{title}</SheetDescription>

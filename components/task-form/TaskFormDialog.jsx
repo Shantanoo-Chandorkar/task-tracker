@@ -140,7 +140,6 @@ export default function TaskFormDialog({
                             setTitleError('');
                         }}
                         placeholder="Task title"
-                        autoFocus
                     />
                     {titleError && <p className="text-xs text-destructive">{titleError}</p>}
                 </div>
