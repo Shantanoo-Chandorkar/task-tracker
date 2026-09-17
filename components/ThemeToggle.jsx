@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
 import { Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -14,7 +15,7 @@ function getSnapshot() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-// Matches the `dark` class hardcoded on <html> in app/layout.js.
+// SSR default, before the blocking init script (layout.js's <head>) sets the real class.
 function getServerSnapshot() {
     return true;
 }
@@ -38,14 +39,33 @@ function setTheme(isDark) {
 export default function ThemeToggle() {
     const isDark = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-    // Keep the DOM class in sync with the resolved theme — a legitimate
-    // external-system sync, not a state reset.
-    useEffect(() => {
+    // useLayoutEffect (not useEffect) so this flips synchronously inside the flushSync call below.
+    useLayoutEffect(() => {
         document.documentElement.classList.toggle('dark', isDark);
     }, [isDark]);
 
-    function toggle() {
-        setTheme(!isDark);
+    function toggle(clickEvent) {
+        const nextIsDark = !isDark;
+
+        // Always start a transition — CSS gates the custom reveal by prefers-reduced-motion, not this check.
+        if (!document.startViewTransition) {
+            setTheme(nextIsDark);
+            return;
+        }
+
+        const { clientX, clientY } = clickEvent;
+        const root = document.documentElement;
+        const radius = Math.hypot(
+            Math.max(clientX, window.innerWidth - clientX),
+            Math.max(clientY, window.innerHeight - clientY),
+        );
+        root.style.setProperty('--theme-toggle-x', `${clientX}px`);
+        root.style.setProperty('--theme-toggle-y', `${clientY}px`);
+        root.style.setProperty('--theme-toggle-radius', `${radius}px`);
+
+        // .ready rejects if the transition is skipped (e.g. backgrounded tab); setTheme still ran, so this is harmless.
+        const transition = document.startViewTransition(() => flushSync(() => setTheme(nextIsDark)));
+        transition.ready.catch(() => {});
     }
 
     return (

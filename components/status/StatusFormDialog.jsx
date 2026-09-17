@@ -23,6 +23,7 @@ export default function StatusFormDialog({ open, onClose, status = null }) {
             create: createStatus,
             update: updateStatus,
             invalidateQueryKey: ['statuses'],
+            bustCache: () => ({ prefixes: ['/lists/'] }),
             onClose,
         });
 

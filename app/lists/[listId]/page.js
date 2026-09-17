@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import TaskList from '@/components/task-list/TaskList';
+import { attachTaskCounts } from '@/lib/list-task-counts';
 
 /**
  * List task-tree page (Server Component) — fetches everything server-side for zero-waterfall hydration.
@@ -51,6 +52,9 @@ export default async function ListPage({ params }) {
         status_color: task.statuses?.color ?? null,
     }));
 
+    // Matches /api/lists' computation, so the client refetch never hydration-mismatches this field.
+    const listsWithCounts = await attachTaskCounts(supabase, lists || []);
+
     return (
         <div className="px-4 md:px-8 py-6">
             <TaskList
@@ -58,7 +62,7 @@ export default async function ListPage({ params }) {
                 initialTasks={normalizedTasks}
                 initialStatuses={statuses || []}
                 initialSpaces={spaces || []}
-                initialLists={lists || []}
+                initialLists={listsWithCounts}
                 initialSublists={sublists || []}
             />
         </div>

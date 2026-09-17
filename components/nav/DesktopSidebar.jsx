@@ -11,22 +11,23 @@ import { openSearch } from './GlobalSearch';
  */
 export default function DesktopSidebar() {
     return (
-        <aside className="hidden lg:flex sticky top-0 h-screen overflow-y-auto w-[20%] flex-shrink-0 flex-col border-r border-border bg-muted/40 p-3">
-            <div className="flex items-center justify-between pb-4 px-2">
-                <Link
-                    href="/"
-                    className="text-sm font-semibold text-foreground no-underline hover:text-muted-foreground"
-                >
-                    Task Tracker
-                </Link>
-                <button
-                    onClick={openSearch}
-                    aria-label="Search"
-                    className="text-muted-foreground hover:text-foreground"
-                >
-                    <Search className="h-4 w-4" />
-                </button>
-            </div>
+        <aside className="hidden lg:flex sticky top-0 h-screen w-[20%] flex-shrink-0 flex-col border-r border-border bg-sidebar p-3">
+            <Link
+                href="/"
+                className="mb-4 flex items-center gap-2 px-2 text-[15px] font-semibold text-foreground no-underline"
+            >
+                Task Tracker
+            </Link>
+            <button
+                onClick={openSearch}
+                className="mb-4 flex items-center justify-between gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+            >
+                <span className="flex items-center gap-2">
+                    <Search className="h-3.5 w-3.5" />
+                    Quick Search
+                </span>
+                <kbd className="rounded border border-border bg-muted px-1 text-[10px]">⌘K</kbd>
+            </button>
             <SidebarNav />
         </aside>
     );

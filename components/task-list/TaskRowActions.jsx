@@ -32,6 +32,7 @@ import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
+import { bustPageCache } from '@/lib/service-worker-cache';
 
 /**
  * Action bar for a task row — a single, always-visible `···` dropdown with
@@ -83,7 +84,10 @@ export default function TaskRowActions({
 
     function getSublistIdForTarget(targetId) {
         const ancestors = findAncestors(targetId, flatList);
-        const root = ancestors.length > 0 ? ancestors[ancestors.length - 1] : flatList.find((t) => t.id === targetId);
+        const root =
+            ancestors.length > 0
+                ? ancestors[ancestors.length - 1]
+                : flatList.find((flatTask) => flatTask.id === targetId);
         return root?.sublist_id ?? null;
     }
 
@@ -91,18 +95,18 @@ export default function TaskRowActions({
 
     const targetGroups = [
         { id: null, name: 'Main List', targets: [] },
-        ...sublists.map((sl) => ({ id: sl.id, name: sl.name, targets: [] }))
+        ...sublists.map((sublist) => ({ id: sublist.id, name: sublist.name, targets: [] }))
     ];
 
     validTargets.forEach((target) => {
         const sublistId = getSublistIdForTarget(target.id);
-        const group = targetGroups.find((g) => g.id === sublistId) || targetGroups[0];
+        const group = targetGroups.find((targetGroup) => targetGroup.id === sublistId) || targetGroups[0];
         group.targets.push(target);
     });
 
     const sortedGroups = [
-        targetGroups.find((g) => g.id === currentSublistId),
-        ...targetGroups.filter((g) => g.id !== currentSublistId),
+        targetGroups.find((targetGroup) => targetGroup.id === currentSublistId),
+        ...targetGroups.filter((targetGroup) => targetGroup.id !== currentSublistId),
     ]
         .filter(Boolean)
         .map((group) => ({
@@ -153,6 +157,9 @@ export default function TaskRowActions({
         }
 
         await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+        // Deleting a task changes the list's total count, which the sidebar reads from ['lists'].
+        queryClient.invalidateQueries({ queryKey: ['lists'] });
+        bustPageCache({ urls: [`/lists/${listId}`] });
         toast.success('Task deleted', { id: toastId });
         onDeleted?.();
     }
@@ -182,6 +189,7 @@ export default function TaskRowActions({
         }
 
         await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+        bustPageCache({ urls: [`/lists/${listId}`] });
         toast.success(successMessage, { id: toastId });
     }
 
@@ -224,6 +232,9 @@ export default function TaskRowActions({
         }
 
         await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+        // Duplicating creates a new task, changing the list's total count in ['lists'].
+        queryClient.invalidateQueries({ queryKey: ['lists'] });
+        bustPageCache({ urls: [`/lists/${listId}`] });
         toast.success('Task duplicated', { id: toastId });
     }
 

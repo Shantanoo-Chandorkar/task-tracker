@@ -40,6 +40,7 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
             update: updateList,
             buildFields: () => ({ space_id: spaceId }),
             invalidateQueryKey: ['lists'],
+            bustCache: () => ({ urls: ['/spaces', ...(list ? [`/lists/${list.id}`] : [])] }),
             onClose,
         });
 
@@ -50,13 +51,13 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
                     <input
                         type="color"
                         value={color}
-                        onChange={(e) => setColor(e.target.value)}
+                        onChange={(event) => setColor(event.target.value)}
                         className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
                         disabled={submitting}
                     />
                     <Input
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(event) => setName(event.target.value)}
                         placeholder="List name"
                         className="flex-1"
                         autoFocus

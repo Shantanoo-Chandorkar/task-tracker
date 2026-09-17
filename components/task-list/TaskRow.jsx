@@ -5,15 +5,17 @@ import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronRight, Circle, GripVertical, RefreshCw } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Circle, GripVertical, RefreshCw } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import StatusPicker from '@/components/status/StatusPicker';
 import TaskRowActions from './TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
+import CompleteTaskDialog from './CompleteTaskDialog';
 import DepthWarning from './DepthWarning';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
+import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 
 /**
  * Recursive row component — renders one task and all its children.
@@ -49,6 +51,23 @@ function TaskRow({ task, depth, flatList, listId }) {
         [task.is_recurring, task.recurrence_rule],
     );
 
+    const { doneStatus, defaultStatus, isDone, setComplete, confirmState, closeConfirm, confirmCascade } =
+        useTaskCompletion();
+    const taskIsDone = isDone(task);
+    const canToggleComplete = Boolean(doneStatus && defaultStatus);
+
+    function handleToggleComplete(clickEvent) {
+        clickEvent.stopPropagation();
+        setComplete(task, flatList, listId, !taskIsDone);
+    }
+
+    // Clicking empty row space (not a nested control) toggles expand/collapse, like the chevron.
+    function handleRowClick(clickEvent) {
+        if (hasChildren && clickEvent.target === clickEvent.currentTarget) {
+            toggleFlag(expandKey);
+        }
+    }
+
     return (
         <div
             ref={setNodeRef}
@@ -58,6 +77,7 @@ function TaskRow({ task, depth, flatList, listId }) {
         >
             {/* Task row — flat, hairline-separated: no per-row card background or radius */}
             <div
+                onClick={handleRowClick}
                 className="group flex items-center gap-1.5 py-2 px-2 border-b border-border/60 motion-safe:transition-colors duration-150 hover:bg-muted/50 cursor-default"
                 style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth})` }}
             >
@@ -69,6 +89,19 @@ function TaskRow({ task, depth, flatList, listId }) {
                     tabIndex={-1}
                 >
                     <GripVertical className="h-3.5 w-3.5" />
+                </button>
+
+                <button
+                    onClick={handleToggleComplete}
+                    disabled={!canToggleComplete}
+                    className={`flex-shrink-0 flex h-4 w-4 items-center justify-center rounded border motion-safe:transition-colors ${
+                        taskIsDone
+                            ? 'border-metric bg-metric text-background'
+                            : 'border-muted-foreground/40 hover:border-muted-foreground'
+                    } ${!canToggleComplete ? 'opacity-40' : ''}`}
+                    aria-label={taskIsDone ? 'Mark as incomplete' : 'Mark as complete'}
+                >
+                    {taskIsDone && <Check className="h-3 w-3" strokeWidth={3} />}
                 </button>
 
                 {/* Expand/collapse toggle */}
@@ -88,8 +121,13 @@ function TaskRow({ task, depth, flatList, listId }) {
                     )}
                 </button>
 
-                {/* Title opens the task page; clicking elsewhere just focuses the row for keyboard shortcuts */}
-                <span className="flex-1 text-sm text-foreground truncate min-w-0 flex items-center gap-1.5">
+                {/* Title opens the task page; clicking the empty space beside it toggles expand/collapse */}
+                <span
+                    onClick={handleRowClick}
+                    className={`flex-1 text-sm truncate min-w-0 flex items-center gap-1.5 ${
+                        taskIsDone ? 'text-muted-foreground line-through' : 'text-foreground'
+                    }`}
+                >
                     <Link
                         href={`/lists/${listId}/tasks/${task.id}`}
                         className="truncate no-underline text-inherit"
@@ -139,6 +177,16 @@ function TaskRow({ task, depth, flatList, listId }) {
                 onClose={() => setAddSubtaskOpen(false)}
                 parentId={task.id}
                 listId={listId}
+            />
+
+            {/* Cascade complete/incomplete confirmation for the row checkbox */}
+            <CompleteTaskDialog
+                open={!!confirmState}
+                onClose={closeConfirm}
+                task={confirmState?.task}
+                isComplete={confirmState?.isComplete}
+                descendantCount={confirmState?.descendantCount ?? 0}
+                onConfirm={confirmCascade}
             />
 
             {/* Children container with connecting line */}

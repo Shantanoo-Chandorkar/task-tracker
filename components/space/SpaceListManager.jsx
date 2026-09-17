@@ -40,6 +40,7 @@ import { updateSpace, deleteSpace } from '@/actions/space-actions';
 import { updateList, deleteList } from '@/actions/list-actions';
 import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
+import { bustPageCache } from '@/lib/service-worker-cache';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };
@@ -229,6 +230,7 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
     async function refetchAll() {
         await queryClient.invalidateQueries({ queryKey: ['spaces'] });
         await queryClient.invalidateQueries({ queryKey: ['lists'] });
+        bustPageCache({ urls: ['/spaces'] });
     }
 
     /**
@@ -241,9 +243,9 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
     async function persistPositions(rows, updateFn) {
         const results = await Promise.all(
             rows
-                .map((row, i) => ({ row, i }))
-                .filter(({ row, i }) => row.position !== i)
-                .map(({ row, i }) => updateFn(row.id, { position: i })),
+                .map((row, newPosition) => ({ row, newPosition }))
+                .filter(({ row, newPosition }) => row.position !== newPosition)
+                .map(({ row, newPosition }) => updateFn(row.id, { position: newPosition })),
         );
         await refetchAll();
         const failed = results.find((updateOutcome) => updateOutcome.error);
@@ -333,6 +335,11 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
             toast.error(error, { id: toastId });
             setError(error);
         } else {
+            bustPageCache(
+                deleteTarget.type === 'space'
+                    ? { prefixes: ['/lists/'] }
+                    : { urls: [`/lists/${deleteTarget.id}`] },
+            );
             await refetchAll();
             toast.success(deleteTarget.type === 'space' ? 'Space deleted' : 'List deleted', {
                 id: toastId,

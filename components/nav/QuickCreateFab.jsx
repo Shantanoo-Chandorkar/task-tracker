@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, ListChecks, ListPlus, LayoutGrid } from 'lucide-react';
+import { Plus, ListChecks, ListPlus, LayoutGrid, FolderPlus } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -12,6 +12,7 @@ import {
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import SpaceFormDialog from '@/components/space/SpaceFormDialog';
 import ListFormDialog from '@/components/space/ListFormDialog';
+import SublistFormDialog from '@/components/space/SublistFormDialog';
 
 /**
  * Floating action button with a New Task / New List / New Space speed-dial.
@@ -27,6 +28,7 @@ export default function QuickCreateFab({ className }) {
     const [taskDialogOpen, setTaskDialogOpen] = useState(false);
     const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
     const [listDialogOpen, setListDialogOpen] = useState(false);
+    const [sublistDialogOpen, setSublistDialogOpen] = useState(false);
 
     function handleNewTask() {
         if (listId) {
@@ -55,6 +57,10 @@ export default function QuickCreateFab({ className }) {
                         <ListPlus className="h-3.5 w-3.5" />
                         New List
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSublistDialogOpen(true)} className="gap-2">
+                        <FolderPlus className="h-3.5 w-3.5" />
+                        New Sublist
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setSpaceDialogOpen(true)} className="gap-2">
                         <LayoutGrid className="h-3.5 w-3.5" />
                         New Space
@@ -71,6 +77,7 @@ export default function QuickCreateFab({ className }) {
             )}
             <SpaceFormDialog open={spaceDialogOpen} onClose={() => setSpaceDialogOpen(false)} />
             <ListFormDialog open={listDialogOpen} onClose={() => setListDialogOpen(false)} />
+            <SublistFormDialog open={sublistDialogOpen} onClose={() => setSublistDialogOpen(false)} />
         </>
     );
 }

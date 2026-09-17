@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { createList } from '@/actions/list-actions';
 import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
+import { attachTaskCounts } from '@/lib/list-task-counts';
 
 /**
  * GET /api/lists
@@ -16,26 +17,13 @@ export const GET = withApiErrorHandling(async function GET(request) {
     let query = supabase.from('lists').select('*').order('position', { ascending: true });
     if (spaceId) query = query.eq('space_id', spaceId);
 
-    const [{ data: lists, error }, { data: tasks }] = await Promise.all([
-        query,
-        supabase.from('tasks').select('list_id'),
-    ]);
+    const { data: lists, error } = await query;
 
     if (error) {
         return NextResponse.json({ error: 'Failed to fetch lists' }, { status: 500 });
     }
 
-    const taskCountByListId = new Map();
-    for (const task of tasks || []) {
-        taskCountByListId.set(task.list_id, (taskCountByListId.get(task.list_id) ?? 0) + 1);
-    }
-
-    const listsWithCounts = (lists || []).map((list) => ({
-        ...list,
-        task_count: taskCountByListId.get(list.id) ?? 0,
-    }));
-
-    return NextResponse.json(listsWithCounts);
+    return NextResponse.json(await attachTaskCounts(supabase, lists || []));
 });
 
 /**

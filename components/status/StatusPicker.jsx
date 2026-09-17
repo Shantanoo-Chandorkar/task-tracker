@@ -15,6 +15,7 @@ import {
 import { Loader } from '@/components/ui/loader';
 import StatusBadge from './StatusBadge';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
+import { bustPageCache } from '@/lib/service-worker-cache';
 
 /**
  * Inline status dropdown for changing a task's status directly from the task row.
@@ -58,8 +59,9 @@ export default function StatusPicker({ task, flatList }) {
             }
 
             await queryClient.invalidateQueries({ queryKey: ['tasks', task.list_id] });
-        } catch (err) {
-            console.error('Status update failed:', err);
+            bustPageCache({ urls: [`/lists/${task.list_id}`] });
+        } catch (error) {
+            console.error('Status update failed:', error);
             toast.error('Failed to update task status');
         } finally {
             setPending(false);
