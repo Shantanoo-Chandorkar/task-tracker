@@ -30,9 +30,29 @@ export const viewport = {
     themeColor: '#171717',
 };
 
+// Runs before first paint so the `dark` class is correct immediately, instead of always
+// painting dark first and flipping after hydration. Mirrors ThemeToggle.jsx's `getSnapshot()` —
+// kept in sync manually, since this runs outside the module graph before any bundled code does.
+const THEME_INIT_SCRIPT = `
+(function () {
+  try {
+    var stored = localStorage.getItem('theme');
+    var isDark = stored === 'light' ? false : stored === 'dark' ? true : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', isDark);
+  } catch {}
+})();
+`;
+
 export default function RootLayout({ children }) {
     return (
-        <html lang="en" className={`dark ${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <html
+            lang="en"
+            className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+            suppressHydrationWarning
+        >
+            <head>
+                <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+            </head>
             <body className="flex flex-col bg-background text-foreground">
                 <NavigationProgressBar />
                 <ServiceWorkerRegister />

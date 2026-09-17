@@ -55,55 +55,57 @@
    hover states don't turn orange everywhere. --metric (cyan) is a custom
    addition, reserved for count numerals only, never for actions. */
 :root {
+    color-scheme: light;
     --background: #ffffff;
-    --foreground: #171717;
-    --card: #f5f5f5;
+    --foreground: #0f0f0f;
+    --card: #ededed;
     --card-foreground: #171717;
-    --popover: #f5f5f5;
+    --popover: #ededed;
     --popover-foreground: #171717;
-    --primary: #f97316;
+    --primary: #c2410c;
     --primary-foreground: #ffffff;
-    --secondary: #f5f5f5;
+    --secondary: #ededed;
     --secondary-foreground: #171717;
-    --muted: #f5f5f5;
+    --muted: #ededed;
     --muted-foreground: #737373;
-    --accent: #f5f5f5;
+    --accent: #ededed;
     --accent-foreground: #171717;
     --destructive: oklch(0.577 0.245 27.325);
     --border: #e7e5e4;
     --input: #e7e5e4;
-    --ring: #f97316;
-    --metric: #06b6d4;
+    --ring: #c2410c;
+    --metric: #0891b2;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0.625rem;
-    --sidebar: #f5f5f5;
+    --sidebar: #ededed;
     --sidebar-foreground: #171717;
-    --sidebar-primary: #f97316;
+    --sidebar-primary: #c2410c;
     --sidebar-primary-foreground: #ffffff;
     --sidebar-accent: #ececec;
     --sidebar-accent-foreground: #171717;
     --sidebar-border: #e7e5e4;
-    --sidebar-ring: #f97316;
+    --sidebar-ring: #c2410c;
 }
 
 .dark {
-    --background: #171717;
+    color-scheme: dark;
+    --background: #121212;
     --foreground: #ffffff;
-    --card: #262626;
+    --card: #1e1e1e;
     --card-foreground: #ffffff;
-    --popover: #262626;
+    --popover: #1e1e1e;
     --popover-foreground: #ffffff;
     --primary: #fb923c;
     --primary-foreground: #1a1200;
-    --secondary: #262626;
+    --secondary: #1e1e1e;
     --secondary-foreground: #ffffff;
-    --muted: #262626;
+    --muted: #1e1e1e;
     --muted-foreground: #a3a3a3;
-    --accent: #262626;
+    --accent: #1e1e1e;
     --accent-foreground: #ffffff;
     --destructive: oklch(0.704 0.191 22.216);
     --border: #2a2a2a;
@@ -115,7 +117,7 @@
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: #262626;
+    --sidebar: #1e1e1e;
     --sidebar-foreground: #ffffff;
     --sidebar-primary: #fb923c;
     --sidebar-primary-foreground: #1a1200;
@@ -123,6 +125,35 @@
     --sidebar-accent-foreground: #ffffff;
     --sidebar-border: #2a2a2a;
     --sidebar-ring: #fb923c;
+}
+
+/* Theme toggle reveal — a circle grows from the toggle button's click point to cover the
+   viewport, anchored via --theme-toggle-x/-y/-radius (set in ThemeToggle.jsx at click time).
+   Structural only, no color values, so it stays correct if the palette changes later. */
+@media (prefers-reduced-motion: no-preference) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation: none;
+        mix-blend-mode: normal;
+    }
+
+    ::view-transition-old(root) {
+        z-index: 0;
+    }
+
+    ::view-transition-new(root) {
+        z-index: 1;
+        clip-path: circle(0px at var(--theme-toggle-x, 0px) var(--theme-toggle-y, 0px));
+        animation: theme-reveal 550ms ease-in-out forwards;
+    }
+
+    @keyframes theme-reveal {
+        to {
+            clip-path: circle(
+                var(--theme-toggle-radius, 150%) at var(--theme-toggle-x, 0px) var(--theme-toggle-y, 0px)
+            );
+        }
+    }
 }
 
 @layer base {

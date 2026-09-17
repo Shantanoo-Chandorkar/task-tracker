@@ -23,28 +23,33 @@ export default function SidebarNav({ onNavigate }) {
     const { data: lists = [] } = useListsQuery();
 
     return (
-        <nav className="flex flex-1 flex-col overflow-y-auto">
+        <nav className="flex flex-1 min-h-0 flex-col">
             <Link
                 href="/spaces"
                 onClick={onNavigate}
-                className={`mb-3 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline ${
+                className={`mb-4 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline ${
                     isSpacesActive
-                        ? 'bg-background font-medium text-primary'
-                        : 'text-foreground hover:bg-background/60'
+                        ? 'bg-sidebar-accent font-medium text-sidebar-primary'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
                 }`}
             >
                 <LayoutGrid className="h-4 w-4" />
                 Spaces
             </Link>
 
-            <div className="flex-1 space-y-4">
+            <div className="px-2 pb-2 text-[11px] font-semibold tracking-wider text-muted-foreground">
+                LISTS
+            </div>
+
+            {/* Only this region scrolls — Spaces/Settings/Theme above and below stay fixed */}
+            <div className="flex-1 min-h-0 space-y-4 overflow-y-auto">
                 {spaces.map((space) => {
                     const spaceLists = lists.filter((list) => list.space_id === space.id);
                     if (spaceLists.length === 0) return null;
 
                     return (
                         <div key={space.id}>
-                            <div className="px-2 pb-1 text-xs font-semibold text-muted-foreground truncate">
+                            <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
                                 {space.name}
                             </div>
                             {spaceLists.map((list) => {
@@ -56,11 +61,17 @@ export default function SidebarNav({ onNavigate }) {
                                         onClick={onNavigate}
                                         className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm no-underline ${
                                             isActive
-                                                ? 'bg-background font-medium text-primary'
-                                                : 'text-foreground hover:bg-background/60'
+                                                ? 'bg-sidebar-accent font-medium text-sidebar-primary'
+                                                : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
                                         }`}
                                     >
-                                        <span className="truncate">{list.name}</span>
+                                        <span className="flex min-w-0 items-center gap-2">
+                                            <span
+                                                className="h-2 w-2 flex-shrink-0 rounded-full"
+                                                style={{ backgroundColor: list.color || 'var(--sidebar-primary)' }}
+                                            />
+                                            <span className="truncate">{list.name}</span>
+                                        </span>
                                         <span className="flex-shrink-0 font-mono text-xs text-metric">
                                             {list.task_count ?? 0}
                                         </span>
@@ -72,17 +83,15 @@ export default function SidebarNav({ onNavigate }) {
                 })}
             </div>
 
-            <Link
-                href="/settings"
-                onClick={onNavigate}
-                className="mt-auto flex items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground no-underline hover:text-foreground"
-            >
-                <Settings className="h-4 w-4" />
-                Settings
-            </Link>
-
-            <div className="mt-3 flex items-center justify-between border-t border-border px-2 pt-3">
-                <span className="text-xs text-muted-foreground">Theme</span>
+            <div className="mt-3 flex items-center gap-1 border-t border-sidebar-border pt-3">
+                <Link
+                    href="/settings"
+                    onClick={onNavigate}
+                    className="flex flex-1 items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground no-underline hover:text-sidebar-foreground"
+                >
+                    <Settings className="h-4 w-4" />
+                    Settings
+                </Link>
                 <ThemeToggle />
             </div>
         </nav>
