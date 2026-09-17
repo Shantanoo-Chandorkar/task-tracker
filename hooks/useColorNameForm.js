@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { bustPageCache } from '@/lib/service-worker-cache';
 
 /**
  * Shared name/color create-or-edit form state for the near-identical Space/List/Sublist/Status dialogs.
@@ -15,6 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
  * @param {Function} config.update - async (id, fields) => { error } — called in edit mode
  * @param {Function} [config.buildFields] - () => object, extra fields merged in on submit
  * @param {string[]} config.invalidateQueryKey - Query key to invalidate on success
+ * @param {Function} [config.bustCache] - () => {urls?, prefixes?} of pages to evict on success
  * @param {Function} config.onClose - Called after a successful submit
  * @returns {{
  *   isEditing: boolean,
@@ -33,6 +35,7 @@ export function useColorNameForm({
     update,
     buildFields = () => ({}),
     invalidateQueryKey,
+    bustCache,
     onClose,
 }) {
     const queryClient = useQueryClient();
@@ -71,6 +74,7 @@ export function useColorNameForm({
         }
 
         await queryClient.invalidateQueries({ queryKey: invalidateQueryKey });
+        if (bustCache) bustPageCache(bustCache());
         onClose();
     }
 

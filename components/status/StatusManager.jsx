@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { toast } from 'sonner';
+import { bustPageCache } from '@/lib/service-worker-cache';
 import {
     DndContext,
     closestCenter,
@@ -157,18 +158,20 @@ export default function StatusManager({ initialStatuses }) {
 
         const results = await Promise.all(
             reordered
-                .map((status, i) => ({ status, i }))
-                .filter(({ status, i }) => status.position !== i)
-                .map(({ status, i }) => updateStatus(status.id, { position: i })),
+                .map((status, newPosition) => ({ status, newPosition }))
+                .filter(({ status, newPosition }) => status.position !== newPosition)
+                .map(({ status, newPosition }) => updateStatus(status.id, { position: newPosition })),
         );
         const failed = results.find((updateOutcome) => updateOutcome.error);
         if (failed) {
             await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+            bustPageCache({ prefixes: ['/lists/'] });
             toast.error(failed.error, { id: toastId });
             return;
         }
 
         await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+        bustPageCache({ prefixes: ['/lists/'] });
         toast.success('Order saved', { id: toastId });
     }
 
@@ -186,6 +189,7 @@ export default function StatusManager({ initialStatuses }) {
             setError(error);
         } else {
             await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+            bustPageCache({ prefixes: ['/lists/'] });
             toast.success('Status deleted', { id: toastId });
         }
     }

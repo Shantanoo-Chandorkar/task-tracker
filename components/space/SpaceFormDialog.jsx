@@ -24,6 +24,7 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
             create: createSpace,
             update: updateSpace,
             invalidateQueryKey: ['spaces'],
+            bustCache: () => ({ urls: ['/spaces'], prefixes: ['/lists/'] }),
             onClose,
         });
 
@@ -34,13 +35,13 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
                     <input
                         type="color"
                         value={color}
-                        onChange={(e) => setColor(e.target.value)}
+                        onChange={(event) => setColor(event.target.value)}
                         className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
                         disabled={submitting}
                     />
                     <Input
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(event) => setName(event.target.value)}
                         placeholder="Space name"
                         className="flex-1"
                         autoFocus

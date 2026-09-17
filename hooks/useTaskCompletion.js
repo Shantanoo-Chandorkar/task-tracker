@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { findCompletedDescendants, findIncompleteDescendants } from '@/lib/tree';
 import { updateTask, completeTaskAndDescendants, uncompleteTaskAndDescendants } from '@/actions/task-actions';
+import { bustPageCache } from '@/lib/service-worker-cache';
 
 /**
  * Single source of truth for marking a task (and its descendants) complete or incomplete.
@@ -62,6 +63,7 @@ export function useTaskCompletion() {
             }
 
             await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+            bustPageCache({ urls: [`/lists/${listId}`] });
             toast.dismiss(toastId);
         },
         [queryClient],
@@ -90,6 +92,7 @@ export function useTaskCompletion() {
             }
 
             await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+            bustPageCache({ urls: [`/lists/${listId}`] });
             toast.dismiss(toastId);
         },
         [doneStatus, defaultStatus, getIncompleteDescendants, getCompletedDescendants, queryClient],

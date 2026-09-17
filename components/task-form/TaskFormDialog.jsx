@@ -19,6 +19,7 @@ import RecurrenceBuilder from './RecurrenceBuilder';
 import { createTask, updateTask } from '@/actions/task-actions';
 import { Loader } from '@/components/ui/loader';
 import { toast } from 'sonner';
+import { bustPageCache } from '@/lib/service-worker-cache';
 
 /**
  * Modal for creating or editing a task, via the shared ResponsiveModal container.
@@ -116,6 +117,9 @@ export default function TaskFormDialog({
         onClose();
         // Not awaited — the dialog closes immediately instead of blocking on this refetch.
         queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
+        // A new task changes the list's total count — the sidebar's ['lists'] query needs telling.
+        if (!isEditing) queryClient.invalidateQueries({ queryKey: ['lists'] });
+        bustPageCache({ urls: [`/lists/${listId ?? task?.list_id}`] });
     }
 
     return (
