@@ -34,7 +34,25 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-    if (event.data === 'SKIP_WAITING') self.skipWaiting();
+    if (event.data === 'SKIP_WAITING') {
+        self.skipWaiting();
+        return;
+    }
+
+    // A mutation succeeded — evict the stale-while-revalidate entries it affects.
+    if (event.data?.type === 'BUST_PAGE_CACHE') {
+        const { urls = [], prefixes = [] } = event.data;
+        event.waitUntil(
+            caches.open(CACHE_NAME).then(async (cache) => {
+                const requests = await cache.keys();
+                const staleRequests = requests.filter((request) => {
+                    const { pathname } = new URL(request.url);
+                    return urls.includes(pathname) || prefixes.some((prefix) => pathname.startsWith(prefix));
+                });
+                await Promise.all(staleRequests.map((request) => cache.delete(request)));
+            }),
+        );
+    }
 });
 
 self.addEventListener('fetch', (event) => {

@@ -2,6 +2,7 @@
 
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
+import ExportMenu from '@/components/export/ExportMenu';
 
 /**
  * Space + List name header above the status tiles — reads the shared `['spaces']`/`['lists']` cache.
@@ -24,9 +25,19 @@ export default function ListHeader({ listId, initialSpaces, initialLists }) {
     if (!currentList) return null;
 
     return (
-        <div className="mb-1">
+        <div className="mb-4">
             {currentSpace && <p className="text-xs text-muted-foreground">{currentSpace.name}</p>}
-            <h1 className="text-lg font-semibold text-foreground">{currentList.name}</h1>
+            <div className="mt-1 flex items-center gap-2">
+                <span
+                    className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                    style={{ backgroundColor: currentList.color || 'var(--primary)' }}
+                />
+                <h1 className="text-lg font-semibold text-foreground">{currentList.name}</h1>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    {currentList.task_count ?? 0} tasks
+                </span>
+                <ExportMenu scope={{ type: 'list', id: listId }} />
+            </div>
         </div>
     );
 }
