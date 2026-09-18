@@ -1,5 +1,5 @@
 // Bumped on any change to this file's caching logic so `activate` evicts stale caches.
-const CACHE_NAME = 'task-tracker-shell-v3';
+const CACHE_NAME = 'task-tracker-shell-v4';
 
 // Fixed, known-ahead-of-time assets only. Page HTML and API responses are
 // cached at runtime instead — Next's chunk filenames are content-hashed and
@@ -55,12 +55,21 @@ self.addEventListener('message', (event) => {
     }
 });
 
+// /reset-password's content depends on hidden session state, not the URL -- a stale cached copy
+// can show the wrong screen (form vs. "link expired"). Always hit the network for it.
+const NEVER_CACHE_PATHS = ['/reset-password'];
+
 self.addEventListener('fetch', (event) => {
     const { request } = event;
 
     // Never touch mutations (POST/PATCH/DELETE to /api/*, Next Server Actions
     // are POSTs too) or cross-origin requests — only same-origin GETs are cached.
     if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) {
+        return;
+    }
+
+    if (NEVER_CACHE_PATHS.includes(new URL(request.url).pathname)) {
+        event.respondWith(fetch(request));
         return;
     }
 
