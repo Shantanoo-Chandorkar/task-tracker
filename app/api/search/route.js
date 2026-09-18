@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { requireAuthResponse } from '@/lib/api-response';
 
 const RESULTS_PER_CATEGORY = 8;
 
@@ -22,6 +23,9 @@ function escapeIlike(value) {
  * immediately rather than scanning every row.
  */
 export async function GET(request) {
+    const unauthorized = await requireAuthResponse();
+    if (unauthorized) return unauthorized;
+
     try {
         const searchQuery = (request.nextUrl.searchParams.get('q') ?? '').trim();
 

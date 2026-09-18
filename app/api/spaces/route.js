@@ -1,13 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { createSpace } from '@/actions/space-actions';
-import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
+import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
 
 /**
  * GET /api/spaces
  * Returns all spaces ordered by position.
  */
 export const GET = withApiErrorHandling(async function GET() {
+    const unauthorized = await requireAuthResponse();
+    if (unauthorized) return unauthorized;
+
     const supabase = await createClient();
 
     const { data: spaces, error } = await supabase

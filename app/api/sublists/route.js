@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { createSublist } from '@/actions/sublist-actions';
-import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
+import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
 
 /**
  * GET /api/sublists?list_id=<id>
@@ -9,6 +9,9 @@ import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
  * list_id is required — sublists only ever make sense scoped to one list.
  */
 export const GET = withApiErrorHandling(async function GET(request) {
+    const unauthorized = await requireAuthResponse();
+    if (unauthorized) return unauthorized;
+
     const supabase = await createClient();
     const listId = request.nextUrl.searchParams.get('list_id');
 

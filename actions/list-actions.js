@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
+import { getCurrentUser } from '@/lib/auth/session';
+import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 
 /**
  * Creates a new list under a space. Appends it after the last existing list
@@ -15,6 +17,9 @@ import { getNextPosition } from '@/lib/position';
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function createList(fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!fields.name || fields.name.trim() === '') {
         return { data: null, error: 'List name is required' };
     }
@@ -27,7 +32,7 @@ export async function createList(fields) {
 
         const position = await getNextPosition(supabase, 'lists', { space_id: fields.space_id });
 
-        const { data, error } = await supabase
+        const { data: createdList, error } = await supabase
             .from('lists')
             .insert({
                 name: fields.name.trim(),
@@ -43,7 +48,7 @@ export async function createList(fields) {
         }
 
         revalidateTag('lists');
-        return { data, error: null };
+        return { data: createdList, error: null };
     } catch {
         return { data: null, error: 'Unexpected error creating list' };
     }
@@ -57,12 +62,15 @@ export async function createList(fields) {
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function updateList(id, fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!id) return { data: null, error: 'List ID is required' };
 
     try {
         const supabase = await createClient();
 
-        const { data, error } = await supabase
+        const { data: updatedList, error } = await supabase
             .from('lists')
             .update(fields)
             .eq('id', id)
@@ -74,7 +82,7 @@ export async function updateList(id, fields) {
         }
 
         revalidateTag('lists');
-        return { data, error: null };
+        return { data: updatedList, error: null };
     } catch {
         return { data: null, error: 'Unexpected error updating list' };
     }
@@ -88,6 +96,9 @@ export async function updateList(id, fields) {
  * @returns {{ error: string|null }}
  */
 export async function deleteList(id) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!id) return { error: 'List ID is required' };
 
     try {

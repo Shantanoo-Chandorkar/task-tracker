@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
+import { getCurrentUser } from '@/lib/auth/session';
+import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 
 /**
  * Creates a new space. Appends it after the last existing space.
@@ -13,6 +15,9 @@ import { getNextPosition } from '@/lib/position';
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function createSpace(fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!fields.name || fields.name.trim() === '') {
         return { data: null, error: 'Space name is required' };
     }
@@ -22,12 +27,13 @@ export async function createSpace(fields) {
 
         const position = await getNextPosition(supabase, 'spaces', {});
 
-        const { data, error } = await supabase
+        const { data: createdSpace, error } = await supabase
             .from('spaces')
             .insert({
                 name: fields.name.trim(),
                 color: fields.color ?? '#6b7280',
                 position,
+                owner_id: user.id,
             })
             .select()
             .single();
@@ -37,7 +43,7 @@ export async function createSpace(fields) {
         }
 
         revalidateTag('spaces');
-        return { data, error: null };
+        return { data: createdSpace, error: null };
     } catch {
         return { data: null, error: 'Unexpected error creating space' };
     }
@@ -51,12 +57,15 @@ export async function createSpace(fields) {
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function updateSpace(id, fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!id) return { data: null, error: 'Space ID is required' };
 
     try {
         const supabase = await createClient();
 
-        const { data, error } = await supabase
+        const { data: updatedSpace, error } = await supabase
             .from('spaces')
             .update(fields)
             .eq('id', id)
@@ -68,7 +77,7 @@ export async function updateSpace(id, fields) {
         }
 
         revalidateTag('spaces');
-        return { data, error: null };
+        return { data: updatedSpace, error: null };
     } catch {
         return { data: null, error: 'Unexpected error updating space' };
     }
@@ -81,6 +90,9 @@ export async function updateSpace(id, fields) {
  * @returns {{ error: string|null }}
  */
 export async function deleteSpace(id) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!id) return { error: 'Space ID is required' };
 
     try {

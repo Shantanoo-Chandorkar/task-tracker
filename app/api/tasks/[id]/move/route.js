@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getPositionBetween } from '@/lib/fractional-index';
 import { findAncestors, findDescendantIds } from '@/lib/tree';
 import { getNestingMode, FINITE_MAX_DEPTH } from '@/lib/config';
+import { requireAuthResponse } from '@/lib/api-response';
 
 /**
  * POST /api/tasks/[id]/move
@@ -17,6 +18,9 @@ import { getNestingMode, FINITE_MAX_DEPTH } from '@/lib/config';
  *   listId?: uuid, sublistId?: uuid|null }
  */
 export async function POST(request, { params }) {
+    const unauthorized = await requireAuthResponse();
+    if (unauthorized) return unauthorized;
+
     const { id: taskId } = await params;
 
     try {

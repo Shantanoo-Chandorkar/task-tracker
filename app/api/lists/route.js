@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { createList } from '@/actions/list-actions';
-import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
+import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
 import { attachTaskCounts } from '@/lib/list-task-counts';
 
 /**
@@ -11,6 +11,9 @@ import { attachTaskCounts } from '@/lib/list-task-counts';
  * across every space (used to build nav).
  */
 export const GET = withApiErrorHandling(async function GET(request) {
+    const unauthorized = await requireAuthResponse();
+    if (unauthorized) return unauthorized;
+
     const supabase = await createClient();
     const spaceId = request.nextUrl.searchParams.get('space_id');
 
