@@ -8,6 +8,8 @@ import { findDescendantIds, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
 import { getNextPosition } from '@/lib/position';
 import { canMarkTaskDone, getDefaultStatusId, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
+import { getCurrentUser } from '@/lib/auth/session';
+import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 
 /**
  * Deepest relative depth in a subtree snapshot (0 = root with no children).
@@ -39,6 +41,9 @@ function snapshotMaxRelativeDepth(node) {
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function createTask(fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!fields.title || fields.title.trim() === '') {
         return { data: null, error: 'Title is required' };
     }
@@ -131,6 +136,9 @@ export async function createTask(fields) {
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function updateTask(taskId, fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!taskId) return { data: null, error: 'Task ID is required' };
 
     try {
@@ -139,9 +147,15 @@ export async function updateTask(taskId, fields) {
         const updates = { ...fields };
 
         if (updates.status_id) {
-            const doneStatusId = await getDoneStatusId(supabase);
-            if (doneStatusId && updates.status_id === doneStatusId) {
-                const canComplete = await canMarkTaskDone(supabase, taskId, doneStatusId);
+            // Look up the target status's own code rather than resolving a "the done status"
+            // globally — statuses are per-space now, so there's no single done status id to compare against.
+            const { data: targetStatus } = await supabase
+                .from('statuses')
+                .select('code')
+                .eq('id', updates.status_id)
+                .single();
+            if (targetStatus?.code === 'done') {
+                const canComplete = await canMarkTaskDone(supabase, taskId, updates.status_id);
                 if (!canComplete) {
                     return { data: null, error: 'Complete all subtasks before marking this task done' };
                 }
@@ -201,6 +215,9 @@ export async function updateTask(taskId, fields) {
  * @returns {{ error: string|null }}
  */
 export async function completeTaskAndDescendants(taskId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!taskId) return { error: 'Task ID is required' };
 
     try {
@@ -209,7 +226,7 @@ export async function completeTaskAndDescendants(taskId) {
         const { task, listTasks } = await getTaskListTree(supabase, taskId);
         if (!task) return { error: 'Task not found' };
 
-        const doneStatusId = await getDoneStatusId(supabase);
+        const doneStatusId = await getDoneStatusId(supabase, task.space_id);
         if (!doneStatusId) return { error: 'No "done" status configured' };
 
         const descendantIds = Array.from(findDescendantIds(taskId, listTasks));
@@ -237,6 +254,9 @@ export async function completeTaskAndDescendants(taskId) {
  * @returns {{ error: string|null }}
  */
 export async function uncompleteTaskAndDescendants(taskId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!taskId) return { error: 'Task ID is required' };
 
     try {
@@ -245,7 +265,7 @@ export async function uncompleteTaskAndDescendants(taskId) {
         const { task, listTasks } = await getTaskListTree(supabase, taskId);
         if (!task) return { error: 'Task not found' };
 
-        const defaultStatusId = await getDefaultStatusId(supabase);
+        const defaultStatusId = await getDefaultStatusId(supabase, task.space_id);
         if (!defaultStatusId) return { error: 'No default status configured' };
 
         const descendantIds = Array.from(findDescendantIds(taskId, listTasks));
@@ -272,6 +292,9 @@ export async function uncompleteTaskAndDescendants(taskId) {
  * @returns {{ error: string|null }}
  */
 export async function deleteTask(id) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!id) return { error: 'Task ID is required' };
 
     try {
@@ -301,6 +324,9 @@ export async function deleteTask(id) {
  * @returns {{ error: string|null }}
  */
 export async function deleteTaskAndReparentChildren(taskId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!taskId) return { error: 'Task ID is required' };
 
     try {
@@ -404,6 +430,9 @@ export async function deleteTaskAndReparentChildren(taskId) {
  * @returns {{ error: string|null }}
  */
 export async function duplicateTask(taskId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!taskId) return { error: 'Task ID is required' };
 
     try {

@@ -8,6 +8,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 /**
  * Reusable export trigger — drop anywhere with a `scope` describing what to export, and it
@@ -23,15 +24,19 @@ import {
  *   'menu-items': bare items to compose inside an existing DropdownMenuContent.
  */
 export default function ExportMenu({ scope, variant = 'icon' }) {
+    const handleExportClick = () => {
+        toast.success("Export started. Please check your downloads folder.");
+    };
+
     const items = (
         <>
             <DropdownMenuItem asChild>
-                <a href={`/api/export?type=${scope.type}&id=${scope.id}&format=csv`} download>
+                <a href={`/api/export?type=${scope.type}&id=${scope.id}&format=csv`} download onClick={handleExportClick}>
                     Export as CSV
                 </a>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-                <a href={`/api/export?type=${scope.type}&id=${scope.id}&format=json`} download>
+                <a href={`/api/export?type=${scope.type}&id=${scope.id}&format=json`} download onClick={handleExportClick}>
                     Export as JSON
                 </a>
             </DropdownMenuItem>

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
-import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
+import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
 
 /**
  * GET /api/sublists/[id]
@@ -9,6 +9,9 @@ import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
  * exactly how many tasks a cascade would remove.
  */
 export const GET = withApiErrorHandling(async function GET(request, { params }) {
+    const unauthorized = await requireAuthResponse();
+    if (unauthorized) return unauthorized;
+
     const { id: sublistId } = await params;
     const supabase = await createClient();
 

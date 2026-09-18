@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
+import { getCurrentUser } from '@/lib/auth/session';
+import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 
 /**
  * Creates a new sublist under a list. Appends it after the last existing sublist in that list.
@@ -14,6 +16,9 @@ import { getNextPosition } from '@/lib/position';
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function createSublist(fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!fields.name || fields.name.trim() === '') {
         return { data: null, error: 'Sublist name is required' };
     }
@@ -56,6 +61,9 @@ export async function createSublist(fields) {
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function updateSublist(sublistId, fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!sublistId) return { data: null, error: 'Sublist ID is required' };
 
     try {
@@ -86,6 +94,9 @@ export async function updateSublist(sublistId, fields) {
  * @returns {{ error: string|null }}
  */
 export async function deleteSublist(sublistId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!sublistId) return { error: 'Sublist ID is required' };
 
     try {

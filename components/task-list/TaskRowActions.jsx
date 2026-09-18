@@ -65,7 +65,7 @@ export default function TaskRowActions({
     const { data: sublists = [] } = useSublistsQuery(listId);
 
     const { doneStatus, defaultStatus, isDone, setComplete, confirmState, closeConfirm, confirmCascade } =
-        useTaskCompletion();
+        useTaskCompletion(listId);
     const taskIsDone = isDone(task);
 
     const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);

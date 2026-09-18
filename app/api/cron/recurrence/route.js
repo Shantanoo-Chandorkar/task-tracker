@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/admin';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { NextResponse } from 'next/server';
 
@@ -39,12 +39,24 @@ export async function GET(request) {
             return NextResponse.json({ processed: 0 });
         }
 
-        // Fetch the default status to reset new task instances to
-        const { data: defaultStatus } = await supabase
+        // Resolve each due task's own space's default status — statuses are per-space, and
+        // dueTasks can span multiple spaces, so there's no single "the" default status anymore.
+        const distinctListIds = [...new Set(dueTasks.map((task) => task.list_id))];
+        const { data: taskLists = [] } = await supabase
+            .from('lists')
+            .select('id, space_id')
+            .in('id', distinctListIds);
+        const spaceIdByListId = new Map(taskLists.map((list) => [list.id, list.space_id]));
+
+        const distinctSpaceIds = [...new Set(taskLists.map((list) => list.space_id))];
+        const { data: defaultStatuses = [] } = await supabase
             .from('statuses')
-            .select('id')
+            .select('id, space_id')
             .eq('is_default', true)
-            .single();
+            .in('space_id', distinctSpaceIds);
+        const defaultStatusIdBySpaceId = new Map(
+            defaultStatuses.map((status) => [status.space_id, status.id]),
+        );
 
         let processed = 0;
 
@@ -67,10 +79,13 @@ export async function GET(request) {
             const { data: siblings } = await siblingQuery;
             const newPosition = siblings && siblings.length > 0 ? siblings[0].position + 1 : 1;
 
+            const taskSpaceId = spaceIdByListId.get(task.list_id);
+            const defaultStatusId = defaultStatusIdBySpaceId.get(taskSpaceId) ?? null;
+
             const { error: insertError } = await supabase.from('tasks').insert({
                 title: task.title,
                 description: task.description,
-                status_id: defaultStatus?.id ?? null,
+                status_id: defaultStatusId,
                 parent_id: task.parent_id,
                 list_id: task.list_id,
                 position: newPosition,

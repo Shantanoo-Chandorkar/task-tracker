@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
+import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { toast } from 'sonner';
 import {
     Select,
@@ -28,9 +29,10 @@ import { bustPageCache } from '@/lib/service-worker-cache';
 export default function StatusPicker({ task, flatList }) {
     const queryClient = useQueryClient();
     const [pending, setPending] = useState(false);
-    const { data: statuses = [] } = useStatusesQuery();
+    const spaceId = useSpaceIdForList(task.list_id);
+    const { data: statuses = [] } = useStatusesQuery(spaceId);
     const { doneStatus, defaultStatus, setComplete, confirmState, closeConfirm, confirmCascade } =
-        useTaskCompletion();
+        useTaskCompletion(task.list_id);
 
     async function handleChange(newStatusId) {
         const isCompleteTransition = doneStatus && newStatusId === doneStatus.id;

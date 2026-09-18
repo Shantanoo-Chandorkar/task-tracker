@@ -123,20 +123,24 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
 }
 
 /**
- * Full status management UI — create, rename, recolor, reorder, and delete statuses.
+ * Full status management UI for one space, rendered inline on that space's own card.
  * Create/edit go through StatusFormDialog, the same modal container Task/List/Sublist use.
  *
  * @param {object} props
- * @param {object[]} props.initialStatuses - SSR-fetched statuses for initial hydration
+ * @param {string} props.spaceId - Space these statuses belong to
+ * @param {object[]} [props.initialStatuses] - SSR-fetched statuses, for hydration without a flash
  */
-export default function StatusManager({ initialStatuses }) {
+export default function StatusManager({ spaceId, initialStatuses }) {
     const queryClient = useQueryClient();
     const [statusDialog, setStatusDialog] = useState({ open: false, status: null });
     const [error, setError] = useState('');
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
 
-    const { data: statuses = [] } = useStatusesQuery({ initialData: initialStatuses });
+    const { data: statuses = [], isLoading } = useStatusesQuery(
+        spaceId,
+        initialStatuses ? { initialData: initialStatuses } : {},
+    );
 
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
@@ -152,16 +156,25 @@ export default function StatusManager({ initialStatuses }) {
         const newIndex = statuses.findIndex((status) => status.id === over.id);
         const reordered = arrayMove(statuses, oldIndex, newIndex);
 
-        queryClient.setQueryData(['statuses'], reordered);
+        queryClient.setQueryData(['statuses', spaceId], reordered);
 
         const toastId = toast.loading('Saving order...');
 
-        const results = await Promise.all(
-            reordered
-                .map((status, newPosition) => ({ status, newPosition }))
-                .filter(({ status, newPosition }) => status.position !== newPosition)
-                .map(({ status, newPosition }) => updateStatus(status.id, { position: newPosition })),
-        );
+        let results;
+        try {
+            results = await Promise.all(
+                reordered
+                    .map((status, newPosition) => ({ status, newPosition }))
+                    .filter(({ status, newPosition }) => status.position !== newPosition)
+                    .map(({ status, newPosition }) => updateStatus(status.id, { position: newPosition })),
+            );
+        } catch {
+            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+            bustPageCache({ prefixes: ['/lists/'] });
+            toast.error('Could not reach the server. Try again.', { id: toastId });
+            return;
+        }
+
         const failed = results.find((updateOutcome) => updateOutcome.error);
         if (failed) {
             await queryClient.invalidateQueries({ queryKey: ['statuses'] });
@@ -180,13 +193,22 @@ export default function StatusManager({ initialStatuses }) {
 
         setDeleting(true);
         const toastId = toast.loading('Deleting status...');
-        const { error } = await deleteStatus(deleteTarget.id);
+
+        let result;
+        try {
+            result = await deleteStatus(deleteTarget.id);
+        } catch {
+            setDeleting(false);
+            setDeleteTarget(null);
+            toast.error('Could not reach the server. Try again.', { id: toastId });
+            return;
+        }
         setDeleting(false);
         setDeleteTarget(null);
 
-        if (error) {
-            toast.error(error, { id: toastId });
-            setError(error);
+        if (result.error) {
+            toast.error(result.error, { id: toastId });
+            setError(result.error);
         } else {
             await queryClient.invalidateQueries({ queryKey: ['statuses'] });
             bustPageCache({ prefixes: ['/lists/'] });
@@ -209,34 +231,42 @@ export default function StatusManager({ initialStatuses }) {
                 </p>
             )}
 
-            <DndContext
-                id="status-dnd"
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-            >
-                <SortableContext
-                    items={statuses.map((status) => status.id)}
-                    strategy={verticalListSortingStrategy}
+            {isLoading ? (
+                <div className="flex items-center justify-center gap-2 rounded-xl bg-card py-6 text-sm text-muted-foreground">
+                    <Loader size="sm" />
+                    Loading statuses...
+                </div>
+            ) : (
+                <DndContext
+                    id="status-dnd"
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
                 >
-                    <div className="rounded-xl bg-card">
-                        {statuses.map((status) => (
-                            <StatusRow
-                                key={status.id}
-                                status={status}
-                                onEditRequest={(status) => setStatusDialog({ open: true, status })}
-                                onDeleteRequest={setDeleteTarget}
-                                isOnly={statuses.length === 1}
-                            />
-                        ))}
-                    </div>
-                </SortableContext>
-            </DndContext>
+                    <SortableContext
+                        items={statuses.map((status) => status.id)}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        <div className="rounded-xl bg-card">
+                            {statuses.map((status) => (
+                                <StatusRow
+                                    key={status.id}
+                                    status={status}
+                                    onEditRequest={(status) => setStatusDialog({ open: true, status })}
+                                    onDeleteRequest={setDeleteTarget}
+                                    isOnly={statuses.length === 1}
+                                />
+                            ))}
+                        </div>
+                    </SortableContext>
+                </DndContext>
+            )}
 
             <button
                 type="button"
                 onClick={() => setStatusDialog({ open: true, status: null })}
-                className="w-full rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                disabled={!spaceId || isLoading}
+                className="w-full rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40 disabled:opacity-50 disabled:pointer-events-none"
             >
                 + Add status
             </button>
@@ -245,6 +275,7 @@ export default function StatusManager({ initialStatuses }) {
                 open={statusDialog.open}
                 onClose={() => setStatusDialog({ open: false, status: null })}
                 status={statusDialog.status}
+                spaceId={spaceId}
             />
 
             <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

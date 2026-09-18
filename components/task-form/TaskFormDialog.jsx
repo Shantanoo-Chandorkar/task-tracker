@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
+import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +57,8 @@ export default function TaskFormDialog({
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
 
-    const { data: statuses = [] } = useStatusesQuery();
+    const spaceId = useSpaceIdForList(listId ?? task?.list_id);
+    const { data: statuses = [] } = useStatusesQuery(spaceId);
 
     // Reset fields during render (not an effect) to avoid an extra render/flicker on prop change.
     const resetKey = open

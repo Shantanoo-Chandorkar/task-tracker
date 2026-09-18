@@ -3,31 +3,41 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
+import { getCurrentUser } from '@/lib/auth/session';
+import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 
 /**
- * Creates a new status. Appends it after the last existing status.
+ * Creates a new status. Appends it after the last existing status in its space.
  *
  * @param {object} fields
  * @param {string} fields.name - Required status name
+ * @param {string} fields.space_id - Required space this status belongs to
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function createStatus(fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!fields.name || fields.name.trim() === '') {
         return { data: null, error: 'Status name is required' };
+    }
+    if (!fields.space_id) {
+        return { data: null, error: 'A space is required' };
     }
 
     try {
         const supabase = await createClient();
 
-        const position = await getNextPosition(supabase, 'statuses', {});
+        const position = await getNextPosition(supabase, 'statuses', { space_id: fields.space_id });
 
-        const { data, error } = await supabase
+        const { data: createdStatus, error } = await supabase
             .from('statuses')
             .insert({
                 name: fields.name.trim(),
                 color: fields.color ?? '#6b7280',
                 position,
+                space_id: fields.space_id,
             })
             .select()
             .single();
@@ -38,7 +48,7 @@ export async function createStatus(fields) {
 
         revalidateTag('statuses');
         revalidateTag('task-tree');
-        return { data, error: null };
+        return { data: createdStatus, error: null };
     } catch {
         return { data: null, error: 'Unexpected error creating status' };
     }
@@ -54,6 +64,9 @@ export async function createStatus(fields) {
  * @returns {{ data: object|null, error: string|null }}
  */
 export async function updateStatus(id, fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!id) return { data: null, error: 'Status ID is required' };
 
     const { name, color, position } = fields;
@@ -66,7 +79,7 @@ export async function updateStatus(id, fields) {
     try {
         const supabase = await createClient();
 
-        const { data, error } = await supabase
+        const { data: updatedStatus, error } = await supabase
             .from('statuses')
             .update(updates)
             .eq('id', id)
@@ -79,7 +92,7 @@ export async function updateStatus(id, fields) {
 
         revalidateTag('statuses');
         revalidateTag('task-tree');
-        return { data, error: null };
+        return { data: updatedStatus, error: null };
     } catch {
         return { data: null, error: 'Unexpected error updating status' };
     }
@@ -92,29 +105,37 @@ export async function updateStatus(id, fields) {
  * @returns {{ error: string|null }}
  */
 export async function deleteStatus(id) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
     if (!id) return { error: 'Status ID is required' };
 
     try {
         const supabase = await createClient();
 
+        const { data: target } = await supabase
+            .from('statuses')
+            .select('is_default, code, space_id')
+            .eq('id', id)
+            .single();
+
+        if (!target) return { error: 'Status not found' };
+
+        // Scoped to this status's own space -- other spaces' statuses must never affect
+        // whether this is "the last remaining" one.
         const { count } = await supabase
             .from('statuses')
-            .select('*', { count: 'exact', head: true });
+            .select('*', { count: 'exact', head: true })
+            .eq('space_id', target.space_id);
 
         if (count <= 1) {
             return { error: 'Cannot delete the last remaining status' };
         }
 
-        const { data: target } = await supabase
-            .from('statuses')
-            .select('is_default, code')
-            .eq('id', id)
-            .single();
-
-        if (target?.is_default) {
+        if (target.is_default) {
             return { error: 'Cannot delete the default status' };
         }
-        if (target?.code) {
+        if (target.code) {
             return { error: 'Cannot delete a built-in status' };
         }
 

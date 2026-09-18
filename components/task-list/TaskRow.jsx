@@ -52,7 +52,7 @@ function TaskRow({ task, depth, flatList, listId }) {
     );
 
     const { doneStatus, defaultStatus, isDone, setComplete, confirmState, closeConfirm, confirmCascade } =
-        useTaskCompletion();
+        useTaskCompletion(listId);
     const taskIsDone = isDone(task);
     const canToggleComplete = Boolean(doneStatus && defaultStatus);
 

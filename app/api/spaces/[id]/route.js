@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { updateSpace, deleteSpace } from '@/actions/space-actions';
-import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
+import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
 
 /**
  * GET /api/spaces/[id]
@@ -9,6 +9,9 @@ import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
  * can warn exactly how much a cascade would remove.
  */
 export const GET = withApiErrorHandling(async function GET(request, { params }) {
+    const unauthorized = await requireAuthResponse();
+    if (unauthorized) return unauthorized;
+
     const { id } = await params;
     const supabase = await createClient();
 

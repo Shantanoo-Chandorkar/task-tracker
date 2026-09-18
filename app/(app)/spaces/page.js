@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/session';
 import SpaceListManager from '@/components/space/SpaceListManager';
 
 /**
@@ -8,6 +9,7 @@ import SpaceListManager from '@/components/space/SpaceListManager';
  */
 export default async function SpacesPage() {
     const supabase = await createClient();
+    const user = await getCurrentUser();
 
     const [{ data: spaces }, { data: lists }] = await Promise.all([
         supabase.from('spaces').select('*').order('position', { ascending: true }),
@@ -23,7 +25,11 @@ export default async function SpacesPage() {
                 </p>
             </div>
 
-            <SpaceListManager initialSpaces={spaces || []} initialLists={lists || []} />
+            <SpaceListManager
+                initialSpaces={spaces || []}
+                initialLists={lists || []}
+                currentUserId={user?.id ?? null}
+            />
         </div>
     );
 }
