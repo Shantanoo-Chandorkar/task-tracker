@@ -23,7 +23,7 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import {
@@ -38,8 +38,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { updateSpace, deleteSpace } from '@/actions/space-actions';
 import { updateList, deleteList } from '@/actions/list-actions';
+import { leaveSpace } from '@/actions/collaboration-actions';
 import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
+import JoinSpaceDialog from './JoinSpaceDialog';
+import SpaceSharingSection from './SpaceSharingSection';
+import StatusManager from '@/components/status/StatusManager';
 import { bustPageCache } from '@/lib/service-worker-cache';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
@@ -111,28 +115,37 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
 /**
  * One drag-reorderable space section: header, its lists, and an add-list entry point.
  * Editing/creating happens in SpaceFormDialog/ListFormDialog, opened by the parent.
+ * Rename/delete and the Sharing panel are owner-only; a collaborator sees a "Shared" badge
+ * and a Leave button instead -- both still get Statuses, since content rights are shared.
  *
  * @param {object} props
  * @param {object} props.space - Space to display
  * @param {object[]} props.lists - Lists belonging to this space
+ * @param {boolean} props.isOwner - Whether the current user owns this space
  * @param {Function} props.onEditSpaceRequest - Called with the space to open it for editing
  * @param {Function} props.onDeleteSpaceRequest - Called with the space to ask for delete confirmation
  * @param {Function} props.onAddListRequest - Called with the space id to open list creation for it
  * @param {Function} props.onEditListRequest - Called with the list to open it for editing
  * @param {Function} props.onDeleteListRequest - Called with the list to ask for delete confirmation
+ * @param {Function} props.onLeaveSpaceRequest - Called with the space to leave it
  */
 function SpaceSection({
     space,
     lists,
+    isOwner,
     onEditSpaceRequest,
     onDeleteSpaceRequest,
     onAddListRequest,
     onEditListRequest,
     onDeleteListRequest,
+    onLeaveSpaceRequest,
 }) {
+    const [statusesOpen, setStatusesOpen] = useState(false);
+    const [sharingOpen, setSharingOpen] = useState(false);
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: space.id,
         data: { type: 'space' },
+        disabled: !isOwner,
     });
 
     const style = {
@@ -144,35 +157,48 @@ function SpaceSection({
     return (
         <div ref={setNodeRef} style={style} className="rounded-xl bg-card">
             <div className="flex items-center gap-1.5 py-2.5 px-2 border-b border-border group/space">
-                <button
-                    {...listeners}
-                    {...attributes}
-                    className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
-                    aria-label="Drag to reorder"
-                >
-                    <GripVertical className="h-3.5 w-3.5" />
-                </button>
+                {isOwner && (
+                    <button
+                        {...listeners}
+                        {...attributes}
+                        className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                        aria-label="Drag to reorder"
+                    >
+                        <GripVertical className="h-3.5 w-3.5" />
+                    </button>
+                )}
                 <span
                     className="h-4 w-4 rounded-full flex-shrink-0"
                     style={{ backgroundColor: space.color }}
                 />
-                <span className="flex-1 text-sm font-semibold text-foreground">{space.name}</span>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => onEditSpaceRequest(space)}
-                >
-                    <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => onDeleteSpaceRequest(space)}
-                >
-                    <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <span className="flex-1 text-sm font-semibold text-foreground">
+                    {space.name}
+                    {!isOwner && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            Shared with you
+                        </span>
+                    )}
+                </span>
+                {isOwner && (
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => onEditSpaceRequest(space)}
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => onDeleteSpaceRequest(space)}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                    </>
+                )}
             </div>
 
             <div>
@@ -198,27 +224,112 @@ function SpaceSection({
                     + Add list
                 </button>
             </div>
+
+            <div className="flex items-center gap-1 border-t border-border px-2 py-1.5">
+                <button
+                    type="button"
+                    onClick={() => setStatusesOpen((open) => !open)}
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+                >
+                    Statuses
+                    {statusesOpen ? (
+                        <ChevronUp className="h-3 w-3" />
+                    ) : (
+                        <ChevronDown className="h-3 w-3" />
+                    )}
+                </button>
+                {isOwner && (
+                    <button
+                        type="button"
+                        onClick={() => setSharingOpen((open) => !open)}
+                        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+                    >
+                        Share this space
+                        {sharingOpen ? (
+                            <ChevronUp className="h-3 w-3" />
+                        ) : (
+                            <ChevronDown className="h-3 w-3" />
+                        )}
+                    </button>
+                )}
+                {!isOwner && (
+                    <button
+                        type="button"
+                        onClick={() => onLeaveSpaceRequest(space)}
+                        className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-destructive hover:bg-muted"
+                    >
+                        Leave space
+                    </button>
+                )}
+            </div>
+
+            {statusesOpen && (
+                <div className="border-t border-border px-3 py-3">
+                    <StatusManager spaceId={space.id} />
+                </div>
+            )}
+
+            {isOwner && sharingOpen && (
+                <div className="border-t border-border px-3 py-3">
+                    <SpaceSharingSection space={space} />
+                </div>
+            )}
         </div>
     );
 }
 
 /**
  * Full Space/List management UI — create, rename, recolor, reorder, and delete both.
+ * Owned spaces are drag-reorderable; spaces shared with the current user render in a
+ * separate, non-reorderable section (reordering a space you don't own would just fail RLS).
  *
  * @param {object} props
  * @param {object[]} props.initialSpaces - SSR-fetched spaces for initial hydration
  * @param {object[]} props.initialLists - SSR-fetched lists (all spaces) for initial hydration
+ * @param {string} props.currentUserId - Signed-in user's ID, to tell owned spaces from shared ones
  */
-export default function SpaceListManager({ initialSpaces, initialLists }) {
+export default function SpaceListManager({ initialSpaces, initialLists, currentUserId }) {
     const queryClient = useQueryClient();
     const [spaceDialog, setSpaceDialog] = useState({ open: false, space: null });
     const [listDialog, setListDialog] = useState({ open: false, list: null, defaultSpaceId: null });
+    // Lazy initializer only -- reads the URL once, before the dialog could otherwise ever open,
+    // rather than an effect that would set state after an initial closed render.
+    const [joinDialog, setJoinDialog] = useState(() => {
+        if (typeof window === 'undefined') return { open: false, prefillSpaceId: '' };
+        const joinId = new URLSearchParams(window.location.search).get('join');
+        return joinId ? { open: true, prefillSpaceId: joinId } : { open: false, prefillSpaceId: '' };
+    });
     const [error, setError] = useState('');
     const [deleteTarget, setDeleteTarget] = useState(null); // { type, id, name, counts }
     const [deleting, setDeleting] = useState(false);
 
     const { data: spaces = [] } = useSpacesQuery({ initialData: initialSpaces });
     const { data: lists = [] } = useListsQuery({ initialData: initialLists });
+    const ownedSpaces = spaces.filter((space) => space.owner_id === currentUserId);
+    const sharedSpaces = spaces.filter((space) => space.owner_id !== currentUserId);
+
+    function closeJoinDialog() {
+        setJoinDialog({ open: false, prefillSpaceId: '' });
+        if (window.location.search.includes('join=')) {
+            window.history.replaceState(null, '', '/spaces');
+        }
+    }
+
+    async function handleLeaveSpace(space) {
+        let result;
+        try {
+            result = await leaveSpace({ spaceId: space.id });
+        } catch {
+            toast.error('Could not reach the server. Try again.');
+            return;
+        }
+        if (result.error) {
+            toast.error(result.error);
+            return;
+        }
+        toast.success('Left space');
+        await refetchAll();
+    }
 
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
@@ -241,12 +352,18 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
      * @returns {string|null} Error message if a position update failed, else null
      */
     async function persistPositions(rows, updateFn) {
-        const results = await Promise.all(
-            rows
-                .map((row, newPosition) => ({ row, newPosition }))
-                .filter(({ row, newPosition }) => row.position !== newPosition)
-                .map(({ row, newPosition }) => updateFn(row.id, { position: newPosition })),
-        );
+        let results;
+        try {
+            results = await Promise.all(
+                rows
+                    .map((row, newPosition) => ({ row, newPosition }))
+                    .filter(({ row, newPosition }) => row.position !== newPosition)
+                    .map(({ row, newPosition }) => updateFn(row.id, { position: newPosition })),
+            );
+        } catch {
+            await refetchAll();
+            return 'Could not reach the server. Try again.';
+        }
         await refetchAll();
         const failed = results.find((updateOutcome) => updateOutcome.error);
         return failed ? failed.error : null;
@@ -259,16 +376,16 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
         let persistError;
 
         if (type === 'space') {
-            const oldIndex = spaces.findIndex((space) => space.id === active.id);
-            const newIndex = spaces.findIndex((space) => space.id === over.id);
+            const oldIndex = ownedSpaces.findIndex((space) => space.id === active.id);
+            const newIndex = ownedSpaces.findIndex((space) => space.id === over.id);
             if (oldIndex === -1 || newIndex === -1) {
                 toast.dismiss(toastId);
                 return;
             }
 
-            const reordered = arrayMove(spaces, oldIndex, newIndex);
-            queryClient.setQueryData(['spaces'], reordered);
-            persistError = await persistPositions(reordered, updateSpace);
+            const reorderedOwned = arrayMove(ownedSpaces, oldIndex, newIndex);
+            queryClient.setQueryData(['spaces'], [...reorderedOwned, ...sharedSpaces]);
+            persistError = await persistPositions(reorderedOwned, updateSpace);
         } else if (type === 'list') {
             const spaceId = active.data.current.spaceId;
             const spaceLists = lists.filter((list) => list.space_id === spaceId);
@@ -293,28 +410,36 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
 
     async function requestDeleteSpace(space) {
         setError('');
-        const response = await fetch(`/api/spaces/${space.id}`);
-        const spaceDeleteCounts = await response.json();
-        setDeleteTarget({
-            type: 'space',
-            id: space.id,
-            name: space.name,
-            counts: response.ok
-                ? { lists: spaceDeleteCounts.list_count, tasks: spaceDeleteCounts.task_count }
-                : null,
-        });
+        try {
+            const response = await fetch(`/api/spaces/${space.id}`);
+            const spaceDeleteCounts = await response.json();
+            setDeleteTarget({
+                type: 'space',
+                id: space.id,
+                name: space.name,
+                counts: response.ok
+                    ? { lists: spaceDeleteCounts.list_count, tasks: spaceDeleteCounts.task_count }
+                    : null,
+            });
+        } catch {
+            toast.error('Could not reach the server. Try again.');
+        }
     }
 
     async function requestDeleteList(list) {
         setError('');
-        const response = await fetch(`/api/lists/${list.id}`);
-        const listDeleteCounts = await response.json();
-        setDeleteTarget({
-            type: 'list',
-            id: list.id,
-            name: list.name,
-            counts: response.ok ? { tasks: listDeleteCounts.task_count } : null,
-        });
+        try {
+            const response = await fetch(`/api/lists/${list.id}`);
+            const listDeleteCounts = await response.json();
+            setDeleteTarget({
+                type: 'list',
+                id: list.id,
+                name: list.name,
+                counts: response.ok ? { tasks: listDeleteCounts.task_count } : null,
+            });
+        } catch {
+            toast.error('Could not reach the server. Try again.');
+        }
     }
 
     async function handleConfirmDelete() {
@@ -324,16 +449,25 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
         const toastId = toast.loading(
             deleteTarget.type === 'space' ? 'Deleting space...' : 'Deleting list...',
         );
-        const { error } =
-            deleteTarget.type === 'space'
-                ? await deleteSpace(deleteTarget.id)
-                : await deleteList(deleteTarget.id);
+
+        let result;
+        try {
+            result =
+                deleteTarget.type === 'space'
+                    ? await deleteSpace(deleteTarget.id)
+                    : await deleteList(deleteTarget.id);
+        } catch {
+            setDeleting(false);
+            setDeleteTarget(null);
+            toast.error('Could not reach the server. Try again.', { id: toastId });
+            return;
+        }
         setDeleting(false);
 
         setDeleteTarget(null);
-        if (error) {
-            toast.error(error, { id: toastId });
-            setError(error);
+        if (result.error) {
+            toast.error(result.error, { id: toastId });
+            setError(result.error);
         } else {
             bustPageCache(
                 deleteTarget.type === 'space'
@@ -369,14 +503,15 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
                 onDragEnd={handleDragEnd}
             >
                 <SortableContext
-                    items={spaces.map((space) => space.id)}
+                    items={ownedSpaces.map((space) => space.id)}
                     strategy={verticalListSortingStrategy}
                 >
                     <div className="space-y-3">
-                        {spaces.map((space) => (
+                        {ownedSpaces.map((space) => (
                             <SpaceSection
                                 key={space.id}
                                 space={space}
+                                isOwner
                                 lists={lists.filter((list) => list.space_id === space.id)}
                                 onEditSpaceRequest={(space) =>
                                     setSpaceDialog({ open: true, space })
@@ -397,15 +532,55 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
                         ))}
                     </div>
                 </SortableContext>
+
+                {sharedSpaces.length > 0 && (
+                    <div className="space-y-3 mt-6">
+                        <p className="text-xs font-medium text-muted-foreground">Shared with you</p>
+                        <SortableContext
+                            items={sharedSpaces.map((space) => space.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            {sharedSpaces.map((space) => (
+                                <SpaceSection
+                                    key={space.id}
+                                    space={space}
+                                    isOwner={false}
+                                    lists={lists.filter((list) => list.space_id === space.id)}
+                                    onAddListRequest={(spaceId) =>
+                                        setListDialog({
+                                            open: true,
+                                            list: null,
+                                            defaultSpaceId: spaceId,
+                                        })
+                                    }
+                                    onEditListRequest={(list) =>
+                                        setListDialog({ open: true, list, defaultSpaceId: null })
+                                    }
+                                    onDeleteListRequest={requestDeleteList}
+                                    onLeaveSpaceRequest={handleLeaveSpace}
+                                />
+                            ))}
+                        </SortableContext>
+                    </div>
+                )}
             </DndContext>
 
-            <button
-                type="button"
-                onClick={() => setSpaceDialog({ open: true, space: null })}
-                className="w-full rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40"
-            >
-                + Add space
-            </button>
+            <div className="flex gap-2">
+                <button
+                    type="button"
+                    onClick={() => setSpaceDialog({ open: true, space: null })}
+                    className="flex-1 rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                >
+                    + Add space
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setJoinDialog({ open: true, prefillSpaceId: '' })}
+                    className="flex-1 rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                >
+                    Join a space
+                </button>
+            </div>
 
             <SpaceFormDialog
                 open={spaceDialog.open}
@@ -418,6 +593,12 @@ export default function SpaceListManager({ initialSpaces, initialLists }) {
                 onClose={() => setListDialog({ open: false, list: null, defaultSpaceId: null })}
                 list={listDialog.list}
                 defaultSpaceId={listDialog.defaultSpaceId}
+            />
+
+            <JoinSpaceDialog
+                open={joinDialog.open}
+                onClose={closeJoinDialog}
+                initialSpaceId={joinDialog.prefillSpaceId}
             />
 
             <AlertDialog
