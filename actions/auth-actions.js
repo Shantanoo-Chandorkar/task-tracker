@@ -32,8 +32,8 @@ function logAuthFailure(code, email, detail) {
 }
 
 /**
- * Creates a new account. Email confirmation is disabled for this project, so a successful
- * signup also returns an active session immediately.
+ * Creates a new account. Email confirmation is required, so this never returns an active
+ * session, the caller must show a "check your email" state, not attempt to sign in.
  *
  * @param {object} fields
  * @param {string} fields.email
@@ -130,11 +130,16 @@ export async function signInAction(fields) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
-            // Deliberately generic — never reveal whether the email exists or why it failed
-            // (wrong password vs. unconfirmed vs. locked are all the same message to the client).
+            // Unconfirmed email still counts toward the lockout below -- not a free, unthrottled probe.
             logAuthFailure(AUTH_ERROR_CODES.SIGNIN_FAILED, email, error.message);
             await recordFailedAttempt('signin', email, ipAddress);
             cookieStore.delete(REMEMBER_ME_COOKIE);
+            if (error.message === 'Email not confirmed') {
+                return {
+                    error: 'Confirm your email before logging in. Check your inbox for the link.',
+                    code: AUTH_ERROR_CODES.EMAIL_NOT_CONFIRMED,
+                };
+            }
             return {
                 error: 'Invalid email or password',
                 code: AUTH_ERROR_CODES.INVALID_CREDENTIALS,
