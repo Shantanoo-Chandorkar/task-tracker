@@ -10,7 +10,8 @@ import PasswordInput from '@/components/auth/PasswordInput';
 import { updatePasswordAction } from '@/actions/auth-actions';
 import { clearAllCaches } from '@/lib/cache';
 
-const MIN_PASSWORD_LENGTH = 8;
+// Length over composition rules (NIST 800-63B, OWASP) -- no forced uppercase/symbol/number.
+const MIN_PASSWORD_LENGTH = 12;
 
 /**
  * Sets a new password for the recovery session /auth/confirm already established.

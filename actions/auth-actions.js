@@ -10,7 +10,8 @@ import { REMEMBER_ME_COOKIE, REMEMBER_ME_MAX_AGE_SECONDS } from '@/lib/auth/reme
 import { sendPasswordResetEmail } from '@/lib/email/send-password-reset-email';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
+// Length over composition rules (NIST 800-63B, OWASP) -- no forced uppercase/symbol/number.
+const MIN_PASSWORD_LENGTH = 12;
 const LOCKOUT_ERROR_MESSAGE = (minutes) =>
     `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 
