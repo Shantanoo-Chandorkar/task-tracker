@@ -8,15 +8,23 @@ export default async function TaskDetailPage({ params }) {
     const { listId, taskId } = await params;
     const supabase = await createClient();
 
-    const [{ data: tasks }, { data: statuses }] = await Promise.all([
+    const [{ data: tasks }, { data: list }] = await Promise.all([
         supabase
             .from('tasks')
             .select('*, statuses(id, name, color, is_default, position)')
             .eq('list_id', listId)
             .order('depth', { ascending: true })
             .order('position', { ascending: true }),
-        supabase.from('statuses').select('*').order('position', { ascending: true }),
+        supabase.from('lists').select('space_id').eq('id', listId).maybeSingle(),
     ]);
+
+    const { data: statuses } = list
+        ? await supabase
+              .from('statuses')
+              .select('*')
+              .eq('space_id', list.space_id)
+              .order('position', { ascending: true })
+        : { data: [] };
 
     const normalizedTasks = (tasks || []).map((task) => ({
         ...task,

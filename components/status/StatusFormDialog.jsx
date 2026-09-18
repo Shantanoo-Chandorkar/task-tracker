@@ -14,15 +14,17 @@ import { createStatus, updateStatus } from '@/actions/status-actions';
  * @param {boolean} props.open - Whether the dialog is open
  * @param {Function} props.onClose - Called when the dialog should close
  * @param {object|null} [props.status] - Status to edit, or null for create mode
+ * @param {string} props.spaceId - Space this status belongs to (create mode only)
  */
-export default function StatusFormDialog({ open, onClose, status = null }) {
+export default function StatusFormDialog({ open, onClose, status = null, spaceId }) {
     const { isEditing, name, setName, color, setColor, submitting, error, handleSubmit } =
         useColorNameForm({
             open,
             entity: status,
             create: createStatus,
             update: updateStatus,
-            invalidateQueryKey: ['statuses'],
+            buildFields: () => ({ space_id: spaceId }),
+            invalidateQueryKey: ['statuses', spaceId],
             bustCache: () => ({ prefixes: ['/lists/'] }),
             onClose,
         });

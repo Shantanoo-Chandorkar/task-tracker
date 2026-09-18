@@ -18,7 +18,7 @@ import { useUIFlag, toggleFlag } from '@/providers/UIStateProvider';
  */
 export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
     const { doneStatus, defaultStatus, setComplete, confirmState, closeConfirm, confirmCascade } =
-        useTaskCompletion();
+        useTaskCompletion(listId);
 
     const handleToggle = useCallback(
         (node, checked) => setComplete(node, flatList, listId, checked),

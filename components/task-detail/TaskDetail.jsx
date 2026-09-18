@@ -9,6 +9,7 @@ import { ArrowLeft, Plus } from 'lucide-react';
 import { findAncestors, findDescendantIds, flatToTree } from '@/lib/tree';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import StatusBadge from '@/components/status/StatusBadge';
 import TaskRowActions from '@/components/task-list/TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
@@ -38,8 +39,9 @@ export default function TaskDetail({ listId, taskId, initialTasks, initialStatus
         initialData: initialTasks,
     });
 
-    // Seeds the shared ['statuses'] cache so SubtaskTree's checkboxes don't hydrate-mismatch on mount.
-    useStatusesQuery({ initialData: initialStatuses });
+    // Seeds the shared ['statuses', spaceId] cache so SubtaskTree's checkboxes don't hydrate-mismatch on mount.
+    const spaceId = useSpaceIdForList(listId);
+    useStatusesQuery(spaceId, { initialData: initialStatuses });
 
     const task = flatList.find((task) => task.id === taskId);
 

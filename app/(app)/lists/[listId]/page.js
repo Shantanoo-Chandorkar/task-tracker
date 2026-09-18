@@ -13,19 +13,17 @@ export default async function ListPage({ params }) {
     const [
         { data: list },
         { data: tasks },
-        { data: statuses },
         { data: spaces },
         { data: lists },
         { data: sublists },
     ] = await Promise.all([
-        supabase.from('lists').select('id').eq('id', listId).maybeSingle(),
+        supabase.from('lists').select('id, space_id').eq('id', listId).maybeSingle(),
         supabase
             .from('tasks')
             .select('*, statuses(id, name, color, is_default, position)')
             .eq('list_id', listId)
             .order('depth', { ascending: true })
             .order('position', { ascending: true }),
-        supabase.from('statuses').select('*').order('position', { ascending: true }),
         supabase.from('spaces').select('*').order('position', { ascending: true }),
         supabase.from('lists').select('*').order('position', { ascending: true }),
         supabase.from('sublists').select('*').eq('list_id', listId).order('position', { ascending: true }),
@@ -51,6 +49,12 @@ export default async function ListPage({ params }) {
         status_name: task.statuses?.name ?? null,
         status_color: task.statuses?.color ?? null,
     }));
+
+    const { data: statuses } = await supabase
+        .from('statuses')
+        .select('*')
+        .eq('space_id', list.space_id)
+        .order('position', { ascending: true });
 
     // Matches /api/lists' computation, so the client refetch never hydration-mismatches this field.
     const listsWithCounts = await attachTaskCounts(supabase, lists || []);

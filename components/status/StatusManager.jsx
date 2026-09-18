@@ -35,6 +35,13 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
 
@@ -123,20 +130,28 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
 }
 
 /**
- * Full status management UI — create, rename, recolor, reorder, and delete statuses.
+ * Full status management UI for one space at a time, picked via the dropdown at the top.
  * Create/edit go through StatusFormDialog, the same modal container Task/List/Sublist use.
  *
  * @param {object} props
- * @param {object[]} props.initialStatuses - SSR-fetched statuses for initial hydration
+ * @param {object[]} props.spaces - Every space, for the picker
+ * @param {string|null} props.initialSpaceId - Space selected on first load (SSR default)
+ * @param {object[]} props.initialStatuses - SSR-fetched statuses for `initialSpaceId`'s hydration
  */
-export default function StatusManager({ initialStatuses }) {
+export default function StatusManager({ spaces, initialSpaceId, initialStatuses }) {
     const queryClient = useQueryClient();
+    const [selectedSpaceId, setSelectedSpaceId] = useState(initialSpaceId);
     const [statusDialog, setStatusDialog] = useState({ open: false, status: null });
     const [error, setError] = useState('');
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
 
-    const { data: statuses = [] } = useStatusesQuery({ initialData: initialStatuses });
+    // initialData only applies to the space it was actually fetched for — otherwise switching
+    // spaces would briefly flash the first space's statuses under the newly selected one.
+    const { data: statuses = [] } = useStatusesQuery(
+        selectedSpaceId,
+        selectedSpaceId === initialSpaceId ? { initialData: initialStatuses } : {},
+    );
 
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
@@ -152,7 +167,7 @@ export default function StatusManager({ initialStatuses }) {
         const newIndex = statuses.findIndex((status) => status.id === over.id);
         const reordered = arrayMove(statuses, oldIndex, newIndex);
 
-        queryClient.setQueryData(['statuses'], reordered);
+        queryClient.setQueryData(['statuses', selectedSpaceId], reordered);
 
         const toastId = toast.loading('Saving order...');
 
@@ -203,6 +218,19 @@ export default function StatusManager({ initialStatuses }) {
                 </p>
             </div>
 
+            <Select value={selectedSpaceId ?? ''} onValueChange={setSelectedSpaceId}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Select a space..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {spaces.map((space) => (
+                        <SelectItem key={space.id} value={space.id}>
+                            {space.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
             {error && (
                 <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
                     {error}
@@ -236,7 +264,8 @@ export default function StatusManager({ initialStatuses }) {
             <button
                 type="button"
                 onClick={() => setStatusDialog({ open: true, status: null })}
-                className="w-full rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                disabled={!selectedSpaceId}
+                className="w-full rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40 disabled:opacity-50 disabled:pointer-events-none"
             >
                 + Add status
             </button>
@@ -245,6 +274,7 @@ export default function StatusManager({ initialStatuses }) {
                 open={statusDialog.open}
                 onClose={() => setStatusDialog({ open: false, status: null })}
                 status={statusDialog.status}
+                spaceId={selectedSpaceId}
             />
 
             <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

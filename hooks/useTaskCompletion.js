@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { findCompletedDescendants, findIncompleteDescendants } from '@/lib/tree';
 import { updateTask, completeTaskAndDescendants, uncompleteTaskAndDescendants } from '@/actions/task-actions';
 import { bustPageCache } from '@/lib/service-worker-cache';
@@ -13,6 +14,7 @@ import { bustPageCache } from '@/lib/service-worker-cache';
  * Normalizes checkbox/dropdown/menu-toggle callers into one `setComplete(...)` entry point.
  * Also owns the shared cascade-confirm dialog state, used by both directions.
  *
+ * @param {string} listId - The list this completion state applies to (resolves its space's statuses)
  * @returns {{
  *   doneStatus: object|undefined,
  *   defaultStatus: object|undefined,
@@ -25,9 +27,10 @@ import { bustPageCache } from '@/lib/service-worker-cache';
  *   confirmCascade: () => Promise<void>,
  * }}
  */
-export function useTaskCompletion() {
+export function useTaskCompletion(listId) {
     const queryClient = useQueryClient();
-    const { data: statuses = [] } = useStatusesQuery();
+    const spaceId = useSpaceIdForList(listId);
+    const { data: statuses = [] } = useStatusesQuery(spaceId);
     const [confirmState, setConfirmState] = useState(null);
 
     const doneStatus = statuses.find((status) => status.code === 'done');

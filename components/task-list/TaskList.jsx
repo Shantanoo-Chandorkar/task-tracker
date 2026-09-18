@@ -41,6 +41,7 @@ import {
 import { flatToTree, findDescendantIds } from '@/lib/tree';
 import { useUIState } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
@@ -74,10 +75,10 @@ function siblingScopedCollisionDetection(args) {
     const activeParentId = activeData.parentId ?? null;
     const activeSublistId = activeData.sublistId ?? null;
     const siblingContainers = args.droppableContainers.filter((container) => {
-        const data = container.data.current ?? {};
+        const containerData = container.data.current ?? {};
         return (
-            (data.parentId ?? null) === activeParentId &&
-            (data.sublistId ?? null) === activeSublistId
+            (containerData.parentId ?? null) === activeParentId &&
+            (containerData.sublistId ?? null) === activeSublistId
         );
     });
 
@@ -319,7 +320,8 @@ export default function TaskList({
         initialData: initialTasks,
     });
 
-    const { data: statuses = [] } = useStatusesQuery({ initialData: initialStatuses });
+    const spaceId = useSpaceIdForList(listId);
+    const { data: statuses = [] } = useStatusesQuery(spaceId, { initialData: initialStatuses });
 
     const { data: sublists = [] } = useSublistsQuery(listId, { initialData: initialSublists });
 
