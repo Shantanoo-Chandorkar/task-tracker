@@ -6,6 +6,7 @@ import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
 import { LayoutGrid, Settings } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
+import LogoutButton from '@/components/nav/LogoutButton';
 
 /**
  * Shared nav content: Spaces link, Space-grouped Lists, and Settings — framed by the caller.
@@ -68,7 +69,10 @@ export default function SidebarNav({ onNavigate }) {
                                         <span className="flex min-w-0 items-center gap-2">
                                             <span
                                                 className="h-2 w-2 flex-shrink-0 rounded-full"
-                                                style={{ backgroundColor: list.color || 'var(--sidebar-primary)' }}
+                                                style={{
+                                                    backgroundColor:
+                                                        list.color || 'var(--sidebar-primary)',
+                                                }}
                                             />
                                             <span className="truncate">{list.name}</span>
                                         </span>
@@ -93,6 +97,7 @@ export default function SidebarNav({ onNavigate }) {
                     Settings
                 </Link>
                 <ThemeToggle />
+                <LogoutButton onNavigate={onNavigate} />
             </div>
         </nav>
     );
