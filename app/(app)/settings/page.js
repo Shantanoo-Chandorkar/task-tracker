@@ -1,7 +1,7 @@
 import InstallAppCard from '@/components/nav/InstallAppCard';
 
 /**
- * Settings page — Server Component. Per-space settings (statuses, sharing) live on /spaces
+ * Settings page - Server Component. Per-space settings (statuses, sharing) live on /spaces
  * instead, next to the space they belong to.
  */
 export default function SettingsPage() {

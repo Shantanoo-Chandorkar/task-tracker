@@ -14,7 +14,7 @@ const PUBLIC_ROUTES = [
 
 /**
  * Gates every page route behind a session check and refreshes the Supabase session cookie
- * on each request. Optimistic only (cookie presence, not per-row authorization) — Next 16's
+ * on each request. Optimistic only (cookie presence, not per-row authorization) - Next 16's
  * own docs are explicit that Server Actions bypass Proxy entirely, so real authorization
  * still has to happen in RLS policies and in each server action, not just here.
  *
@@ -51,7 +51,7 @@ export default async function proxy(request) {
 
 export const config = {
     // Skips static assets, the PWA manifest/icons/service worker, and /api (routes are not
-    // yet auth-scoped — that lands in Bucket 2 — so redirecting them here would just break
+    // yet auth-scoped - that lands in Bucket 2 - so redirecting them here would just break
     // existing anonymous fetches instead of protecting anything).
     matcher: [
         '/((?!_next/static|_next/image|api|favicon.ico|apple-icon.png|icon.png|manifest.webmanifest|icons|sw.js).*)',

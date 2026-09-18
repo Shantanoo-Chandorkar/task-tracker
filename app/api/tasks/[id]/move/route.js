@@ -38,7 +38,7 @@ export async function POST(request, { params }) {
             return NextResponse.json({ error: 'Task not found' }, { status: 404 });
         }
 
-        // Defense in depth — a self/descendant reparent creates a cycle that hangs every tree walker.
+        // Defense in depth - a self/descendant reparent creates a cycle that hangs every tree walker.
         if (newParentId === taskId) {
             return NextResponse.json(
                 { error: 'A task cannot be its own parent' },
@@ -82,7 +82,7 @@ export async function POST(request, { params }) {
         const depthDelta = newDepth - task.depth;
 
         // Cap must hold for the deepest descendant of the moved subtree, not just the
-        // moved task itself — reparenting a subtree carries its whole shape with it.
+        // moved task itself - reparenting a subtree carries its whole shape with it.
         // MAX_DEPTH_CONSTANT
         const nestingMode = await getNestingMode();
         if (nestingMode === 'finite' && depthDelta > 0) {

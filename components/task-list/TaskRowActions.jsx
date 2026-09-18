@@ -35,7 +35,7 @@ import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 import { bustPageCache } from '@/lib/service-worker-cache';
 
 /**
- * Action bar for a task row — a single, always-visible `···` dropdown with
+ * Action bar for a task row - a single, always-visible `···` dropdown with
  * the full action set (edit, delete, add subtask, duplicate, promote,
  * move to).
  *
@@ -73,7 +73,7 @@ export default function TaskRowActions({
     const canPromote = Boolean(task.parent_id);
 
     // Descendants are excluded to avoid a reparent cycle.
-    // Depth-first order keeps each subtask directly after its real parent — a flat sort would scatter them.
+    // Depth-first order keeps each subtask directly after its real parent - a flat sort would scatter them.
     const descendantIds = findDescendantIds(task.id, flatList);
     const validTargets = flattenTreeDepthFirst(flatList).filter(
         (flatTask) =>
@@ -240,7 +240,7 @@ export default function TaskRowActions({
 
     return (
         <>
-            {/* Edit/Delete live only in this menu — always visible since mobile has no hover. */}
+            {/* Edit/Delete live only in this menu - always visible since mobile has no hover. */}
             <div className="flex items-center gap-0.5 flex-shrink-0">
                 {/* ··· context menu */}
                 <DropdownMenu>
@@ -279,7 +279,7 @@ export default function TaskRowActions({
                         <DropdownMenuItem onClick={handleDuplicate}>Duplicate</DropdownMenuItem>
                         <DropdownMenuSeparator />
 
-                        {/* Promote — only for non-root tasks */}
+                        {/* Promote - only for non-root tasks */}
                         {canPromote && (
                             <DropdownMenuItem onClick={handlePromote}>
                                 Promote to sibling
@@ -315,7 +315,7 @@ export default function TaskRowActions({
                 onConfirm={handleDeleteConfirm}
             />
 
-            {/* Cascade complete/incomplete confirmation — only shown when descendants would also change */}
+            {/* Cascade complete/incomplete confirmation - only shown when descendants would also change */}
             <CompleteTaskDialog
                 open={!!confirmState}
                 onClose={closeConfirm}
@@ -325,7 +325,7 @@ export default function TaskRowActions({
                 onConfirm={confirmCascade}
             />
 
-            {/* Move-to destination picker — same bottom sheet on every breakpoint */}
+            {/* Move-to destination picker - same bottom sheet on every breakpoint */}
             <Sheet open={moveSheetOpen} onOpenChange={(open) => !open && setMoveSheetOpen(false)}>
                 <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
                     <SheetHeader>

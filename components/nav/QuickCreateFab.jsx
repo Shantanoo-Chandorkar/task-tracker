@@ -34,7 +34,7 @@ export default function QuickCreateFab({ className }) {
         if (listId) {
             setTaskDialogOpen(true);
         } else {
-            // No list in scope (on Spaces/Settings) — `/` dynamically resolves to
+            // No list in scope (on Spaces/Settings) - `/` dynamically resolves to
             // whichever list is actually first, so the option lands somewhere useful.
             router.push('/');
         }

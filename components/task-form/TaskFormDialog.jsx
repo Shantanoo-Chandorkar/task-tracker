@@ -117,9 +117,9 @@ export default function TaskFormDialog({
 
         toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
         onClose();
-        // Not awaited — the dialog closes immediately instead of blocking on this refetch.
+        // Not awaited - the dialog closes immediately instead of blocking on this refetch.
         queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
-        // A new task changes the list's total count — the sidebar's ['lists'] query needs telling.
+        // A new task changes the list's total count - the sidebar's ['lists'] query needs telling.
         if (!isEditing) queryClient.invalidateQueries({ queryKey: ['lists'] });
         bustPageCache({ urls: [`/lists/${listId ?? task?.list_id}`] });
     }
@@ -168,7 +168,7 @@ export default function TaskFormDialog({
                     </SelectContent>
                 </Select>
 
-                {/* Sublist — root-level tasks only */}
+                {/* Sublist - root-level tasks only */}
                 {isRootCreate && sublists.length > 0 && (
                     <Select
                         value={sublistId || 'none'}
@@ -217,7 +217,7 @@ export default function TaskFormDialog({
                         <span className="text-sm text-foreground">Recurring task</span>
                     </label>
 
-                    {/* RecurrenceBuilder — shown only when recurring is enabled */}
+                    {/* RecurrenceBuilder - shown only when recurring is enabled */}
                     {isRecurring && (
                         <RecurrenceBuilder value={recurrenceRule} onChange={setRecurrenceRule} />
                     )}

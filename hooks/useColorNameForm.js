@@ -12,8 +12,8 @@ import { bustPageCache } from '@/lib/service-worker-cache';
  * @param {object|null} config.entity - The row being edited, or null for create mode
  * @param {Function} [config.onReset] - Called with (entity) on reset, so callers can reset their own extra fields
  * @param {Function} [config.isValid] - () => boolean, extra submit guard beyond name being non-empty
- * @param {Function} config.create - async (fields) => { error } — called in create mode
- * @param {Function} config.update - async (id, fields) => { error } — called in edit mode
+ * @param {Function} config.create - async (fields) => { error } - called in create mode
+ * @param {Function} config.update - async (id, fields) => { error } - called in edit mode
  * @param {Function} [config.buildFields] - () => object, extra fields merged in on submit
  * @param {string[]} config.invalidateQueryKey - Query key to invalidate on success
  * @param {Function} [config.bustCache] - () => {urls?, prefixes?} of pages to evict on success

@@ -15,7 +15,7 @@ const MIN_PASSWORD_LENGTH = 12;
 const LOCKOUT_ERROR_MESSAGE = (minutes) =>
     `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 
-// The only Supabase signUp() error safe to forward verbatim — telling someone to log in
+// The only Supabase signUp() error safe to forward verbatim - telling someone to log in
 // instead isn't an enumeration risk, it's necessary UX. Anything else could be an internal
 // detail (a failed trigger, a DB error) and must not reach the client raw.
 const SAFE_SIGNUP_ERROR_MESSAGES = new Set(['User already registered']);
@@ -32,8 +32,8 @@ function logAuthFailure(code, email, detail) {
 }
 
 /**
- * Creates a new account. Email confirmation is disabled for this project, so a successful
- * signup also returns an active session immediately.
+ * Creates a new account. Email confirmation is required, so this never returns an active
+ * session, the caller must show a "check your email" state, not attempt to sign in.
  *
  * @param {object} fields
  * @param {string} fields.email
@@ -130,11 +130,16 @@ export async function signInAction(fields) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
-            // Deliberately generic — never reveal whether the email exists or why it failed
-            // (wrong password vs. unconfirmed vs. locked are all the same message to the client).
+            // Unconfirmed email still counts toward the lockout below -- not a free, unthrottled probe.
             logAuthFailure(AUTH_ERROR_CODES.SIGNIN_FAILED, email, error.message);
             await recordFailedAttempt('signin', email, ipAddress);
             cookieStore.delete(REMEMBER_ME_COOKIE);
+            if (error.message === 'Email not confirmed') {
+                return {
+                    error: 'Confirm your email before logging in. Check your inbox for the link.',
+                    code: AUTH_ERROR_CODES.EMAIL_NOT_CONFIRMED,
+                };
+            }
             return {
                 error: 'Invalid email or password',
                 code: AUTH_ERROR_CODES.INVALID_CREDENTIALS,
@@ -177,7 +182,7 @@ export async function signOutAction() {
 
 /**
  * Requests a password-reset email. Always returns the same generic response regardless of
- * whether the account exists — the account-enumeration protection this bucket exists to add.
+ * whether the account exists - the account-enumeration protection this bucket exists to add.
  *
  * @param {object} fields
  * @param {string} fields.email
@@ -254,6 +259,8 @@ export async function updatePasswordAction(fields) {
         };
     }
 
+    const ipAddress = getClientIp(await headers());
+
     try {
         const supabase = await createClient();
         const { error } = await supabase.auth.updateUser({ password: newPassword });
@@ -266,6 +273,7 @@ export async function updatePasswordAction(fields) {
             };
         }
 
+        await resetAttempts('password_reset', user.email, ipAddress);
         return { error: null, code: null };
     } catch (thrown) {
         logAuthFailure(AUTH_ERROR_CODES.PASSWORD_UPDATE_FAILED, user.email, thrown?.message);

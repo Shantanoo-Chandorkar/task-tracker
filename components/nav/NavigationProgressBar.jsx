@@ -12,7 +12,7 @@ export default function NavigationProgressBar() {
     const [lastIsLoading, setLastIsLoading] = useState(isLoading);
     const rafRef = useRef(null);
 
-    // Adjusted during render, not an effect — see TaskFormDialog's resetKey pattern.
+    // Adjusted during render, not an effect - see TaskFormDialog's resetKey pattern.
     if (isLoading !== lastIsLoading) {
         setLastIsLoading(isLoading);
         if (isLoading) {
@@ -23,7 +23,7 @@ export default function NavigationProgressBar() {
     }
 
     // The rAF sweep and the reset-to-zero timeout are genuinely external-timer-driven,
-    // not synchronous state derived from a prop — a real effect, not a render adjustment.
+    // not synchronous state derived from a prop - a real effect, not a render adjustment.
     useEffect(() => {
         if (isLoading) {
             function advance() {

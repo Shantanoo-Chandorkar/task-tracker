@@ -11,7 +11,7 @@ function getSnapshot() {
     const stored = localStorage.getItem('theme');
     if (stored === 'light') return false;
     if (stored === 'dark') return true;
-    // No stored preference — use system preference, default to dark
+    // No stored preference - use system preference, default to dark
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
@@ -47,7 +47,7 @@ export default function ThemeToggle() {
     function toggle(clickEvent) {
         const nextIsDark = !isDark;
 
-        // Always start a transition — CSS gates the custom reveal by prefers-reduced-motion, not this check.
+        // Always start a transition - CSS gates the custom reveal by prefers-reduced-motion, not this check.
         if (!document.startViewTransition) {
             setTheme(nextIsDark);
             return;

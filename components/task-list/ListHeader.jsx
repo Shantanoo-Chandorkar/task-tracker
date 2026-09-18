@@ -5,7 +5,7 @@ import { useListsQuery } from '@/hooks/useListsQuery';
 import ExportMenu from '@/components/export/ExportMenu';
 
 /**
- * Space + List name header above the status tiles — reads the shared `['spaces']`/`['lists']` cache.
+ * Space + List name header above the status tiles - reads the shared `['spaces']`/`['lists']` cache.
  * `initialSpaces`/`initialLists` seed that cache from SSR to avoid a hydration mismatch.
  *
  * @param {object} props

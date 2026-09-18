@@ -1,10 +1,21 @@
 'use client';
 
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Copy, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';
 import { useCollaboratorsQuery } from '@/hooks/useCollaboratorsQuery';
@@ -34,6 +45,9 @@ export default function SpaceSharingSection({ space }) {
     const queryClient = useQueryClient();
     const { data: pendingRequests = [], isLoading: isLoadingRequests } = useJoinRequestsQuery(space.id);
     const { data: collaborators = [], isLoading: isLoadingCollaborators } = useCollaboratorsQuery(space.id);
+    // { action: 'reject'|'remove', targetId, label } while a confirm dialog is open, else null.
+    const [confirmTarget, setConfirmTarget] = useState(null);
+    const [confirming, setConfirming] = useState(false);
 
     async function refetch() {
         await queryClient.invalidateQueries({ queryKey: ['space-collaborators', space.id] });
@@ -41,50 +55,51 @@ export default function SpaceSharingSection({ space }) {
     }
 
     async function handleApprove(requestId) {
+        const toastId = toast.loading('Approving...');
         let result;
         try {
             result = await approveJoinRequest({ requestId });
         } catch {
-            toast.error('Could not reach the server. Try again.');
+            toast.error('Could not reach the server. Try again.', { id: toastId });
             return;
         }
         if (result.error) {
-            toast.error(result.error);
+            toast.error(result.error, { id: toastId });
             return;
         }
-        toast.success('Request approved');
+        toast.success('Request approved', { id: toastId });
         await refetch();
     }
 
-    async function handleReject(requestId) {
-        let result;
-        try {
-            result = await rejectJoinRequest({ requestId });
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-            return;
-        }
-        if (result.error) {
-            toast.error(result.error);
-            return;
-        }
-        toast.success('Request rejected');
-        await refetch();
-    }
+    async function handleConfirm() {
+        if (!confirmTarget) return;
+        const { action, targetId } = confirmTarget;
 
-    async function handleRemove(collaboratorId) {
+        setConfirming(true);
+        const toastId = toast.loading(action === 'reject' ? 'Rejecting...' : 'Removing...');
+
         let result;
         try {
-            result = await removeCollaborator({ collaboratorId });
+            result =
+                action === 'reject'
+                    ? await rejectJoinRequest({ requestId: targetId })
+                    : await removeCollaborator({ collaboratorId: targetId });
         } catch {
-            toast.error('Could not reach the server. Try again.');
+            setConfirming(false);
+            setConfirmTarget(null);
+            toast.error('Could not reach the server. Try again.', { id: toastId });
             return;
         }
+        setConfirming(false);
+        setConfirmTarget(null);
+
         if (result.error) {
-            toast.error(result.error);
+            toast.error(result.error, { id: toastId });
             return;
         }
-        toast.success('Collaborator removed');
+        toast.success(action === 'reject' ? 'Request rejected' : 'Collaborator removed', {
+            id: toastId,
+        });
         await refetch();
     }
 
@@ -146,7 +161,13 @@ export default function SpaceSharingSection({ space }) {
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7 text-destructive hover:text-destructive"
-                                        onClick={() => handleReject(request.id)}
+                                        onClick={() =>
+                                            setConfirmTarget({
+                                                action: 'reject',
+                                                targetId: request.id,
+                                                label: request.requester_email,
+                                            })
+                                        }
                                     >
                                         <X className="h-4 w-4" />
                                     </Button>
@@ -171,7 +192,13 @@ export default function SpaceSharingSection({ space }) {
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                    onClick={() => handleRemove(collaborator.id)}
+                                    onClick={() =>
+                                        setConfirmTarget({
+                                            action: 'remove',
+                                            targetId: collaborator.id,
+                                            label: collaborator.requester_email,
+                                        })
+                                    }
                                 >
                                     <X className="h-4 w-4" />
                                 </Button>
@@ -180,6 +207,39 @@ export default function SpaceSharingSection({ space }) {
                     </div>
                 </div>
             )}
+
+            <AlertDialog
+                open={!!confirmTarget}
+                onOpenChange={(open) => !open && setConfirmTarget(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {confirmTarget?.action === 'reject'
+                                ? `Reject request from "${confirmTarget?.label}"?`
+                                : `Remove "${confirmTarget?.label}" from this space?`}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {confirmTarget?.action === 'reject'
+                                ? "They'll need to send a new request to join."
+                                : "They'll lose access to this space's lists and tasks."}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setConfirmTarget(null)}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirm}
+                            disabled={confirming}
+                            className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {confirming && <Loader size="xs" />}
+                            {confirmTarget?.action === 'reject' ? 'Reject' : 'Remove'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

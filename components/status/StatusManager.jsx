@@ -110,7 +110,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
                     status.is_default
                         ? 'Cannot delete the default status'
                         : status.code
-                          ? 'Built-in status — can’t be deleted'
+                          ? 'Built-in status - can’t be deleted'
                           : isOnly
                             ? 'Cannot delete the only status'
                             : 'Delete status'

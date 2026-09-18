@@ -88,7 +88,7 @@ export async function updateSublist(sublistId, fields) {
 }
 
 /**
- * Deletes a sublist, cascading to its tasks — callers should warn with the task count first.
+ * Deletes a sublist, cascading to its tasks - callers should warn with the task count first.
  *
  * @param {string} sublistId - Sublist ID to delete
  * @returns {{ error: string|null }}

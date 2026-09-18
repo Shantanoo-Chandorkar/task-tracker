@@ -2,7 +2,7 @@ import Link from 'next/link';
 import ResetPasswordForm from '@/components/auth/ResetPasswordForm';
 import { getCurrentUser } from '@/lib/auth/session';
 
-export const metadata = { title: 'Reset password — Task Tracker' };
+export const metadata = { title: 'Reset password - Task Tracker' };
 
 export default async function ResetPasswordPage() {
     const user = await getCurrentUser();

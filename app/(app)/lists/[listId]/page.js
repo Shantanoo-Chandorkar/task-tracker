@@ -4,7 +4,7 @@ import TaskList from '@/components/task-list/TaskList';
 import { attachTaskCounts } from '@/lib/list-task-counts';
 
 /**
- * List task-tree page (Server Component) — fetches everything server-side for zero-waterfall hydration.
+ * List task-tree page (Server Component) - fetches everything server-side for zero-waterfall hydration.
  */
 export default async function ListPage({ params }) {
     const { listId } = await params;

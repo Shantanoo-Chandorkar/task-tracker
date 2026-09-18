@@ -29,7 +29,7 @@ export default function LogoutButton({ onNavigate }) {
         try {
             signOutResult = await signOutAction();
         } catch {
-            // Server Actions reject on a transport failure (offline, server down) — without
+            // Server Actions reject on a transport failure (offline, server down) - without
             // this catch, pending would stay true forever with no feedback to the client.
             setIsPending(false);
             toast.error('Could not reach the server. Check your connection and try again.', {

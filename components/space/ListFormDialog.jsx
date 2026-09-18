@@ -18,7 +18,7 @@ import { createList, updateList } from '@/actions/list-actions';
 
 /**
  * Modal for creating or editing a List, rendered through the shared
- * ResponsiveModal container — same container as Task/Space creation.
+ * ResponsiveModal container - same container as Task/Space creation.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open

@@ -3,7 +3,7 @@
 import { CornerDownRight } from 'lucide-react';
 
 /**
- * Move destinations for the mobile "Move to..." Sheet — plain buttons, not a Radix menu, for bigger touch targets.
+ * Move destinations for the mobile "Move to..." Sheet - plain buttons, not a Radix menu, for bigger touch targets.
  *
  * @param {object} props
  * @param {object[]} props.destinations - Move targets to list, each an isLabel/isSublist/isTask row
