@@ -254,6 +254,8 @@ export async function updatePasswordAction(fields) {
         };
     }
 
+    const ipAddress = getClientIp(await headers());
+
     try {
         const supabase = await createClient();
         const { error } = await supabase.auth.updateUser({ password: newPassword });
@@ -266,6 +268,7 @@ export async function updatePasswordAction(fields) {
             };
         }
 
+        await resetAttempts('password_reset', user.email, ipAddress);
         return { error: null, code: null };
     } catch (thrown) {
         logAuthFailure(AUTH_ERROR_CODES.PASSWORD_UPDATE_FAILED, user.email, thrown?.message);
