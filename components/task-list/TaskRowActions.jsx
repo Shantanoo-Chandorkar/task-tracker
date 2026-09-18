@@ -94,8 +94,8 @@ export default function TaskRowActions({
     const currentSublistId = getSublistIdForTarget(task.id);
 
     const targetGroups = [
-        { id: null, name: 'Main List', targets: [] },
-        ...sublists.map((sublist) => ({ id: sublist.id, name: sublist.name, targets: [] }))
+        { id: null, name: 'Main List', targets: [], color: 'var(--primary)' },
+        ...sublists.map((sublist) => ({ id: sublist.id, name: sublist.name, targets: [], color: sublist.color }))
     ];
 
     validTargets.forEach((target) => {
@@ -117,7 +117,7 @@ export default function TaskRowActions({
 
     const moveDestinations = sortedGroups.flatMap((group) => {
         const groupDestinations = [
-            { id: `label-${group.id || 'main'}`, label: group.name, isLabel: true },
+            { id: `label-${group.id || 'main'}`, label: group.name, isLabel: true, color: group.color },
         ];
 
         if (group.canMoveToRoot) {

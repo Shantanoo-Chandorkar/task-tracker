@@ -631,7 +631,11 @@ export default function TaskList({
                     listId={listId}
                     initialSpaces={initialSpaces}
                     initialLists={initialLists}
-                />
+                >
+                    {doneStatus && (
+                        <VelocityMeter completedCount={completedCount} totalCount={flatList.length} />
+                    )}
+                </ListHeader>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <StatusCountTiles
@@ -641,9 +645,6 @@ export default function TaskList({
                         activeStatusId={activeStatusId}
                         onSelect={handleSelectStatus}
                     />
-                    {doneStatus && (
-                        <VelocityMeter completedCount={completedCount} totalCount={flatList.length} />
-                    )}
                 </div>
 
                 <SortableContext

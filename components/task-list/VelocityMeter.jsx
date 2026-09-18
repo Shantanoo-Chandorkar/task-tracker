@@ -17,7 +17,7 @@ export default function VelocityMeter({ completedCount, totalCount }) {
         <div className="flex flex-col gap-1 min-w-[140px]">
             <div className="flex items-center justify-between text-xs gap-4">
                 <span className="font-semibold uppercase tracking-wider text-muted-foreground">
-                    Velocity
+                    Progress
                 </span>
                 <span className="font-mono font-semibold text-metric">
                     {percent}% ({completedCount}/{totalCount})
