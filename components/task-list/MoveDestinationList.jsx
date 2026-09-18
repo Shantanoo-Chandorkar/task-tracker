@@ -16,7 +16,11 @@ export default function MoveDestinationList({ destinations, onSelect, onSelectSu
             {destinations.map((destination) => {
                 if (destination.isLabel) {
                     return (
-                        <div key={destination.id} className="px-3 py-2 text-sm font-semibold text-foreground mt-2 first:mt-0">
+                        <div key={destination.id} className="px-3 py-2 text-sm font-semibold text-foreground mt-2 first:mt-0 flex items-center gap-2">
+                            <span
+                                className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                                style={{ backgroundColor: destination.color || 'var(--primary)' }}
+                            />
                             {destination.label}
                         </div>
                     );
