@@ -25,7 +25,7 @@ import { toast } from 'sonner';
  */
 export default function ExportMenu({ scope, variant = 'icon' }) {
     const handleExportClick = () => {
-        toast.success("Export started. Please check your downloads folder.");
+        toast.success('Export downloading in the background, you can keep browsing.');
     };
 
     const items = (
