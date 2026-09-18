@@ -300,7 +300,8 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
         return joinId ? { open: true, prefillSpaceId: joinId } : { open: false, prefillSpaceId: '' };
     });
     const [error, setError] = useState('');
-    const [deleteTarget, setDeleteTarget] = useState(null); // { type, id, name, counts }
+    // { type: 'space'|'list'|'leave-space', id, name, counts }
+    const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
 
     const { data: spaces = [] } = useSpacesQuery({ initialData: initialSpaces });
@@ -315,20 +316,8 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
         }
     }
 
-    async function handleLeaveSpace(space) {
-        let result;
-        try {
-            result = await leaveSpace({ spaceId: space.id });
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-            return;
-        }
-        if (result.error) {
-            toast.error(result.error);
-            return;
-        }
-        toast.success('Left space');
-        await refetchAll();
+    function handleLeaveSpace(space) {
+        setDeleteTarget({ type: 'leave-space', id: space.id, name: space.name, counts: null });
     }
 
     const sensors = useSensors(
@@ -444,18 +433,18 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
 
     async function handleConfirmDelete() {
         if (!deleteTarget) return;
+        const { type } = deleteTarget;
 
         setDeleting(true);
         const toastId = toast.loading(
-            deleteTarget.type === 'space' ? 'Deleting space...' : 'Deleting list...',
+            type === 'space' ? 'Deleting space...' : type === 'list' ? 'Deleting list...' : 'Leaving space...',
         );
 
         let result;
         try {
-            result =
-                deleteTarget.type === 'space'
-                    ? await deleteSpace(deleteTarget.id)
-                    : await deleteList(deleteTarget.id);
+            if (type === 'space') result = await deleteSpace(deleteTarget.id);
+            else if (type === 'list') result = await deleteList(deleteTarget.id);
+            else result = await leaveSpace({ spaceId: deleteTarget.id });
         } catch {
             setDeleting(false);
             setDeleteTarget(null);
@@ -469,15 +458,13 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
             toast.error(result.error, { id: toastId });
             setError(result.error);
         } else {
-            bustPageCache(
-                deleteTarget.type === 'space'
-                    ? { prefixes: ['/lists/'] }
-                    : { urls: [`/lists/${deleteTarget.id}`] },
-            );
+            if (type === 'space') bustPageCache({ prefixes: ['/lists/'] });
+            else if (type === 'list') bustPageCache({ urls: [`/lists/${deleteTarget.id}`] });
             await refetchAll();
-            toast.success(deleteTarget.type === 'space' ? 'Space deleted' : 'List deleted', {
-                id: toastId,
-            });
+            toast.success(
+                type === 'space' ? 'Space deleted' : type === 'list' ? 'List deleted' : 'Left space',
+                { id: toastId },
+            );
         }
     }
 
@@ -608,14 +595,18 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Delete &ldquo;{deleteTarget?.name}&rdquo;?
+                            {deleteTarget?.type === 'leave-space'
+                                ? `Leave "${deleteTarget?.name}"?`
+                                : `Delete "${deleteTarget?.name}"?`}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {deleteTarget?.type === 'space' && deleteTarget.counts
                                 ? `This deletes ${deleteTarget.counts.lists} list${deleteTarget.counts.lists !== 1 ? 's' : ''} and ${deleteTarget.counts.tasks} task${deleteTarget.counts.tasks !== 1 ? 's' : ''}. This cannot be undone.`
                                 : deleteTarget?.type === 'list' && deleteTarget.counts
                                   ? `This deletes ${deleteTarget.counts.tasks} task${deleteTarget.counts.tasks !== 1 ? 's' : ''}. This cannot be undone.`
-                                  : 'This cannot be undone.'}
+                                  : deleteTarget?.type === 'leave-space'
+                                    ? "You'll lose access to this space's lists and tasks."
+                                    : 'This cannot be undone.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -628,7 +619,7 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             {deleting && <Loader size="xs" />}
-                            Delete
+                            {deleteTarget?.type === 'leave-space' ? 'Leave' : 'Delete'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
