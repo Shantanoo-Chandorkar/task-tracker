@@ -8,6 +8,7 @@ import { Loader } from '@/components/ui/loader';
 import { requestPasswordResetAction } from '@/actions/auth-actions';
 
 const GENERIC_SENT_MESSAGE = 'If an account exists for that email, a reset link is on its way.';
+const DELAY_NOTICE = "It can occasionally take up to 2 hours to arrive — check back if it's not in your inbox yet.";
 
 /**
  * Requests a password-reset email. Deliberately shows the same message whether or not the
@@ -51,7 +52,10 @@ export default function ForgotPasswordForm() {
             </p>
 
             {isSent ? (
-                <p className="mt-6 text-sm text-foreground">{GENERIC_SENT_MESSAGE}</p>
+                <div className="mt-6 space-y-1.5">
+                    <p className="text-sm text-foreground">{GENERIC_SENT_MESSAGE}</p>
+                    <p className="text-xs text-muted-foreground">{DELAY_NOTICE}</p>
+                </div>
             ) : (
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                     <div className="space-y-1.5">
