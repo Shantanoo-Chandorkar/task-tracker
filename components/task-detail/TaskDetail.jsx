@@ -17,7 +17,7 @@ import SubtaskTree from './SubtaskTree';
 import { Button } from '@/components/ui/button';
 
 /**
- * Task detail page content — title, status, description, recurrence, and the subtask tree.
+ * Task detail page content - title, status, description, recurrence, and the subtask tree.
  *
  * @param {object} props
  * @param {string} props.listId - List this task belongs to
@@ -73,7 +73,7 @@ export default function TaskDetail({ listId, taskId, initialTasks, initialStatus
 
     const recurringLabel = task.is_recurring ? humanReadableLabel(task.recurrence_rule) : null;
 
-    /** Navigates away from the task just deleted — to its parent, or the list if it was a root task. */
+    /** Navigates away from the task just deleted - to its parent, or the list if it was a root task. */
     function handleDeleted() {
         const parentId = ancestors[ancestors.length - 1]?.id;
         router.push(parentId ? `/lists/${listId}/tasks/${parentId}` : `/lists/${listId}`);

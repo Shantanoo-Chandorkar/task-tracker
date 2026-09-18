@@ -26,7 +26,7 @@ export const viewport = {
 };
 
 // Runs before first paint so the `dark` class is correct immediately, instead of always
-// painting dark first and flipping after hydration. Mirrors ThemeToggle.jsx's `getSnapshot()` —
+// painting dark first and flipping after hydration. Mirrors ThemeToggle.jsx's `getSnapshot()` -
 // kept in sync manually, since this runs outside the module graph before any bundled code does.
 const THEME_INIT_SCRIPT = `
 (function () {

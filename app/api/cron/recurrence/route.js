@@ -39,7 +39,7 @@ export async function GET(request) {
             return NextResponse.json({ processed: 0 });
         }
 
-        // Resolve each due task's own space's default status — statuses are per-space, and
+        // Resolve each due task's own space's default status - statuses are per-space, and
         // dueTasks can span multiple spaces, so there's no single "the" default status anymore.
         const distinctListIds = [...new Set(dueTasks.map((task) => task.list_id))];
         const { data: taskLists = [] } = await supabase
@@ -109,7 +109,7 @@ export async function GET(request) {
                     .update({ next_occurrence: nextDate.toISOString() })
                     .eq('id', task.id);
             } else {
-                // No more future occurrences — clear the recurring flag
+                // No more future occurrences - clear the recurring flag
                 await supabase
                     .from('tasks')
                     .update({ is_recurring: false, next_occurrence: null })

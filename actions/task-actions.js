@@ -148,7 +148,7 @@ export async function updateTask(taskId, fields) {
 
         if (updates.status_id) {
             // Look up the target status's own code rather than resolving a "the done status"
-            // globally — statuses are per-space now, so there's no single done status id to compare against.
+            // globally - statuses are per-space now, so there's no single done status id to compare against.
             const { data: targetStatus } = await supabase
                 .from('statuses')
                 .select('code')
@@ -208,7 +208,7 @@ export async function updateTask(taskId, fields) {
 
 /**
  * Marks a task and all its descendants (any depth) as done in one update. Used when
- * completing a parent that still has incomplete subtasks — the user has already
+ * completing a parent that still has incomplete subtasks - the user has already
  * confirmed the cascade via a UI dialog before this is called.
  *
  * @param {string} taskId - Root task to complete along with its descendants
@@ -248,7 +248,7 @@ export async function completeTaskAndDescendants(taskId) {
 
 /**
  * Marks a task and all its descendants as the default (not-done) status in one update.
- * Assumes the cascade-confirm dialog already ran — this just performs the write.
+ * Assumes the cascade-confirm dialog already ran - this just performs the write.
  *
  * @param {string} taskId - Root task to uncomplete along with its descendants
  * @returns {{ error: string|null }}
@@ -316,7 +316,7 @@ export async function deleteTask(id) {
 /**
  * Deletes a task and re-parents its direct children to the deleted task's parent.
  * Children are spliced into the sibling list at the exact position where the deleted task sat.
- * Grandchildren (and deeper) remain attached to their own parents — only the top-level link is re-wired.
+ * Grandchildren (and deeper) remain attached to their own parents - only the top-level link is re-wired.
  *
  * Must re-parent BEFORE deleting to prevent the DB cascade from wiping the children first.
  *
@@ -453,7 +453,7 @@ export async function duplicateTask(taskId) {
         const snapshot = deepCloneSubtree(taskId, listTasks || []);
         if (!snapshot) return { error: 'Task not found' };
 
-        // MAX_DEPTH_CONSTANT — duplicate lands at the same depth as the original, but a deep
+        // MAX_DEPTH_CONSTANT - duplicate lands at the same depth as the original, but a deep
         // subtree could still push its descendants past the limit.
         const nestingMode = await getNestingMode();
         if (
@@ -501,7 +501,7 @@ export async function duplicateTask(taskId) {
 
 /**
  * Recursively inserts a single snapshot node and its descendants.
- * Called by duplicateTask — not exported.
+ * Called by duplicateTask - not exported.
  *
  * @param {object} supabase - Supabase client
  * @param {object} node - Snapshot node with optional children array

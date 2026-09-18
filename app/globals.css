@@ -49,7 +49,7 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Minimalist Charcoal palette — locked in the Bucket 2b plan. Accent (orange)
+/* Minimalist Charcoal palette - locked in the Bucket 2b plan. Accent (orange)
    carries Shadcn's --primary (buttons, links, active nav, focus ring); the
    structural --accent token (menu/row hover backgrounds) stays neutral gray so
    hover states don't turn orange everywhere. --metric (cyan) is a custom
@@ -127,7 +127,7 @@
     --sidebar-ring: #FDBA74;
 }
 
-/* Theme toggle reveal — a circle grows from the toggle button's click point to cover the
+/* Theme toggle reveal - a circle grows from the toggle button's click point to cover the
    viewport, anchored via --theme-toggle-x/-y/-radius (set in ThemeToggle.jsx at click time).
    Structural only, no color values, so it stays correct if the palette changes later. */
 @media (prefers-reduced-motion: no-preference) {

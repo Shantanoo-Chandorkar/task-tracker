@@ -1,5 +1,5 @@
 /**
- * Layout for unauthenticated routes (login, signup) — centered card, no nav chrome.
+ * Layout for unauthenticated routes (login, signup) - centered card, no nav chrome.
  * Route protection (redirecting an already-authenticated visitor away) happens in proxy.js.
  */
 export default function AuthLayout({ children }) {

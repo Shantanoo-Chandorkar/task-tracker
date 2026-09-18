@@ -37,7 +37,7 @@ export function setFlag(key, value) {
 }
 
 /**
- * Passthrough wrapper — the store is module-level now, so this no longer needs to hold React state.
+ * Passthrough wrapper - the store is module-level now, so this no longer needs to hold React state.
  *
  * @param {object} props
  * @param {React.ReactNode} props.children - Content to render inside the provider

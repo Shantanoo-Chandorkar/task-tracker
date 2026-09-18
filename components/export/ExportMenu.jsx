@@ -11,10 +11,10 @@ import {
 import { toast } from 'sonner';
 
 /**
- * Reusable export trigger — drop anywhere with a `scope` describing what to export, and it
+ * Reusable export trigger - drop anywhere with a `scope` describing what to export, and it
  * adapts: the menu always offers CSV/JSON for that scope, hitting the same `/api/export` route.
  * Each item is a plain link so the browser handles the download via the route's
- * `Content-Disposition` header — no client-side fetch/blob handling needed.
+ * `Content-Disposition` header - no client-side fetch/blob handling needed.
  *
  * @param {object} props
  * @param {object} props.scope - What to export

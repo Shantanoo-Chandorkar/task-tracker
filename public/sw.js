@@ -2,7 +2,7 @@
 const CACHE_NAME = 'task-tracker-shell-v4';
 
 // Fixed, known-ahead-of-time assets only. Page HTML and API responses are
-// cached at runtime instead — Next's chunk filenames are content-hashed and
+// cached at runtime instead - Next's chunk filenames are content-hashed and
 // unknown here, and there's no fixed set of "pages" to precache in an app
 // where every route is server-rendered per-request.
 const SHELL_ASSETS = [
@@ -39,7 +39,7 @@ self.addEventListener('message', (event) => {
         return;
     }
 
-    // A mutation succeeded — evict the stale-while-revalidate entries it affects.
+    // A mutation succeeded - evict the stale-while-revalidate entries it affects.
     if (event.data?.type === 'BUST_PAGE_CACHE') {
         const { urls = [], prefixes = [] } = event.data;
         event.waitUntil(
@@ -63,7 +63,7 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
 
     // Never touch mutations (POST/PATCH/DELETE to /api/*, Next Server Actions
-    // are POSTs too) or cross-origin requests — only same-origin GETs are cached.
+    // are POSTs too) or cross-origin requests - only same-origin GETs are cached.
     if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) {
         return;
     }
@@ -74,7 +74,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Navigations get stale-while-revalidate for an instant shell paint on repeat visits.
-    // Everything else stays network-first — mutations POST to the page URL, not /api/*, no bust signal.
+    // Everything else stays network-first - mutations POST to the page URL, not /api/*, no bust signal.
     const isNavigation = request.mode === 'navigate' || request.destination === 'document';
 
     if (isNavigation) {

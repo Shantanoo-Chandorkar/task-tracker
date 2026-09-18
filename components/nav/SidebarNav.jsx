@@ -9,7 +9,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/nav/LogoutButton';
 
 /**
- * Shared nav content: Spaces link, Space-grouped Lists, and Settings — framed by the caller.
+ * Shared nav content: Spaces link, Space-grouped Lists, and Settings - framed by the caller.
  *
  * @param {object} props
  * @param {Function} [props.onNavigate] - Called after a link is clicked (used to close the mobile drawer)
@@ -42,7 +42,7 @@ export default function SidebarNav({ onNavigate }) {
                 LISTS
             </div>
 
-            {/* Only this region scrolls — Spaces/Settings/Theme above and below stay fixed */}
+            {/* Only this region scrolls - Spaces/Settings/Theme above and below stay fixed */}
             <div className="flex-1 min-h-0 space-y-4 overflow-y-auto">
                 {spaces.map((space) => {
                     const spaceLists = lists.filter((list) => list.space_id === space.id);

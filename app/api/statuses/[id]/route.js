@@ -4,7 +4,7 @@ import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
 /**
  * PATCH /api/statuses/[id]
  * Updates a status's name, color, or position. Returns the updated status.
- * `code` can never be set through this route — `updateStatus` whitelists fields.
+ * `code` can never be set through this route - `updateStatus` whitelists fields.
  */
 export const PATCH = withApiErrorHandling(async function PATCH(request, { params }) {
     const { id } = await params;

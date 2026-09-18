@@ -8,7 +8,7 @@ import { ListChecks, LayoutGrid, Settings } from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
 
 /**
- * Mobile bottom navigation — Tasks / Spaces / Settings, with a center-FAB quick-create.
+ * Mobile bottom navigation - Tasks / Spaces / Settings, with a center-FAB quick-create.
  */
 export default function BottomNav() {
     const pathname = usePathname();

@@ -15,7 +15,7 @@ const MIN_PASSWORD_LENGTH = 12;
 
 /**
  * Sets a new password for the recovery session /auth/confirm already established.
- * Only rendered when a valid session exists — see app/(auth)/reset-password/page.js.
+ * Only rendered when a valid session exists - see app/(auth)/reset-password/page.js.
  */
 export default function ResetPasswordForm() {
     const router = useRouter();

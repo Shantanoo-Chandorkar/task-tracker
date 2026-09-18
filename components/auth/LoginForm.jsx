@@ -14,7 +14,7 @@ import { clearAllCaches } from '@/lib/cache';
 
 /**
  * Email/password login form. On success, clears any stale cached shell from a
- * previous session before navigating — the service worker's page cache isn't
+ * previous session before navigating - the service worker's page cache isn't
  * keyed by user, so a leftover snapshot could otherwise flash before revalidating.
  */
 export default function LoginForm() {
@@ -37,7 +37,7 @@ export default function LoginForm() {
         try {
             signInResult = await signInAction({ email, password, shouldRememberSession });
         } catch {
-            // Server Actions reject on a transport failure (offline, server down) — without
+            // Server Actions reject on a transport failure (offline, server down) - without
             // this catch, submitting would stay true forever with no feedback to the client.
             setSubmitting(false);
             setError('Could not reach the server. Check your connection and try again.');

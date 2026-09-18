@@ -89,7 +89,7 @@ export async function updateList(id, fields) {
 }
 
 /**
- * Deletes a list. Cascades to its tasks (ON DELETE CASCADE) — callers are
+ * Deletes a list. Cascades to its tasks (ON DELETE CASCADE) - callers are
  * expected to warn the user with the task count before calling this.
  *
  * @param {string} id - List ID to delete

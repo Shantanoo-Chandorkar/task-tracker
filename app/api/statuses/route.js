@@ -5,7 +5,7 @@ import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib
 
 /**
  * GET /api/statuses?space_id=<id>
- * Returns the statuses for one space, ordered by position. space_id is required —
+ * Returns the statuses for one space, ordered by position. space_id is required -
  * statuses only ever make sense scoped to one space.
  */
 export const GET = withApiErrorHandling(async function GET(request) {

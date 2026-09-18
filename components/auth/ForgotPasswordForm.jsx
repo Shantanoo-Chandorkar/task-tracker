@@ -8,11 +8,11 @@ import { Loader } from '@/components/ui/loader';
 import { requestPasswordResetAction } from '@/actions/auth-actions';
 
 const GENERIC_SENT_MESSAGE = 'If an account exists for that email, a reset link is on its way.';
-const DELAY_NOTICE = "It can occasionally take up to 2 hours to arrive — check back if it's not in your inbox yet.";
+const DELAY_NOTICE = "It can occasionally take up to 2 hours to arrive - check back if it's not in your inbox yet.";
 
 /**
  * Requests a password-reset email. Deliberately shows the same message whether or not the
- * account exists — the server action never reveals that distinction (account enumeration).
+ * account exists - the server action never reveals that distinction (account enumeration).
  */
 export default function ForgotPasswordForm() {
     const [email, setEmail] = useState('');

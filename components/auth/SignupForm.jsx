@@ -35,7 +35,7 @@ export default function SignupForm() {
         try {
             signUpResult = await signUpAction({ email, password, displayName });
         } catch {
-            // Server Actions reject on a transport failure (offline, server down) — without
+            // Server Actions reject on a transport failure (offline, server down) - without
             // this catch, submitting would stay true forever with no feedback to the client.
             setSubmitting(false);
             setError('Could not reach the server. Check your connection and try again.');

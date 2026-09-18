@@ -15,7 +15,7 @@ const MIN_PASSWORD_LENGTH = 12;
 const LOCKOUT_ERROR_MESSAGE = (minutes) =>
     `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 
-// The only Supabase signUp() error safe to forward verbatim — telling someone to log in
+// The only Supabase signUp() error safe to forward verbatim - telling someone to log in
 // instead isn't an enumeration risk, it's necessary UX. Anything else could be an internal
 // detail (a failed trigger, a DB error) and must not reach the client raw.
 const SAFE_SIGNUP_ERROR_MESSAGES = new Set(['User already registered']);
@@ -182,7 +182,7 @@ export async function signOutAction() {
 
 /**
  * Requests a password-reset email. Always returns the same generic response regardless of
- * whether the account exists — the account-enumeration protection this bucket exists to add.
+ * whether the account exists - the account-enumeration protection this bucket exists to add.
  *
  * @param {object} fields
  * @param {string} fields.email

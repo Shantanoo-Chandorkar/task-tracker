@@ -279,7 +279,7 @@ function SpaceSection({
 }
 
 /**
- * Full Space/List management UI — create, rename, recolor, reorder, and delete both.
+ * Full Space/List management UI - create, rename, recolor, reorder, and delete both.
  * Owned spaces are drag-reorderable; spaces shared with the current user render in a
  * separate, non-reorderable section (reordering a space you don't own would just fail RLS).
  *

@@ -53,7 +53,7 @@ export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) 
             return;
         }
 
-        toast.success('Request sent — the owner will be notified.');
+        toast.success('Request sent - the owner will be notified.');
         onClose();
     }
 

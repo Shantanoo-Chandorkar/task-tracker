@@ -61,7 +61,7 @@ const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
 
 /**
  * Collision detection scoped to the dragged row's own siblings (parent_id + sublist_id).
- * Sublist headers fall back to plain closestCenter — they're already one flat list.
+ * Sublist headers fall back to plain closestCenter - they're already one flat list.
  *
  * @param {object} args - dnd-kit collision detection arguments
  * @returns {object[]} Collisions, scoped to siblings when possible
@@ -182,7 +182,7 @@ function describeBucketBreakdown(countsByStatusId, statuses) {
 }
 
 /**
- * Collapsible sublist section header — drag handle, color swatch, name, status breakdown, edit, delete.
+ * Collapsible sublist section header - drag handle, color swatch, name, status breakdown, edit, delete.
  *
  * @param {object} props
  * @param {object} props.sublist
@@ -276,7 +276,7 @@ function SublistHeader({
 }
 
 /**
- * Root task list — groups root tasks by sublist, then by status, all collapsible.
+ * Root task list - groups root tasks by sublist, then by status, all collapsible.
  * Handles DnD reordering (tasks and sublists) and the Ctrl+D duplicate shortcut.
  *
  * @param {object} props
@@ -297,7 +297,7 @@ export default function TaskList({
 }) {
     const queryClient = useQueryClient();
 
-    // Every mutation below only ever affects this one page — one shared bust target.
+    // Every mutation below only ever affects this one page - one shared bust target.
     function bustThisListPage() {
         bustPageCache({ urls: [`/lists/${listId}`] });
     }
@@ -328,7 +328,7 @@ export default function TaskList({
     const tree = useMemo(() => flatToTree(flatList), [flatList]);
     const rootTasks = tree; // flatToTree already returns only root nodes
 
-    // Counts include every depth, not just root tasks — a subtask's status can differ from its parent's.
+    // Counts include every depth, not just root tasks - a subtask's status can differ from its parent's.
     const countsByStatusId = useMemo(() => {
         const nextCountsByStatusId = {};
         for (const status of statuses) {
@@ -344,7 +344,7 @@ export default function TaskList({
     const doneStatus = statuses.find((status) => status.code === 'done');
     const completedCount = doneStatus ? (countsByStatusId[doneStatus.id] ?? 0) : 0;
 
-    // Grouped via a single Map pass per bucket instead of a filter-per-status — O(n), not O(n·statuses).
+    // Grouped via a single Map pass per bucket instead of a filter-per-status - O(n), not O(n·statuses).
     const buckets = useMemo(() => {
         function rootMatchesActiveStatus(rootTask) {
             if (!activeStatusId) return true;
@@ -365,7 +365,7 @@ export default function TaskList({
             return tasksByStatusId;
         }
 
-        // Totals include every descendant — a root task's own subtasks belong to its sublist too.
+        // Totals include every descendant - a root task's own subtasks belong to its sublist too.
         function countAllDepth(rootTasksInBucket) {
             let total = rootTasksInBucket.length;
             const countsByStatusId = new Map();
@@ -427,7 +427,7 @@ export default function TaskList({
         if (!activeTask) return;
 
         // flatList is ordered by (depth, position), so same-(parent, sublist) tasks stay in
-        // relative order here — no separate sibling lookup, and non-root tasks always have sublist_id null.
+        // relative order here - no separate sibling lookup, and non-root tasks always have sublist_id null.
         const siblingIds = flatList
             .filter(
                 (task) =>
@@ -444,7 +444,7 @@ export default function TaskList({
         const isMovingToStart = newIndex === 0;
         const afterSiblingId = oldIndex < newIndex ? over.id : (siblingIds[newIndex - 1] ?? null);
 
-        // Optimistic reorder — lands in the new slot immediately, without waiting on the persist round-trip.
+        // Optimistic reorder - lands in the new slot immediately, without waiting on the persist round-trip.
         const reorderedSiblingIds = arrayMove(siblingIds, oldIndex, newIndex);
         queryClient.setQueryData(['tasks', listId], (current) => {
             const currentTasks = current ?? flatList;

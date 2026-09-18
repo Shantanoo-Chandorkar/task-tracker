@@ -56,7 +56,7 @@ export async function createStatus(fields) {
 
 /**
  * Updates specific fields on a status (name, color, position).
- * `code` is deliberately not accepted here — it identifies the 3 built-in
+ * `code` is deliberately not accepted here - it identifies the 3 built-in
  * statuses and must never be settable from the client, even indirectly.
  *
  * @param {string} id - Status ID to update

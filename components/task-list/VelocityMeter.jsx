@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Percentage-complete indicator — completed task count over total, as a labeled progress bar.
+ * Percentage-complete indicator - completed task count over total, as a labeled progress bar.
  * Renders nothing if there's no "done" status configured or no tasks to measure.
  *
  * @param {object} props

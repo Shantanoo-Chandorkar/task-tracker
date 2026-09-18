@@ -17,7 +17,7 @@ import {
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 
 /**
- * Shared modal container for every create/edit form — centered Dialog at `lg`+, bottom Sheet below it.
+ * Shared modal container for every create/edit form - centered Dialog at `lg`+, bottom Sheet below it.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the modal is open

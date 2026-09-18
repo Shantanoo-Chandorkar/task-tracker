@@ -8,7 +8,7 @@ import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import { useUIFlag, toggleFlag } from '@/providers/UIStateProvider';
 
 /**
- * Recursive nested subtask list — each row links to its own task page, with a done/undone checkbox.
+ * Recursive nested subtask list - each row links to its own task page, with a done/undone checkbox.
  *
  * @param {object} props
  * @param {object[]} props.nodes - Task nodes (from flatToTree) with a `children` array
