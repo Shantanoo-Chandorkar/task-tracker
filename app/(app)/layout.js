@@ -3,6 +3,7 @@ import MobileTopBar from '@/components/nav/MobileTopBar';
 import BottomNav from '@/components/nav/BottomNav';
 import QuickCreateFab from '@/components/nav/QuickCreateFab';
 import GlobalSearch from '@/components/nav/GlobalSearch';
+import AuthKeepAlive from '@/components/nav/AuthKeepAlive';
 
 /**
  * Layout for every authenticated app route -- the nav chrome (auth) pages don't get.
@@ -11,6 +12,7 @@ import GlobalSearch from '@/components/nav/GlobalSearch';
 export default function AppLayout({ children }) {
     return (
         <>
+            <AuthKeepAlive />
             <GlobalSearch />
             <div className="flex">
                 <DesktopSidebar />

@@ -56,8 +56,8 @@ self.addEventListener('message', (event) => {
 });
 
 // /reset-password's content depends on hidden session state, not the URL -- a stale cached copy
-// can show the wrong screen (form vs. "link expired"). Always hit the network for it.
-const NEVER_CACHE_PATHS = ['/reset-password'];
+// can show the wrong screen (form vs. "link expired"). /api/auth/session must never replay an old answer either.
+const NEVER_CACHE_PATHS = ['/reset-password', '/api/auth/session'];
 
 self.addEventListener('fetch', (event) => {
     const { request } = event;

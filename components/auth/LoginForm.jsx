@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Loader } from '@/components/ui/loader';
 import PasswordInput from '@/components/auth/PasswordInput';
 import { signInAction } from '@/actions/auth-actions';
@@ -23,7 +22,6 @@ export default function LoginForm() {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [shouldRememberSession, setShouldRememberSession] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
@@ -35,7 +33,7 @@ export default function LoginForm() {
 
         let signInResult;
         try {
-            signInResult = await signInAction({ email, password, shouldRememberSession });
+            signInResult = await signInAction({ email, password });
         } catch {
             // Server Actions reject on a transport failure (offline, server down) - without
             // this catch, submitting would stay true forever with no feedback to the client.
@@ -95,18 +93,6 @@ export default function LoginForm() {
                         onChange={(event) => setPassword(event.target.value)}
                         disabled={submitting}
                     />
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <Checkbox
-                        id="rememberMe"
-                        checked={shouldRememberSession}
-                        onCheckedChange={(checked) => setShouldRememberSession(checked === true)}
-                        disabled={submitting}
-                    />
-                    <label htmlFor="rememberMe" className="text-sm text-foreground">
-                        Remember me
-                    </label>
                 </div>
 
                 {error && <p className="text-xs text-destructive">{error}</p>}

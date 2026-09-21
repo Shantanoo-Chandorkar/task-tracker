@@ -1,12 +1,11 @@
 'use server';
 
-import { cookies, headers } from 'next/headers';
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { AUTH_ERROR_CODES } from '@/lib/auth/error-codes';
 import { checkRateLimit, recordFailedAttempt, resetAttempts, getClientIp } from '@/lib/auth/rate-limit';
-import { REMEMBER_ME_COOKIE, REMEMBER_ME_MAX_AGE_SECONDS } from '@/lib/auth/remember-me';
 import { sendPasswordResetEmail } from '@/lib/email/notifications/send-password-reset-email';
 import { sendSignupConfirmationEmail } from '@/lib/email/notifications/send-signup-confirmation-email';
 import { sendExistingAccountEmail } from '@/lib/email/notifications/send-existing-account-email';
@@ -116,21 +115,17 @@ export async function signUpAction(fields) {
  * @param {object} fields
  * @param {string} fields.email
  * @param {string} fields.password
- * @param {boolean} [fields.shouldRememberSession] - Persists the session cookie 30 days when true.
  * @returns {Promise<{ error: string|null, code: string|null }>}
  */
 export async function signInAction(fields) {
     const email = fields.email?.trim().toLowerCase() ?? '';
     const password = fields.password ?? '';
-    const shouldRememberSession = Boolean(fields.shouldRememberSession);
 
     if (!email || !password) {
         return { error: 'Invalid email or password', code: AUTH_ERROR_CODES.INVALID_CREDENTIALS };
     }
 
     const ipAddress = getClientIp(await headers());
-    const cookieStore = await cookies();
-
     try {
         const { isLocked, retryAfterMinutes } = await checkRateLimit('signin', email, ipAddress);
         if (isLocked) {
@@ -140,19 +135,6 @@ export async function signInAction(fields) {
             };
         }
 
-        // Set before signInWithPassword -- its cookie refresh (see lib/supabase/server.js) reads this synchronously.
-        if (shouldRememberSession) {
-            cookieStore.set(REMEMBER_ME_COOKIE, '1', {
-                maxAge: REMEMBER_ME_MAX_AGE_SECONDS,
-                httpOnly: true,
-                sameSite: 'lax',
-                secure: process.env.NODE_ENV === 'production',
-                path: '/',
-            });
-        } else {
-            cookieStore.delete(REMEMBER_ME_COOKIE);
-        }
-
         const supabase = await createClient();
         const { error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -160,7 +142,6 @@ export async function signInAction(fields) {
             // Unconfirmed email still counts toward the lockout below -- not a free, unthrottled probe.
             logAuthFailure(AUTH_ERROR_CODES.SIGNIN_FAILED, email, error.message);
             await recordFailedAttempt('signin', email, ipAddress);
-            cookieStore.delete(REMEMBER_ME_COOKIE);
             if (error.message === 'Email not confirmed') {
                 return {
                     error: 'Confirm your email before logging in. Check your inbox for the link.',
@@ -190,10 +171,6 @@ export async function signOutAction() {
     try {
         const supabase = await createClient();
         const { error } = await supabase.auth.signOut();
-
-        // Runs regardless of signOut()'s outcome so a stale flag can't leak into the next login.
-        const cookieStore = await cookies();
-        cookieStore.delete(REMEMBER_ME_COOKIE);
 
         if (error) {
             logAuthFailure(AUTH_ERROR_CODES.SIGNOUT_FAILED, null, error.message);
