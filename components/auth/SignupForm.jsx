@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
+import CharLimitField from '@/components/ui/CharLimitField';
 import PasswordInput from '@/components/auth/PasswordInput';
 import { signUpAction } from '@/actions/auth-actions';
 
@@ -60,15 +61,17 @@ export default function SignupForm() {
                 <div className="mt-6 space-y-1.5">
                     <p className="text-sm text-foreground">Account created.</p>
                     <p className="text-xs text-muted-foreground">
-                        Check your email to confirm it, then log in.
+                        Check your email to confirm it and get started.
                     </p>
                 </div>
             ) : (
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                    <div className="space-y-1.5">
-                        <label htmlFor="displayName" className="text-sm font-medium text-foreground">
-                            Name
-                        </label>
+                    <CharLimitField
+                        label="Name"
+                        htmlFor="displayName"
+                        currentLength={displayName.length}
+                        maxLength={50}
+                    >
                         <Input
                             id="displayName"
                             type="text"
@@ -77,8 +80,9 @@ export default function SignupForm() {
                             onChange={(event) => setDisplayName(event.target.value)}
                             disabled={submitting}
                             autoFocus
+                            maxLength={50}
                         />
-                    </div>
+                    </CharLimitField>
 
                     <div className="space-y-1.5">
                         <label htmlFor="email" className="text-sm font-medium text-foreground">

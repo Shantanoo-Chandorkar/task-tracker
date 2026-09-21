@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
+import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
 import { LayoutGrid, Settings } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/nav/LogoutButton';
@@ -22,6 +23,16 @@ export default function SidebarNav({ onNavigate }) {
 
     const { data: spaces = [] } = useSpacesQuery();
     const { data: lists = [] } = useListsQuery();
+    const { data: profile } = useCurrentUserProfileQuery();
+
+    const displayName = profile?.display_name || profile?.email || 'User';
+    const initials = displayName
+        .split(' ')
+        .filter(Boolean)
+        .map((namePart) => namePart[0])
+        .join('')
+        .substring(0, 2)
+        .toUpperCase();
 
     return (
         <nav className="flex flex-1 min-h-0 flex-col">
@@ -87,17 +98,28 @@ export default function SidebarNav({ onNavigate }) {
                 })}
             </div>
 
-            <div className="mt-3 flex items-center gap-1 border-t border-sidebar-border pt-3">
+            <div className="mt-3 flex flex-col pt-3 border-t border-sidebar-border">
                 <Link
                     href="/settings"
                     onClick={onNavigate}
-                    className="flex flex-1 items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground no-underline hover:text-sidebar-foreground"
+                    className="flex items-center gap-2 rounded-md px-2 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent/60 mb-2 no-underline"
                 >
                     <Settings className="h-4 w-4" />
                     Settings
                 </Link>
-                <ThemeToggle />
-                <LogoutButton onNavigate={onNavigate} />
+                <div className="h-px w-full bg-sidebar-border mb-2" />
+                <div className="flex items-center gap-2 px-2 py-1">
+                    <div className="h-8 w-8 rounded-full bg-primary flex flex-shrink-0 items-center justify-center text-primary-foreground text-xs font-semibold">
+                        {initials}
+                    </div>
+                    <div className="flex-1 truncate text-sm font-medium text-sidebar-foreground">
+                        {displayName}
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-1">
+                        <ThemeToggle />
+                        <LogoutButton onNavigate={onNavigate} />
+                    </div>
+                </div>
             </div>
         </nav>
     );

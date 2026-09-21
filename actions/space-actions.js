@@ -5,6 +5,7 @@ import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
+import { sanitizeString, checkMaxLength } from '@/lib/validation';
 
 /**
  * Creates a new space. Appends it after the last existing space.
@@ -18,9 +19,12 @@ export async function createSpace(fields) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
-    if (!fields.name || fields.name.trim() === '') {
+    const name = sanitizeString(fields.name, true);
+    if (!name) {
         return { data: null, error: 'Space name is required' };
     }
+    const nameError = checkMaxLength(name, 100, 'Space name');
+    if (nameError) return { data: null, error: nameError.error };
 
     try {
         const supabase = await createClient();
@@ -30,7 +34,7 @@ export async function createSpace(fields) {
         const { data: createdSpace, error } = await supabase
             .from('spaces')
             .insert({
-                name: fields.name.trim(),
+                name,
                 color: fields.color ?? '#6b7280',
                 position,
                 owner_id: user.id,
@@ -42,9 +46,10 @@ export async function createSpace(fields) {
             return { data: null, error: 'Failed to create space' };
         }
 
-        revalidateTag('spaces');
+        revalidateTag('spaces', { expire: 0 });
         return { data: createdSpace, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[spaces] create threw', { detail: thrown?.message });
         return { data: null, error: 'Unexpected error creating space' };
     }
 }
@@ -61,6 +66,13 @@ export async function updateSpace(id, fields) {
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
     if (!id) return { data: null, error: 'Space ID is required' };
+    
+    if ('name' in fields) {
+        fields.name = sanitizeString(fields.name, true);
+        if (!fields.name) return { data: null, error: 'Space name is required' };
+        const nameError = checkMaxLength(fields.name, 100, 'Space name');
+        if (nameError) return { data: null, error: nameError.error };
+    }
 
     try {
         const supabase = await createClient();
@@ -76,9 +88,10 @@ export async function updateSpace(id, fields) {
             return { data: null, error: 'Failed to update space' };
         }
 
-        revalidateTag('spaces');
+        revalidateTag('spaces', { expire: 0 });
         return { data: updatedSpace, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[spaces] update threw', { id, detail: thrown?.message });
         return { data: null, error: 'Unexpected error updating space' };
     }
 }
@@ -104,11 +117,12 @@ export async function deleteSpace(id) {
             return { error: 'Failed to delete space' };
         }
 
-        revalidateTag('spaces');
-        revalidateTag('lists');
-        revalidateTag('task-tree');
+        revalidateTag('spaces', { expire: 0 });
+        revalidateTag('lists', { expire: 0 });
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[spaces] delete threw', { id, detail: thrown?.message });
         return { error: 'Unexpected error deleting space' };
     }
 }

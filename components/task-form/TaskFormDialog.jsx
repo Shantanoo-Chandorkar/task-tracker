@@ -8,7 +8,8 @@ import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import CharLimitField from '@/components/ui/CharLimitField';
+import RichTextEditor from '@/components/ui/RichTextEditor';
 import {
     Select,
     SelectContent,
@@ -21,6 +22,9 @@ import { createTask, updateTask } from '@/actions/task-actions';
 import { Loader } from '@/components/ui/loader';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
+
+const TITLE_MAX = 200;
+const DESCRIPTION_MAX = 10000;
 
 /**
  * Modal for creating or editing a task, via the shared ResponsiveModal container.
@@ -56,6 +60,7 @@ export default function TaskFormDialog({
     const [recurrenceRule, setRecurrenceRule] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
+    const [formError, setFormError] = useState('');
 
     const spaceId = useSpaceIdForList(listId ?? task?.list_id);
     const { data: statuses = [] } = useStatusesQuery(spaceId);
@@ -77,6 +82,7 @@ export default function TaskFormDialog({
             setIsRecurring(task?.is_recurring ?? false);
             setRecurrenceRule(task?.recurrence_rule ?? null);
             setTitleError('');
+            setFormError('');
         }
     }
 
@@ -92,6 +98,7 @@ export default function TaskFormDialog({
             return;
         }
 
+        setFormError('');
         setSubmitting(true);
 
         const fields = {
@@ -110,7 +117,7 @@ export default function TaskFormDialog({
         setSubmitting(false);
 
         if (error) {
-            setTitleError(error);
+            setFormError(error);
             toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
             return;
         }
@@ -128,7 +135,12 @@ export default function TaskFormDialog({
         <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit Task' : 'New Task'}>
             <form onSubmit={handleSubmit} className="space-y-4 mt-2">
                 {/* Title */}
-                <div className="space-y-1">
+                <CharLimitField
+                    label="Task title"
+                    currentLength={title.length}
+                    maxLength={TITLE_MAX}
+                    error={titleError}
+                >
                     <Input
                         value={title}
                         onChange={(event) => {
@@ -136,17 +148,23 @@ export default function TaskFormDialog({
                             setTitleError('');
                         }}
                         placeholder="Task title"
+                        maxLength={TITLE_MAX}
                     />
-                    {titleError && <p className="text-xs text-destructive">{titleError}</p>}
-                </div>
+                </CharLimitField>
 
                 {/* Description */}
-                <Textarea
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    placeholder="Description (optional)"
-                    rows={3}
-                />
+                <CharLimitField
+                    label="Description (optional)"
+                    currentLength={description.length}
+                    maxLength={DESCRIPTION_MAX}
+                >
+                    <RichTextEditor
+                        value={description}
+                        onChange={setDescription}
+                        maxLength={DESCRIPTION_MAX}
+                        placeholder="Description (optional)"
+                    />
+                </CharLimitField>
 
                 {/* Status */}
                 <Select value={statusId} onValueChange={setStatusId}>
@@ -222,6 +240,8 @@ export default function TaskFormDialog({
                         <RecurrenceBuilder value={recurrenceRule} onChange={setRecurrenceRule} />
                     )}
                 </div>
+
+                {formError && <p className="text-xs text-destructive">{formError}</p>}
 
                 {/* Submit */}
                 <div className="flex justify-end gap-2 pt-2">

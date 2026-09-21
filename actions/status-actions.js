@@ -5,6 +5,7 @@ import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
+import { sanitizeString, checkMaxLength } from '@/lib/validation';
 
 /**
  * Creates a new status. Appends it after the last existing status in its space.
@@ -19,9 +20,13 @@ export async function createStatus(fields) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
-    if (!fields.name || fields.name.trim() === '') {
+    const name = sanitizeString(fields.name, true);
+    if (!name) {
         return { data: null, error: 'Status name is required' };
     }
+    const nameError = checkMaxLength(name, 100, 'Status name');
+    if (nameError) return { data: null, error: nameError.error };
+
     if (!fields.space_id) {
         return { data: null, error: 'A space is required' };
     }
@@ -34,7 +39,7 @@ export async function createStatus(fields) {
         const { data: createdStatus, error } = await supabase
             .from('statuses')
             .insert({
-                name: fields.name.trim(),
+                name,
                 color: fields.color ?? '#6b7280',
                 position,
                 space_id: fields.space_id,
@@ -46,10 +51,11 @@ export async function createStatus(fields) {
             return { data: null, error: 'Failed to create status' };
         }
 
-        revalidateTag('statuses');
-        revalidateTag('task-tree');
+        revalidateTag('statuses', { expire: 0 });
+        revalidateTag('task-tree', { expire: 0 });
         return { data: createdStatus, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[statuses] create threw', { detail: thrown?.message });
         return { data: null, error: 'Unexpected error creating status' };
     }
 }
@@ -69,7 +75,16 @@ export async function updateStatus(id, fields) {
 
     if (!id) return { data: null, error: 'Status ID is required' };
 
-    const { name, color, position } = fields;
+    const { color, position } = fields;
+    let { name } = fields;
+
+    if (name !== undefined) {
+        name = sanitizeString(name, true);
+        if (!name) return { data: null, error: 'Status name is required' };
+        const nameError = checkMaxLength(name, 100, 'Status name');
+        if (nameError) return { data: null, error: nameError.error };
+    }
+
     const updates = {
         ...(name !== undefined && { name }),
         ...(color !== undefined && { color }),
@@ -90,10 +105,11 @@ export async function updateStatus(id, fields) {
             return { data: null, error: 'Failed to update status' };
         }
 
-        revalidateTag('statuses');
-        revalidateTag('task-tree');
+        revalidateTag('statuses', { expire: 0 });
+        revalidateTag('task-tree', { expire: 0 });
         return { data: updatedStatus, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[statuses] update threw', { id, detail: thrown?.message });
         return { data: null, error: 'Unexpected error updating status' };
     }
 }
@@ -145,10 +161,11 @@ export async function deleteStatus(id) {
             return { error: 'Failed to delete status' };
         }
 
-        revalidateTag('statuses');
-        revalidateTag('task-tree');
+        revalidateTag('statuses', { expire: 0 });
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[statuses] delete threw', { id, detail: thrown?.message });
         return { error: 'Unexpected error deleting status' };
     }
 }

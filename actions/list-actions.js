@@ -5,6 +5,7 @@ import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
+import { sanitizeString, checkMaxLength } from '@/lib/validation';
 
 /**
  * Creates a new list under a space. Appends it after the last existing list
@@ -20,9 +21,13 @@ export async function createList(fields) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
-    if (!fields.name || fields.name.trim() === '') {
+    const name = sanitizeString(fields.name, true);
+    if (!name) {
         return { data: null, error: 'List name is required' };
     }
+    const nameError = checkMaxLength(name, 200, 'List name');
+    if (nameError) return { data: null, error: nameError.error };
+
     if (!fields.space_id) {
         return { data: null, error: 'A space is required' };
     }
@@ -35,7 +40,7 @@ export async function createList(fields) {
         const { data: createdList, error } = await supabase
             .from('lists')
             .insert({
-                name: fields.name.trim(),
+                name,
                 space_id: fields.space_id,
                 color: fields.color ?? '#6b7280',
                 position,
@@ -47,9 +52,10 @@ export async function createList(fields) {
             return { data: null, error: 'Failed to create list' };
         }
 
-        revalidateTag('lists');
+        revalidateTag('lists', { expire: 0 });
         return { data: createdList, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[lists] create threw', { detail: thrown?.message });
         return { data: null, error: 'Unexpected error creating list' };
     }
 }
@@ -67,6 +73,13 @@ export async function updateList(id, fields) {
 
     if (!id) return { data: null, error: 'List ID is required' };
 
+    if ('name' in fields) {
+        fields.name = sanitizeString(fields.name, true);
+        if (!fields.name) return { data: null, error: 'List name is required' };
+        const nameError = checkMaxLength(fields.name, 200, 'List name');
+        if (nameError) return { data: null, error: nameError.error };
+    }
+
     try {
         const supabase = await createClient();
 
@@ -81,9 +94,10 @@ export async function updateList(id, fields) {
             return { data: null, error: 'Failed to update list' };
         }
 
-        revalidateTag('lists');
+        revalidateTag('lists', { expire: 0 });
         return { data: updatedList, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[lists] update threw', { id, detail: thrown?.message });
         return { data: null, error: 'Unexpected error updating list' };
     }
 }
@@ -110,10 +124,11 @@ export async function deleteList(id) {
             return { error: 'Failed to delete list' };
         }
 
-        revalidateTag('lists');
-        revalidateTag('task-tree');
+        revalidateTag('lists', { expire: 0 });
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[lists] delete threw', { id, detail: thrown?.message });
         return { error: 'Unexpected error deleting list' };
     }
 }

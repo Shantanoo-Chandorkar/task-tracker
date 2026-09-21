@@ -5,7 +5,10 @@ import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
+import CharLimitField from '@/components/ui/CharLimitField';
 import { createSpace, updateSpace } from '@/actions/space-actions';
+
+const SPACE_NAME_MAX = 100;
 
 /**
  * Modal for creating or editing a Space, rendered through the shared
@@ -31,24 +34,31 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
     return (
         <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit Space' : 'New Space'}>
             <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-                <div className="flex items-center gap-2">
-                    <input
-                        type="color"
-                        value={color}
-                        onChange={(event) => setColor(event.target.value)}
-                        className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
-                        disabled={submitting}
-                    />
-                    <Input
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="Space name"
-                        className="flex-1"
-                        autoFocus
-                        disabled={submitting}
-                    />
-                </div>
-                {error && <p className="text-xs text-destructive">{error}</p>}
+                <CharLimitField
+                    label="Space name"
+                    currentLength={name.length}
+                    maxLength={SPACE_NAME_MAX}
+                    error={error}
+                >
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="color"
+                            value={color}
+                            onChange={(event) => setColor(event.target.value)}
+                            className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
+                            disabled={submitting}
+                        />
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="Space name"
+                            className="flex-1"
+                            autoFocus
+                            disabled={submitting}
+                            maxLength={SPACE_NAME_MAX}
+                        />
+                    </div>
+                </CharLimitField>
 
                 <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
