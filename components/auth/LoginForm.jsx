@@ -16,8 +16,11 @@ import { clearAllCaches } from '@/lib/cache';
  * Email/password login form. On success, clears any stale cached shell from a
  * previous session before navigating - the service worker's page cache isn't
  * keyed by user, so a leftover snapshot could otherwise flash before revalidating.
+ *
+ * @param {object} props
+ * @param {boolean} [props.hasGuestSessionEnded] - Shows a notice that the guest session ran out.
  */
-export default function LoginForm() {
+export default function LoginForm({ hasGuestSessionEnded = false }) {
     const router = useRouter();
     const queryClient = useQueryClient();
 
@@ -58,6 +61,12 @@ export default function LoginForm() {
         <div className="rounded-lg border border-border bg-card p-6">
             <h1 className="text-lg font-semibold text-foreground">Log in</h1>
             <p className="mt-1 text-sm text-muted-foreground">Welcome back to Task Tracker.</p>
+
+            {hasGuestSessionEnded && (
+                <p role="status" className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-sm text-foreground">
+                    Your guest session ended. Sign up to keep your work, or start a new guest session below.
+                </p>
+            )}
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <div className="space-y-1.5">
