@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
+import { blockGuestAction } from '@/lib/guest/guest-guards';
 import { NOT_AUTHENTICATED, SPACE_NOT_FOUND, ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
 import { sendJoinRequestEmail } from '@/lib/email/notifications/send-join-request-email';
 import { sendJoinDecisionEmail } from '@/lib/email/notifications/send-join-decision-email';
@@ -22,6 +23,9 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export async function requestToJoinSpace(fields) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
+    const guestBlock = blockGuestAction(user);
+    if (guestBlock) return { data: null, ...guestBlock };
 
     const spaceId = (fields.spaceId ?? '').trim();
     if (!UUID_PATTERN.test(spaceId)) {
@@ -87,6 +91,9 @@ export async function approveJoinRequest(fields) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
+    const guestBlock = blockGuestAction(user);
+    if (guestBlock) return { data: null, ...guestBlock };
+
     try {
         const supabase = await createClient();
         const { data: acceptedRow, error } = await supabase
@@ -131,6 +138,9 @@ export async function approveJoinRequest(fields) {
 export async function rejectJoinRequest(fields) {
     const user = await getCurrentUser();
     if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
+    const guestBlock = blockGuestAction(user);
+    if (guestBlock) return guestBlock;
 
     try {
         const supabase = await createClient();
@@ -177,6 +187,9 @@ export async function removeCollaborator(fields) {
     const user = await getCurrentUser();
     if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
+    const guestBlock = blockGuestAction(user);
+    if (guestBlock) return guestBlock;
+
     try {
         const supabase = await createClient();
         const { data: removedRow, error } = await supabase
@@ -222,6 +235,9 @@ export async function removeCollaborator(fields) {
 export async function leaveSpace(fields) {
     const user = await getCurrentUser();
     if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
+    const guestBlock = blockGuestAction(user);
+    if (guestBlock) return guestBlock;
 
     try {
         const supabase = await createClient();

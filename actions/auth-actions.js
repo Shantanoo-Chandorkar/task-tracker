@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
+import { blockGuestAction } from '@/lib/guest/guest-guards';
 import { AUTH_ERROR_CODES } from '@/lib/auth/error-codes';
 import { checkRateLimit, recordFailedAttempt, resetAttempts, getClientIp } from '@/lib/auth/rate-limit';
 import { sendPasswordResetEmail } from '@/lib/email/notifications/send-password-reset-email';
@@ -255,6 +256,9 @@ export async function updatePasswordAction(fields) {
             code: AUTH_ERROR_CODES.RESET_TOKEN_INVALID,
         };
     }
+
+    const guestBlock = blockGuestAction(user);
+    if (guestBlock) return guestBlock;
 
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
         return {

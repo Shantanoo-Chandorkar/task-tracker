@@ -9,6 +9,7 @@ import { getPositionBetween } from '@/lib/fractional-index';
 import { getNextPosition } from '@/lib/position';
 import { canMarkTaskDone, getDefaultStatusId, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
 import { getCurrentUser } from '@/lib/auth/session';
+import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED, TASK_INVALID_PRIORITY } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength, sanitizeRichText } from '@/lib/validation';
 
@@ -132,6 +133,8 @@ export async function createTask(fields) {
 
         if (error) {
             console.error('[tasks] create failed', { listId: fields.list_id, code: error.code, detail: error.message });
+            const guestLimitResult = toGuestLimitResult(error);
+            if (guestLimitResult) return { data: null, ...guestLimitResult };
             return { data: null, error: 'Failed to create task' };
         }
 
@@ -547,6 +550,8 @@ export async function duplicateTask(taskId) {
         return { error: null };
     } catch (thrown) {
         console.error('[tasks] duplicate threw', { taskId, detail: thrown?.message });
+        const guestLimitResult = toGuestLimitResult(thrown);
+        if (guestLimitResult) return guestLimitResult;
         return { error: 'Failed to duplicate task' };
     }
 }
