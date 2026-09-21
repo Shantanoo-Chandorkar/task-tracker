@@ -1,28 +1,25 @@
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import SpaceListManager from '@/components/space/SpaceListManager';
+import HomeView from '@/components/home/HomeView';
+import { loadHomeSummary } from '@/lib/home/build-home-summary';
 
 /**
- * Root page - Server Component.
- * Redirects to the first available list (ordered by space, then list,
- * position). With no lists yet, shows the Space/List manager inline so a
- * first-time user can create one without a separate onboarding flow.
+ * Home page - Server Component.
+ * Shows the Home dashboard once the user has a list. With no lists yet, shows the Space/List manager
+ * inline so a first-time user can create one without a separate onboarding flow.
  */
 export default async function Page() {
     const supabase = await createClient();
 
-    const [{ data: spaces }, { data: lists }] = await Promise.all([
+    const [{ data: spaces }, { data: lists }, homeLoadResult] = await Promise.all([
         supabase.from('spaces').select('*').order('position', { ascending: true }),
         supabase.from('lists').select('*').order('position', { ascending: true }),
+        loadHomeSummary(supabase),
     ]);
 
-    const firstSpaceWithList = (spaces || []).find((space) =>
-        (lists || []).some((list) => list.space_id === space.id),
-    );
-
-    if (firstSpaceWithList) {
-        const firstList = (lists || []).find((list) => list.space_id === firstSpaceWithList.id);
-        redirect(`/lists/${firstList.id}`);
+    if ((lists || []).length > 0) {
+        // A failed load leaves initialHome undefined, so the client fetches it and can show a retry
+        return <HomeView initialHome={homeLoadResult.data ?? undefined} firstList={{ id: lists[0].id, name: lists[0].name }} />;
     }
 
     return (

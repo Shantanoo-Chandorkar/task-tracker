@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
-import { ListChecks, LayoutGrid, Settings } from 'lucide-react';
+import { Home, ListChecks, LayoutGrid, Settings } from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
 
 /**
- * Mobile bottom navigation - Tasks / Spaces / Settings, with a center-FAB quick-create.
+ * Mobile bottom navigation - Home / Tasks / Spaces / Settings, with a center-FAB quick-create.
  */
 export default function BottomNav() {
     const pathname = usePathname();
@@ -27,6 +27,7 @@ export default function BottomNav() {
 
     const tasksHref = listId ? `/lists/${listId}` : firstListId ? `/lists/${firstListId}` : '/';
 
+    const isHome = pathname === '/';
     const isTasks = pathname.startsWith('/lists');
     const isSpaces = pathname.startsWith('/spaces');
     const isSettings = pathname.startsWith('/settings');
@@ -36,6 +37,14 @@ export default function BottomNav() {
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
             <div className="relative flex items-center">
                 <div className="flex-1 flex">
+                    <Link
+                        href="/"
+                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
+                    >
+                        <Home className="h-5 w-5" />
+                        Home
+                    </Link>
+
                     <Link
                         href={tasksHref}
                         className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}

@@ -25,11 +25,14 @@ export default function MobileTopBar() {
         ? spaces.find((space) => space.id === currentList.space_id)
         : null;
 
-    const staticTitle = pathname.startsWith('/spaces')
-        ? 'Spaces'
-        : pathname.startsWith('/settings')
-          ? 'Settings'
-          : 'Task Tracker';
+    const staticTitle =
+        pathname === '/'
+            ? 'Home'
+            : pathname.startsWith('/spaces')
+              ? 'Spaces'
+              : pathname.startsWith('/settings')
+                ? 'Settings'
+                : 'Task Tracker';
 
     return (
         <div className="lg:hidden sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-3">

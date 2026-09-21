@@ -5,12 +5,12 @@ import { useParams, usePathname } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
-import { LayoutGrid, Settings } from 'lucide-react';
+import { Home, LayoutGrid, Settings } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/nav/LogoutButton';
 
 /**
- * Shared nav content: Spaces link, Space-grouped Lists, and Settings - framed by the caller.
+ * Shared nav content: Home and Spaces links, Space-grouped Lists, and Settings - framed by the caller.
  *
  * @param {object} props
  * @param {Function} [props.onNavigate] - Called after a link is clicked (used to close the mobile drawer)
@@ -19,6 +19,7 @@ export default function SidebarNav({ onNavigate }) {
     const params = useParams();
     const pathname = usePathname();
     const currentListId = params?.listId;
+    const isHomeActive = pathname === '/';
     const isSpacesActive = pathname.startsWith('/spaces');
 
     const { data: spaces = [] } = useSpacesQuery();
@@ -36,6 +37,19 @@ export default function SidebarNav({ onNavigate }) {
 
     return (
         <nav className="flex flex-1 min-h-0 flex-col">
+            <Link
+                href="/"
+                onClick={onNavigate}
+                className={`mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline ${
+                    isHomeActive
+                        ? 'bg-sidebar-accent font-medium text-sidebar-primary'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/60'
+                }`}
+            >
+                <Home className="h-4 w-4" />
+                Home
+            </Link>
+
             <Link
                 href="/spaces"
                 onClick={onNavigate}

@@ -1,5 +1,5 @@
 // Bumped on any change to this file's caching logic so `activate` evicts stale caches.
-const CACHE_NAME = 'task-tracker-shell-v4';
+const CACHE_NAME = 'task-tracker-shell-v5';
 
 // Fixed, known-ahead-of-time assets only. Page HTML and API responses are
 // cached at runtime instead - Next's chunk filenames are content-hashed and
@@ -47,7 +47,9 @@ self.addEventListener('message', (event) => {
                 const requests = await cache.keys();
                 const staleRequests = requests.filter((request) => {
                     const { pathname } = new URL(request.url);
-                    return urls.includes(pathname) || prefixes.some((prefix) => pathname.startsWith(prefix));
+                    // Home ('/') summarises every list, so any mutation makes its cached copy stale too
+                    const isHomePage = pathname === '/';
+                    return isHomePage || urls.includes(pathname) || prefixes.some((prefix) => pathname.startsWith(prefix));
                 });
                 await Promise.all(staleRequests.map((request) => cache.delete(request)));
             }),
