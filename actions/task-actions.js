@@ -9,7 +9,7 @@ import { getPositionBetween } from '@/lib/fractional-index';
 import { getNextPosition } from '@/lib/position';
 import { canMarkTaskDone, getDefaultStatusId, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
 import { getCurrentUser } from '@/lib/auth/session';
-import { NOT_AUTHENTICATED } from '@/lib/error-codes';
+import { NOT_AUTHENTICATED, TASK_INVALID_PRIORITY } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength, sanitizeRichText } from '@/lib/validation';
 
 /**
@@ -166,6 +166,10 @@ export async function updateTask(taskId, fields) {
             if (!updates.title) return { data: null, error: 'Title is required' };
             const titleError = checkMaxLength(updates.title, 200, 'Title');
             if (titleError) return { data: null, error: titleError.error };
+        }
+
+        if ('is_prioritised' in updates && typeof updates.is_prioritised !== 'boolean') {
+            return { data: null, error: 'Priority must be true or false', code: TASK_INVALID_PRIORITY };
         }
 
         if ('description' in updates) {

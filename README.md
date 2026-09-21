@@ -134,6 +134,7 @@ CREATE TABLE tasks (
   position         FLOAT NOT NULL DEFAULT 0,
   depth            INTEGER NOT NULL DEFAULT 0,
   due_date         DATE,
+  is_prioritised   BOOLEAN NOT NULL DEFAULT false,
   is_recurring     BOOLEAN DEFAULT false,
   recurrence_rule  JSONB,
   next_occurrence  TIMESTAMPTZ,

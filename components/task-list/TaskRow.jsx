@@ -1,11 +1,11 @@
 'use client';
 
-import { memo, useMemo, useState } from 'react';
+import { Fragment, memo, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Check, ChevronDown, ChevronRight, Circle, GripVertical, RefreshCw } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Circle, GripVertical, RefreshCw, Star } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import StatusPicker from '@/components/status/StatusPicker';
 import TaskRowActions from './TaskRowActions';
@@ -16,6 +16,17 @@ import { humanReadableLabel } from '@/lib/recurrence';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
+import { useTaskPriority } from '@/hooks/useTaskPriority';
+import { isStartOfUnprioritisedTier } from '@/lib/tree';
+
+/**
+ * Plain line between the prioritised and unprioritised tier; the star icons carry the meaning, so no label.
+ *
+ * @returns {JSX.Element}
+ */
+export function PriorityTierDivider() {
+    return <div role="separator" className="my-1.5 h-px bg-foreground/20" />;
+}
 
 /**
  * Recursive row component - renders one task and all its children.
@@ -35,7 +46,11 @@ function TaskRow({ task, depth, flatList, listId }) {
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: task.id,
-        data: { parentId: task.parent_id, sublistId: task.sublist_id ?? null },
+        data: {
+            parentId: task.parent_id,
+            sublistId: task.sublist_id ?? null,
+            isPrioritised: Boolean(task.is_prioritised),
+        },
     });
 
     const style = {
@@ -54,6 +69,7 @@ function TaskRow({ task, depth, flatList, listId }) {
     const { doneStatus, defaultStatus, isDone, setComplete, confirmState, closeConfirm, confirmCascade } =
         useTaskCompletion(listId);
     const taskIsDone = isDone(task);
+    const { togglePriority } = useTaskPriority(listId);
     const canToggleComplete = Boolean(doneStatus && defaultStatus);
 
     function handleToggleComplete(clickEvent) {
@@ -119,6 +135,25 @@ function TaskRow({ task, depth, flatList, listId }) {
                     ) : (
                         <Circle className="h-1.5 w-1.5 text-muted-foreground/40" />
                     )}
+                </button>
+
+                {/* Priority star - a plain outline when off, so it is tappable on mobile where there is no hover */}
+                <button
+                    onClick={(clickEvent) => {
+                        clickEvent.stopPropagation();
+                        togglePriority(task);
+                    }}
+                    className="flex-shrink-0 flex items-center justify-center p-2 -m-2 focus:outline-none"
+                    aria-label={task.is_prioritised ? 'Remove from priority' : 'Put on priority'}
+                    aria-pressed={Boolean(task.is_prioritised)}
+                >
+                    <Star
+                        className={`h-3.5 w-3.5 motion-safe:transition-colors ${
+                            task.is_prioritised
+                                ? 'fill-amber-400 text-amber-400'
+                                : 'text-muted-foreground/40 hover:text-muted-foreground'
+                        }`}
+                    />
                 </button>
 
                 {/* Title opens the task page; clicking the empty space beside it toggles expand/collapse */}
@@ -202,14 +237,16 @@ function TaskRow({ task, depth, flatList, listId }) {
                         items={task.children.map((child) => child.id)}
                         strategy={verticalListSortingStrategy}
                     >
-                        {task.children.map((child) => (
-                            <TaskRow
-                                key={child.id}
-                                task={child}
-                                depth={depth + 1}
-                                flatList={flatList}
-                                listId={listId}
-                            />
+                        {task.children.map((child, childIndex) => (
+                            <Fragment key={child.id}>
+                                {isStartOfUnprioritisedTier(task.children, childIndex) && <PriorityTierDivider />}
+                                <TaskRow
+                                    task={child}
+                                    depth={depth + 1}
+                                    flatList={flatList}
+                                    listId={listId}
+                                />
+                            </Fragment>
                         ))}
                     </SortableContext>
                 </div>
