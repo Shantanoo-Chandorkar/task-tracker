@@ -15,7 +15,7 @@ export default function CharLimitField({ label, currentLength, maxLength, htmlFo
     const isExceeded = currentLength >= maxLength;
 
     return (
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-0">
             <div className="flex items-center justify-between">
                 <label htmlFor={htmlFor} className="text-sm font-medium text-foreground">
                     {label}

@@ -133,7 +133,7 @@ export default function TaskFormDialog({
 
     return (
         <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit Task' : 'New Task'}>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <form onSubmit={handleSubmit} className="space-y-4 mt-2 min-w-0">
                 {/* Title */}
                 <CharLimitField
                     label="Task title"

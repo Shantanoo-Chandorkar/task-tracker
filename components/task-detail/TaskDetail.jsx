@@ -136,7 +136,7 @@ export default function TaskDetail({ listId, taskId, initialTasks, initialStatus
                 )}
             </div>
 
-            <div className="w-full">
+            <div className="w-full min-w-0">
                 <p className="text-xs text-muted-foreground mb-1">Description</p>
                 {task.description ? (
                     <RichTextRenderer html={task.description} />
