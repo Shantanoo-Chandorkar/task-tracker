@@ -7,18 +7,16 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { AUTH_ERROR_CODES } from '@/lib/auth/error-codes';
 import { checkRateLimit, recordFailedAttempt, resetAttempts, getClientIp } from '@/lib/auth/rate-limit';
 import { REMEMBER_ME_COOKIE, REMEMBER_ME_MAX_AGE_SECONDS } from '@/lib/auth/remember-me';
-import { sendPasswordResetEmail } from '@/lib/email/send-password-reset-email';
+import { sendPasswordResetEmail } from '@/lib/email/notifications/send-password-reset-email';
+import { sendSignupConfirmationEmail } from '@/lib/email/notifications/send-signup-confirmation-email';
+import { sendExistingAccountEmail } from '@/lib/email/notifications/send-existing-account-email';
+import { sanitizeString, checkMaxLength } from '@/lib/validation';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Length over composition rules (NIST 800-63B, OWASP) -- no forced uppercase/symbol/number.
 const MIN_PASSWORD_LENGTH = 12;
 const LOCKOUT_ERROR_MESSAGE = (minutes) =>
     `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
-
-// The only Supabase signUp() error safe to forward verbatim - telling someone to log in
-// instead isn't an enumeration risk, it's necessary UX. Anything else could be an internal
-// detail (a failed trigger, a DB error) and must not reach the client raw.
-const SAFE_SIGNUP_ERROR_MESSAGES = new Set(['User already registered']);
 
 /**
  * Logs an auth failure server-side with enough context to investigate, never the password.
@@ -32,19 +30,18 @@ function logAuthFailure(code, email, detail) {
 }
 
 /**
- * Creates a new account. Email confirmation is required, so this never returns an active
- * session, the caller must show a "check your email" state, not attempt to sign in.
+ * Creates an unconfirmed account; the response is identical for already-registered emails to block enumeration.
  *
  * @param {object} fields
- * @param {string} fields.email
- * @param {string} fields.password
- * @param {string} fields.displayName
- * @returns {Promise<{ error: string|null, code: string|null }>}
+ * @param {string} fields.email - Address to register.
+ * @param {string} fields.password - Chosen password.
+ * @param {string} fields.displayName - Name shown in the app, max 50 characters.
+ * @returns {Promise<{ error: string|null, code: string|null }>} Null error means "check your email", never a session.
  */
 export async function signUpAction(fields) {
     const email = fields.email?.trim().toLowerCase() ?? '';
     const password = fields.password ?? '';
-    const displayName = fields.displayName?.trim() ?? '';
+    const displayName = sanitizeString(fields.displayName ?? '');
 
     if (!EMAIL_PATTERN.test(email)) {
         return { error: 'Enter a valid email address', code: AUTH_ERROR_CODES.EMAIL_INVALID };
@@ -59,22 +56,52 @@ export async function signUpAction(fields) {
         return { error: 'Enter your name', code: AUTH_ERROR_CODES.DISPLAY_NAME_REQUIRED };
     }
 
+    const lengthError = checkMaxLength(displayName, 50, 'Name');
+    if (lengthError) return lengthError;
+
+    const ipAddress = getClientIp(await headers());
+
     try {
-        const supabase = await createClient();
+        const { isLocked, retryAfterMinutes } = await checkRateLimit('signup', email, ipAddress);
+        if (isLocked) {
+            return {
+                error: LOCKOUT_ERROR_MESSAGE(retryAfterMinutes),
+                code: AUTH_ERROR_CODES.ACCOUNT_LOCKED,
+            };
+        }
+
+        // Runs on every attempt, not just failures -- the only thing stopping signup-email mailbombing.
+        await recordFailedAttempt('signup', email, ipAddress);
+
+        const supabase = createAdminClient();
         // handle_new_user() (migration 0005) reads this into profiles.display_name on insert.
-        const { error } = await supabase.auth.signUp({
+        const { data: generatedLink, error: generateLinkError } = await supabase.auth.admin.generateLink({
+            type: 'signup',
             email,
             password,
             options: { data: { display_name: displayName } },
         });
 
-        if (error) {
-            if (SAFE_SIGNUP_ERROR_MESSAGES.has(error.message)) {
-                return { error: error.message, code: AUTH_ERROR_CODES.EMAIL_ALREADY_REGISTERED };
+        if (generateLinkError) {
+            if (generateLinkError.code === 'user_already_exists') {
+                const { data: recoveryLink } = await supabase.auth.admin.generateLink({
+                    type: 'recovery',
+                    email,
+                    options: { redirectTo: `${process.env.SITE_URL}/auth/confirm?next=/reset-password` },
+                });
+                if (recoveryLink) {
+                    const loginLink = `${process.env.SITE_URL}/auth/confirm?token_hash=${recoveryLink.properties.hashed_token}&type=recovery&next=/reset-password`;
+                    await sendExistingAccountEmail(email, loginLink);
+                }
+                // Same response as a fresh signup - this is what prevents account enumeration
+                return { error: null, code: null };
             }
-            logAuthFailure(AUTH_ERROR_CODES.SIGNUP_FAILED, email, error.message);
+            logAuthFailure(AUTH_ERROR_CODES.SIGNUP_FAILED, email, generateLinkError.message);
             return { error: 'Failed to create account', code: AUTH_ERROR_CODES.SIGNUP_FAILED };
         }
+
+        const confirmLink = `${process.env.SITE_URL}/auth/confirm?token_hash=${generatedLink.properties.hashed_token}&type=signup&next=/`;
+        await sendSignupConfirmationEmail(email, confirmLink);
 
         return { error: null, code: null };
     } catch (thrown) {

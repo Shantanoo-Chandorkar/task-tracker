@@ -4,8 +4,10 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { NOT_AUTHENTICATED, SPACE_NOT_FOUND, ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
-import { sendJoinRequestEmail } from '@/lib/email/send-join-request-email';
-import { sendJoinDecisionEmail } from '@/lib/email/send-join-decision-email';
+import { sendJoinRequestEmail } from '@/lib/email/notifications/send-join-request-email';
+import { sendJoinDecisionEmail } from '@/lib/email/notifications/send-join-decision-email';
+import { sendCollaboratorLeftEmail } from '@/lib/email/notifications/send-collaborator-left-email';
+import { sendCollaboratorRemovedEmail } from '@/lib/email/notifications/send-collaborator-removed-email';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -189,6 +191,20 @@ export async function removeCollaborator(fields) {
             return { error: 'Collaborator not found', code: REQUEST_NOT_FOUND };
         }
 
+        const { data: space, error: spaceLookupError } = await supabase
+            .from('spaces')
+            .select('name')
+            .eq('id', removedRow.space_id)
+            .single();
+        if (space) {
+            await sendCollaboratorRemovedEmail(removedRow.requester_email, space.name);
+        } else {
+            console.error('[collaboration] could not resolve space name for removal notice', {
+                collaboratorId: fields.collaboratorId,
+                detail: spaceLookupError?.message,
+            });
+        }
+
         return { error: null, code: null };
     } catch {
         return { error: 'Unexpected error removing collaborator', code: null };
@@ -219,6 +235,34 @@ export async function leaveSpace(fields) {
 
         if (error || !removedRow) {
             return { error: 'You are not a member of this space', code: null };
+        }
+
+        // Cancelling a pending request is not worth an email; only an accepted member leaving is
+        if (removedRow.status === 'accepted') {
+            const adminSupabase = createAdminClient();
+            const { data: space, error: spaceLookupError } = await adminSupabase
+                .from('spaces')
+                .select('name, owner_id')
+                .eq('id', removedRow.space_id)
+                .single();
+
+            if (space) {
+                const { data: ownerAuthUser, error: ownerLookupError } =
+                    await adminSupabase.auth.admin.getUserById(space.owner_id);
+                if (ownerAuthUser?.user?.email) {
+                    await sendCollaboratorLeftEmail(ownerAuthUser.user.email, space.name, user.email);
+                } else {
+                    console.error('[collaboration] could not resolve owner email for leave notice', {
+                        spaceId: removedRow.space_id,
+                        detail: ownerLookupError?.message,
+                    });
+                }
+            } else {
+                console.error('[collaboration] could not resolve space for leave notice', {
+                    spaceId: removedRow.space_id,
+                    detail: spaceLookupError?.message,
+                });
+            }
         }
 
         return { error: null, code: null };
