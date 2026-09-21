@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import PasswordInput from '@/components/auth/PasswordInput';
+import GuestEntryButton from '@/components/auth/GuestEntryButton';
 import { signInAction } from '@/actions/auth-actions';
 import { clearAllCaches } from '@/lib/cache';
 
@@ -116,6 +117,10 @@ export default function LoginForm() {
                     Sign up
                 </Link>
             </p>
+
+            <div className="mt-4 border-t border-border pt-4">
+                <GuestEntryButton />
+            </div>
         </div>
     );
 }
