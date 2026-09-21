@@ -55,8 +55,10 @@ export default function StatusPicker({ task, flatList }) {
             });
 
             if (!response.ok) {
-                console.error('Failed to update task status');
-                toast.error('Failed to update task status');
+                const errorResponseBody = await response.json().catch(() => null);
+                const errorMessage = errorResponseBody?.error || 'Failed to update task status';
+                console.error('Failed to update task status:', errorMessage);
+                toast.error(errorMessage);
                 return;
             }
 

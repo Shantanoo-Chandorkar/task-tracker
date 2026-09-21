@@ -10,6 +10,7 @@ import { getNextPosition } from '@/lib/position';
 import { canMarkTaskDone, getDefaultStatusId, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
 import { getCurrentUser } from '@/lib/auth/session';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
+import { sanitizeString, checkMaxLength, sanitizeRichText } from '@/lib/validation';
 
 /**
  * Deepest relative depth in a subtree snapshot (0 = root with no children).
@@ -44,9 +45,21 @@ export async function createTask(fields) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
-    if (!fields.title || fields.title.trim() === '') {
+    const title = sanitizeString(fields.title, true);
+    const description = sanitizeRichText(fields.description);
+
+    if (!title) {
         return { data: null, error: 'Title is required' };
     }
+
+    const titleError = checkMaxLength(title, 200, 'Title');
+    if (titleError) return { data: null, error: titleError.error };
+
+    if (description) {
+        const descriptionError = checkMaxLength(description, 10000, 'Description');
+        if (descriptionError) return { data: null, error: descriptionError.error };
+    }
+
     if (!fields.list_id) {
         return { data: null, error: 'A list is required' };
     }
@@ -101,8 +114,8 @@ export async function createTask(fields) {
         const { data: createdTask, error } = await supabase
             .from('tasks')
             .insert({
-                title: fields.title.trim(),
-                description: fields.description ?? null,
+                title,
+                description: description || null,
                 status_id: fields.status_id ?? null,
                 parent_id: fields.parent_id ?? null,
                 sublist_id: fields.parent_id ? null : (fields.sublist_id ?? null),
@@ -118,12 +131,14 @@ export async function createTask(fields) {
             .single();
 
         if (error) {
+            console.error('[tasks] create failed', { listId: fields.list_id, code: error.code, detail: error.message });
             return { data: null, error: 'Failed to create task' };
         }
 
-        revalidateTag('task-tree');
+        revalidateTag('task-tree', { expire: 0 });
         return { data: createdTask, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[tasks] create threw', { listId: fields.list_id, detail: thrown?.message });
         return { data: null, error: 'Unexpected error creating task' };
     }
 }
@@ -145,6 +160,21 @@ export async function updateTask(taskId, fields) {
         const supabase = await createClient();
 
         const updates = { ...fields };
+
+        if ('title' in updates) {
+            updates.title = sanitizeString(updates.title, true);
+            if (!updates.title) return { data: null, error: 'Title is required' };
+            const titleError = checkMaxLength(updates.title, 200, 'Title');
+            if (titleError) return { data: null, error: titleError.error };
+        }
+
+        if ('description' in updates) {
+            updates.description = sanitizeRichText(updates.description) || null;
+            if (updates.description) {
+                const descriptionError = checkMaxLength(updates.description, 10000, 'Description');
+                if (descriptionError) return { data: null, error: descriptionError.error };
+            }
+        }
 
         if (updates.status_id) {
             // Look up the target status's own code rather than resolving a "the done status"
@@ -196,12 +226,19 @@ export async function updateTask(taskId, fields) {
             .single();
 
         if (error) {
+            console.error('[tasks] update failed', {
+                taskId,
+                fields: Object.keys(updates),
+                code: error.code,
+                detail: error.message,
+            });
             return { data: null, error: 'Failed to update task' };
         }
 
-        revalidateTag('task-tree');
+        revalidateTag('task-tree', { expire: 0 });
         return { data: updatedTask, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[tasks] update threw', { taskId, detail: thrown?.message });
         return { data: null, error: 'Unexpected error updating task' };
     }
 }
@@ -237,11 +274,15 @@ export async function completeTaskAndDescendants(taskId) {
             .update({ status_id: doneStatusId })
             .in('id', idsToComplete);
 
-        if (error) return { error: 'Failed to mark tasks complete' };
+        if (error) {
+            console.error('[tasks] complete-cascade failed', { taskId, code: error.code, detail: error.message });
+            return { error: 'Failed to mark tasks complete' };
+        }
 
-        revalidateTag('task-tree');
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[tasks] complete-cascade threw', { taskId, detail: thrown?.message });
         return { error: 'Unexpected error completing tasks' };
     }
 }
@@ -276,11 +317,15 @@ export async function uncompleteTaskAndDescendants(taskId) {
             .update({ status_id: defaultStatusId })
             .in('id', idsToUncomplete);
 
-        if (error) return { error: 'Failed to mark tasks incomplete' };
+        if (error) {
+            console.error('[tasks] uncomplete-cascade failed', { taskId, code: error.code, detail: error.message });
+            return { error: 'Failed to mark tasks incomplete' };
+        }
 
-        revalidateTag('task-tree');
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[tasks] uncomplete-cascade threw', { taskId, detail: thrown?.message });
         return { error: 'Unexpected error uncompleting tasks' };
     }
 }
@@ -306,9 +351,10 @@ export async function deleteTask(id) {
             return { error: 'Failed to delete task' };
         }
 
-        revalidateTag('task-tree');
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[tasks] delete threw', { id, detail: thrown?.message });
         return { error: 'Unexpected error deleting task' };
     }
 }
@@ -414,9 +460,10 @@ export async function deleteTaskAndReparentChildren(taskId) {
 
         if (deleteError) return { error: 'Failed to delete task' };
 
-        revalidateTag('task-tree');
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[tasks] reparent-delete threw', { taskId, detail: thrown?.message });
         return { error: 'Unexpected error during reparent-delete' };
     }
 }
@@ -492,9 +539,10 @@ export async function duplicateTask(taskId) {
             newPosition,
         );
 
-        revalidateTag('task-tree');
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[tasks] duplicate threw', { taskId, detail: thrown?.message });
         return { error: 'Failed to duplicate task' };
     }
 }

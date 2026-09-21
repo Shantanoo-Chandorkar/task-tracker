@@ -15,6 +15,7 @@ import TaskRowActions from '@/components/task-list/TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import SubtaskTree from './SubtaskTree';
 import { Button } from '@/components/ui/button';
+import RichTextRenderer from '@/components/ui/RichTextRenderer';
 
 /**
  * Task detail page content - title, status, description, recurrence, and the subtask tree.
@@ -135,10 +136,10 @@ export default function TaskDetail({ listId, taskId, initialTasks, initialStatus
                 )}
             </div>
 
-            <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Description</p>
+            <div className="w-full">
+                <p className="text-xs text-muted-foreground mb-1">Description</p>
                 {task.description ? (
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{task.description}</p>
+                    <RichTextRenderer html={task.description} />
                 ) : (
                     <p className="text-sm text-muted-foreground">No description</p>
                 )}

@@ -5,6 +5,7 @@ import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
+import { sanitizeString, checkMaxLength } from '@/lib/validation';
 
 /**
  * Creates a new sublist under a list. Appends it after the last existing sublist in that list.
@@ -19,9 +20,13 @@ export async function createSublist(fields) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
-    if (!fields.name || fields.name.trim() === '') {
+    const name = sanitizeString(fields.name, true);
+    if (!name) {
         return { data: null, error: 'Sublist name is required' };
     }
+    const nameError = checkMaxLength(name, 200, 'Sublist name');
+    if (nameError) return { data: null, error: nameError.error };
+
     if (!fields.list_id) {
         return { data: null, error: 'A list is required' };
     }
@@ -34,7 +39,7 @@ export async function createSublist(fields) {
         const { data: createdSublist, error } = await supabase
             .from('sublists')
             .insert({
-                name: fields.name.trim(),
+                name,
                 list_id: fields.list_id,
                 color: fields.color ?? '#6b7280',
                 position,
@@ -46,9 +51,10 @@ export async function createSublist(fields) {
             return { data: null, error: 'Failed to create sublist' };
         }
 
-        revalidateTag('sublists');
+        revalidateTag('sublists', { expire: 0 });
         return { data: createdSublist, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[sublists] create threw', { detail: thrown?.message });
         return { data: null, error: 'Unexpected error creating sublist' };
     }
 }
@@ -66,6 +72,13 @@ export async function updateSublist(sublistId, fields) {
 
     if (!sublistId) return { data: null, error: 'Sublist ID is required' };
 
+    if ('name' in fields) {
+        fields.name = sanitizeString(fields.name, true);
+        if (!fields.name) return { data: null, error: 'Sublist name is required' };
+        const nameError = checkMaxLength(fields.name, 200, 'Sublist name');
+        if (nameError) return { data: null, error: nameError.error };
+    }
+
     try {
         const supabase = await createClient();
 
@@ -80,9 +93,10 @@ export async function updateSublist(sublistId, fields) {
             return { data: null, error: 'Failed to update sublist' };
         }
 
-        revalidateTag('sublists');
+        revalidateTag('sublists', { expire: 0 });
         return { data: updatedSublist, error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[sublists] update threw', { sublistId, detail: thrown?.message });
         return { data: null, error: 'Unexpected error updating sublist' };
     }
 }
@@ -108,10 +122,11 @@ export async function deleteSublist(sublistId) {
             return { error: 'Failed to delete sublist' };
         }
 
-        revalidateTag('sublists');
-        revalidateTag('task-tree');
+        revalidateTag('sublists', { expire: 0 });
+        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch {
+    } catch (thrown) {
+        console.error('[sublists] delete threw', { sublistId, detail: thrown?.message });
         return { error: 'Unexpected error deleting sublist' };
     }
 }

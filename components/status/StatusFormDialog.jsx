@@ -5,7 +5,10 @@ import ResponsiveModal from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
+import CharLimitField from '@/components/ui/CharLimitField';
 import { createStatus, updateStatus } from '@/actions/status-actions';
+
+const STATUS_NAME_MAX = 100;
 
 /**
  * Modal for creating or editing a Status, rendered through the shared ResponsiveModal container.
@@ -36,25 +39,31 @@ export default function StatusFormDialog({ open, onClose, status = null, spaceId
             title={isEditing ? 'Edit Status' : 'New Status'}
         >
             <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-                <div className="flex items-center gap-2">
-                    <input
-                        type="color"
-                        value={color}
-                        onChange={(event) => setColor(event.target.value)}
-                        className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
-                        disabled={submitting}
-                    />
-                    <Input
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="Status name"
-                        className="flex-1"
-                        autoFocus
-                        disabled={submitting}
-                    />
-                </div>
-
-                {error && <p className="text-xs text-destructive">{error}</p>}
+                <CharLimitField
+                    label="Status name"
+                    currentLength={name.length}
+                    maxLength={STATUS_NAME_MAX}
+                    error={error}
+                >
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="color"
+                            value={color}
+                            onChange={(event) => setColor(event.target.value)}
+                            className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
+                            disabled={submitting}
+                        />
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="Status name"
+                            className="flex-1"
+                            autoFocus
+                            disabled={submitting}
+                            maxLength={STATUS_NAME_MAX}
+                        />
+                    </div>
+                </CharLimitField>
 
                 <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
