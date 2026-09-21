@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
+import { GUEST_ERROR_CODES } from '@/lib/guest/guest-error-codes';
 
 const RECHECK_INTERVAL_MS = 20 * 60 * 1000;
 // Resume events can fire in bursts (tab switch, unlock, reconnect); one check per minute is plenty
@@ -30,7 +31,8 @@ export default function AuthKeepAlive() {
                 if (response.status !== 401) return;
 
                 const { code: errorCode } = await response.json();
-                if (errorCode === NOT_AUTHENTICATED) window.location.assign('/login');
+                if (errorCode === GUEST_ERROR_CODES.SESSION_EXPIRED) window.location.assign('/login?reason=guest-expired');
+                else if (errorCode === NOT_AUTHENTICATED) window.location.assign('/login');
             } catch {
                 // Offline or server unreachable: the session is untouched, so stay put and retry on the next trigger
             }
