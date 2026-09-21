@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { signOutAction } from '@/actions/auth-actions';
+import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
 import { clearAllCaches } from '@/lib/cache';
 
 /**
@@ -20,6 +21,8 @@ export default function LogoutButton({ onNavigate }) {
     const router = useRouter();
     const queryClient = useQueryClient();
     const [isPending, setIsPending] = useState(false);
+    const { data: profile } = useCurrentUserProfileQuery();
+    const logoutLabel = profile?.is_guest ? 'End guest session' : 'Log out';
 
     async function handleLogout() {
         setIsPending(true);
@@ -58,7 +61,8 @@ export default function LogoutButton({ onNavigate }) {
             onClick={handleLogout}
             disabled={isPending}
             className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            aria-label="Log out"
+            aria-label={logoutLabel}
+            title={logoutLabel}
         >
             <LogOut className="h-4 w-4" />
         </Button>

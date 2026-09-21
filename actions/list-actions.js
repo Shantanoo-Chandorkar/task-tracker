@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
+import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
 
@@ -49,6 +50,8 @@ export async function createList(fields) {
             .single();
 
         if (error) {
+            const guestLimitResult = toGuestLimitResult(error);
+            if (guestLimitResult) return { data: null, ...guestLimitResult };
             return { data: null, error: 'Failed to create list' };
         }
 

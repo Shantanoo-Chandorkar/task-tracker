@@ -39,6 +39,7 @@ import {
 import { updateSpace, deleteSpace } from '@/actions/space-actions';
 import { updateList, deleteList } from '@/actions/list-actions';
 import { leaveSpace } from '@/actions/collaboration-actions';
+import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
 import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
 import JoinSpaceDialog from './JoinSpaceDialog';
@@ -142,6 +143,9 @@ function SpaceSection({
 }) {
     const [statusesOpen, setStatusesOpen] = useState(false);
     const [sharingOpen, setSharingOpen] = useState(false);
+    const { data: profile } = useCurrentUserProfileQuery();
+    // Guests cannot share; the button stays hidden until the profile confirms a registered user
+    const canShareSpace = isOwner && profile?.is_guest === false;
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: space.id,
         data: { type: 'space' },
@@ -238,7 +242,7 @@ function SpaceSection({
                         <ChevronDown className="h-3 w-3" />
                     )}
                 </button>
-                {isOwner && (
+                {canShareSpace && (
                     <button
                         type="button"
                         onClick={() => setSharingOpen((open) => !open)}
@@ -269,7 +273,7 @@ function SpaceSection({
                 </div>
             )}
 
-            {isOwner && sharingOpen && (
+            {canShareSpace && sharingOpen && (
                 <div className="border-t border-border px-3 py-3">
                     <SpaceSharingSection space={space} />
                 </div>
@@ -290,6 +294,8 @@ function SpaceSection({
  */
 export default function SpaceListManager({ initialSpaces, initialLists, currentUserId }) {
     const queryClient = useQueryClient();
+    const { data: profile } = useCurrentUserProfileQuery();
+    const canJoinSpaces = profile?.is_guest === false;
     const [spaceDialog, setSpaceDialog] = useState({ open: false, space: null });
     const [listDialog, setListDialog] = useState({ open: false, list: null, defaultSpaceId: null });
     // Lazy initializer only -- reads the URL once, before the dialog could otherwise ever open,
@@ -560,13 +566,15 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
                 >
                     + Add space
                 </button>
-                <button
-                    type="button"
-                    onClick={() => setJoinDialog({ open: true, prefillSpaceId: '' })}
-                    className="flex-1 rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40"
-                >
-                    Join a space
-                </button>
+                {canJoinSpaces && (
+                    <button
+                        type="button"
+                        onClick={() => setJoinDialog({ open: true, prefillSpaceId: '' })}
+                        className="flex-1 rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                    >
+                        Join a space
+                    </button>
+                )}
             </div>
 
             <SpaceFormDialog

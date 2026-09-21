@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Plus, ListChecks, ListPlus, LayoutGrid, FolderPlus } from 'lucide-react';
 import {
     DropdownMenu,
@@ -10,6 +12,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
+import { useListsQuery } from '@/hooks/useListsQuery';
 import SpaceFormDialog from '@/components/space/SpaceFormDialog';
 import ListFormDialog from '@/components/space/ListFormDialog';
 import SublistFormDialog from '@/components/space/SublistFormDialog';
@@ -21,23 +24,35 @@ import SublistFormDialog from '@/components/space/SublistFormDialog';
  * @param {string} props.className - Positioning + sizing classes for the button itself
  */
 export default function QuickCreateFab({ className }) {
-    const router = useRouter();
+    const queryClient = useQueryClient();
     const params = useParams();
     const listId = params?.listId;
+    const { data: lists = [] } = useListsQuery();
 
     const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+    const [fallbackListId, setFallbackListId] = useState(null);
     const [spaceDialogOpen, setSpaceDialogOpen] = useState(false);
     const [listDialogOpen, setListDialogOpen] = useState(false);
     const [sublistDialogOpen, setSublistDialogOpen] = useState(false);
 
-    function handleNewTask() {
-        if (listId) {
-            setTaskDialogOpen(true);
-        } else {
-            // No list in scope (on Spaces/Settings) - `/` dynamically resolves to
-            // whichever list is actually first, so the option lands somewhere useful.
-            router.push('/');
+    const newTaskListId = listId ?? fallbackListId;
+
+    /**
+     * Opens the new-task dialog for the open list, or for a fallback list when none is open.
+     */
+    function openNewTaskDialog() {
+        if (!listId) {
+            // Home, Spaces and Settings have no open list, so use the most recently active one, else the first
+            const recentListId = queryClient.getQueryData(['home'])?.recentLists?.[0]?.id;
+            const targetListId = recentListId ?? lists[0]?.id;
+            if (!targetListId) {
+                toast.error('Create a list first, then add tasks to it.');
+                setListDialogOpen(true);
+                return;
+            }
+            setFallbackListId(targetListId);
         }
+        setTaskDialogOpen(true);
     }
 
     return (
@@ -49,7 +64,7 @@ export default function QuickCreateFab({ className }) {
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-40">
-                    <DropdownMenuItem onClick={handleNewTask} className="gap-2">
+                    <DropdownMenuItem onClick={openNewTaskDialog} className="gap-2">
                         <ListChecks className="h-3.5 w-3.5" />
                         New Task
                     </DropdownMenuItem>
@@ -68,11 +83,11 @@ export default function QuickCreateFab({ className }) {
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            {listId && (
+            {newTaskListId && (
                 <TaskFormDialog
                     open={taskDialogOpen}
                     onClose={() => setTaskDialogOpen(false)}
-                    listId={listId}
+                    listId={newTaskListId}
                 />
             )}
             <SpaceFormDialog open={spaceDialogOpen} onClose={() => setSpaceDialogOpen(false)} />

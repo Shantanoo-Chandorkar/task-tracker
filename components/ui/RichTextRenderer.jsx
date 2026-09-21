@@ -15,7 +15,7 @@ export default function RichTextRenderer({ html }) {
 
     return (
         <div
-            className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 whitespace-normal break-words"
+            className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 whitespace-normal min-w-0 [overflow-wrap:anywhere]"
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
     );

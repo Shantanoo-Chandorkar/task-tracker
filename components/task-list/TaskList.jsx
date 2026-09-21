@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
@@ -38,14 +38,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { flatToTree, findDescendantIds } from '@/lib/tree';
+import { flatToTree, findDescendantIds, isStartOfUnprioritisedTier } from '@/lib/tree';
 import { useUIState } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
-import TaskRow from './TaskRow';
+import TaskRow, { PriorityTierDivider } from './TaskRow';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import SublistFormDialog from '@/components/space/SublistFormDialog';
 import StatusCountTiles from './StatusCountTiles';
@@ -60,7 +60,7 @@ const MOUSE_ACTIVATION = { distance: 5 };
 const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
 
 /**
- * Collision detection scoped to the dragged row's own siblings (parent_id + sublist_id).
+ * Collision detection scoped to the dragged row's own siblings (parent_id + sublist_id) and priority tier.
  * Sublist headers fall back to plain closestCenter - they're already one flat list.
  *
  * @param {object} args - dnd-kit collision detection arguments
@@ -74,11 +74,13 @@ function siblingScopedCollisionDetection(args) {
     const activeData = args.active?.data?.current ?? {};
     const activeParentId = activeData.parentId ?? null;
     const activeSublistId = activeData.sublistId ?? null;
+    const activeIsPrioritised = activeData.isPrioritised ?? false;
     const siblingContainers = args.droppableContainers.filter((container) => {
         const containerData = container.data.current ?? {};
         return (
             (containerData.parentId ?? null) === activeParentId &&
-            (containerData.sublistId ?? null) === activeSublistId
+            (containerData.sublistId ?? null) === activeSublistId &&
+            (containerData.isPrioritised ?? false) === activeIsPrioritised
         );
     });
 
@@ -145,10 +147,13 @@ function StatusGroup({
                         items={tasks.map((task) => task.id)}
                         strategy={verticalListSortingStrategy}
                     >
-                        {tasks.map((task) => (
-                            <div key={task.id} onClick={() => onFocusTask(task.id)}>
-                                <TaskRow task={task} depth={0} flatList={flatList} listId={listId} />
-                            </div>
+                        {tasks.map((task, taskIndex) => (
+                            <Fragment key={task.id}>
+                                {isStartOfUnprioritisedTier(tasks, taskIndex) && <PriorityTierDivider />}
+                                <div onClick={() => onFocusTask(task.id)}>
+                                    <TaskRow task={task} depth={0} flatList={flatList} listId={listId} />
+                                </div>
+                            </Fragment>
                         ))}
                     </SortableContext>
 
@@ -435,6 +440,10 @@ export default function TaskList({
                     (task.sublist_id ?? null) === (activeTask.sublist_id ?? null),
             )
             .map((task) => task.id);
+        // Reordering is per tier; changing tier is done with the star, so a cross-tier drop is ignored.
+        const overTask = flatList.find((task) => task.id === over.id);
+        if (Boolean(overTask?.is_prioritised) !== Boolean(activeTask.is_prioritised)) return;
+
         const oldIndex = siblingIds.indexOf(active.id);
         const newIndex = siblingIds.indexOf(over.id);
         if (oldIndex === -1 || newIndex === -1) return;

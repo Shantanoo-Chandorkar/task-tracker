@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
+import { useTaskPriority } from '@/hooks/useTaskPriority';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { toast } from 'sonner';
 import {
@@ -67,6 +68,7 @@ export default function TaskRowActions({
     const { doneStatus, defaultStatus, isDone, setComplete, confirmState, closeConfirm, confirmCascade } =
         useTaskCompletion(listId);
     const taskIsDone = isDone(task);
+    const { togglePriority } = useTaskPriority(listId);
 
     const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);
     const grandparentId = parent?.parent_id ?? null;
@@ -267,6 +269,9 @@ export default function TaskRowActions({
                             className={!doneStatus || !defaultStatus ? 'opacity-40' : ''}
                         >
                             {taskIsDone ? 'Mark as incomplete' : 'Mark as complete'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => togglePriority(task)}>
+                            {task.is_prioritised ? 'Remove from priority' : 'Put on priority'}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={onAddSubtask}

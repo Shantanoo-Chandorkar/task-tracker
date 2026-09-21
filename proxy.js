@@ -1,52 +1,43 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/proxy';
-
-// Redirects an already-logged-in visitor away (there's never a reason to re-login/signup).
-const REDIRECT_IF_AUTHENTICATED_ROUTES = ['/login', '/signup'];
-
-// Accessible without a session, not redirected away once authenticated -- a reset may legitimately happen mid-session.
-const PUBLIC_ROUTES = [
-    ...REDIRECT_IF_AUTHENTICATED_ROUTES,
-    '/forgot-password',
-    '/reset-password',
-    '/auth/confirm',
-];
+import { decideProxyRoute } from '@/lib/auth/proxy-route';
 
 /**
  * Gates every page route behind a session check and refreshes the Supabase session cookie
  * on each request. Optimistic only (cookie presence, not per-row authorization) - Next 16's
  * own docs are explicit that Server Actions bypass Proxy entirely, so real authorization
  * still has to happen in RLS policies and in each server action, not just here.
+ * The routing rules themselves live in `decideProxyRoute`, which also ends expired guest sessions.
  *
  * @param {import('next/server').NextRequest} request
  * @returns {Promise<import('next/server').NextResponse>}
  */
 export default async function proxy(request) {
-    const { supabase, supabaseResponse } = createClient(request);
+    const { supabase, getSupabaseResponse } = createClient(request);
 
     const {
         data: { user },
     } = await supabase.auth.getUser();
 
-    const { pathname } = request.nextUrl;
-    const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
-    const isRedirectIfAuthenticatedRoute = REDIRECT_IF_AUTHENTICATED_ROUTES.some((route) =>
-        pathname.startsWith(route),
-    );
+    const routeDecision = decideProxyRoute({ user, pathname: request.nextUrl.pathname });
 
-    if (!user && !isPublicRoute) {
+    // Runs before the response is read, so the cleared cookies are on it
+    if (routeDecision.clearsSession) await supabase.auth.signOut();
+
+    if (routeDecision.action === 'redirect') {
         const url = request.nextUrl.clone();
-        url.pathname = '/login';
-        return NextResponse.redirect(url);
+        url.pathname = routeDecision.pathname;
+        url.search = routeDecision.search;
+
+        // A fresh redirect does not carry the session cookie changes, so copy them over
+        const redirectResponse = NextResponse.redirect(url);
+        getSupabaseResponse()
+            .cookies.getAll()
+            .forEach((sessionCookie) => redirectResponse.cookies.set(sessionCookie));
+        return redirectResponse;
     }
 
-    if (user && isRedirectIfAuthenticatedRoute) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/';
-        return NextResponse.redirect(url);
-    }
-
-    return supabaseResponse;
+    return getSupabaseResponse();
 }
 
 export const config = {
