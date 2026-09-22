@@ -98,6 +98,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
                 size="icon"
                 className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
                 onClick={() => onEditRequest(list)}
+                aria-label="Edit list"
             >
                 <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -106,6 +107,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
                 size="icon"
                 className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
                 onClick={() => onDeleteRequest(list)}
+                aria-label="Delete list"
             >
                 <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -190,6 +192,7 @@ function SpaceSection({
                             size="icon"
                             className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
                             onClick={() => onEditSpaceRequest(space)}
+                            aria-label="Edit space"
                         >
                             <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -198,6 +201,7 @@ function SpaceSection({
                             size="icon"
                             className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
                             onClick={() => onDeleteSpaceRequest(space)}
+                            aria-label="Delete space"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
                         </Button>

@@ -97,6 +97,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
                 size="icon"
                 className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
                 onClick={() => onEditRequest(status)}
+                aria-label="Edit status"
             >
                 <Pencil className="h-3.5 w-3.5" />
             </Button>
