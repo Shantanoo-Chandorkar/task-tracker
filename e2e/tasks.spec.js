@@ -117,9 +117,12 @@ test.describe('tasks', () => {
 
         await taskRow(page, subtask).getByRole('button', { name: 'More actions' }).click();
         await page.getByRole('menuitem', { name: 'Move to...' }).click();
-        await expect(page.getByText('Move to...')).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Move to...' })).toBeVisible();
         await page.getByRole('button', { name: moveTargetTitle, exact: true }).click();
         await expect(page.getByText('Task moved')).toBeVisible();
+
+        // moveTargetTitle had no children before the move, so its row still defaults to collapsed.
+        await taskRow(page, moveTargetTitle).getByRole('button', { name: 'Expand subtasks' }).click();
 
         await taskRow(page, subtask).getByRole('button', { name: 'More actions' }).click();
         await expect(page.getByRole('menuitem', { name: 'Promote to sibling' })).toBeVisible();

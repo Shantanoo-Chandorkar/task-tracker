@@ -154,11 +154,8 @@ export function taskRow(page, title) {
  */
 async function openNewTaskDialog(page) {
     const newTaskButton = page.getByRole('button', { name: 'New Task' });
-    if (await newTaskButton.count()) {
-        await newTaskButton.click();
-        return;
-    }
-    await page.getByRole('button', { name: 'Add Task' }).first().click();
+    const addTaskButton = page.getByRole('button', { name: 'Add Task' }).first();
+    await newTaskButton.or(addTaskButton).click();
 }
 
 /**
