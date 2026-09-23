@@ -26,8 +26,7 @@ export default function AppLayout({ children }) {
                     </main>
                     <BottomNav />
                 </div>
-                {/* bottom-20 clears the TanStack Query devtools toggle, which also docks bottom-right in dev. */}
-                <QuickCreateFab className="hidden lg:flex fixed bottom-20 right-6 z-30 h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg" />
+                <QuickCreateFab className="hidden lg:flex fixed bottom-10 right-6 z-30 h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg" />
             </div>
         </>
     );
