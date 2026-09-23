@@ -26,16 +26,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import ModalShell from '@/components/ui/modal-shell';
 import { updateSpace, deleteSpace } from '@/actions/space-actions';
 import { updateList, deleteList } from '@/actions/list-actions';
 import { leaveSpace } from '@/actions/collaboration-actions';
@@ -600,31 +592,27 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
                 initialSpaceId={joinDialog.prefillSpaceId}
             />
 
-            <AlertDialog
+            <ModalShell
                 open={!!deleteTarget}
-                onOpenChange={(open) => !open && setDeleteTarget(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            {deleteTarget?.type === 'leave-space'
-                                ? `Leave "${deleteTarget?.name}"?`
-                                : `Delete "${deleteTarget?.name}"?`}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {deleteTarget?.type === 'space' && deleteTarget.counts
-                                ? `This deletes ${deleteTarget.counts.lists} list${deleteTarget.counts.lists !== 1 ? 's' : ''} and ${deleteTarget.counts.tasks} task${deleteTarget.counts.tasks !== 1 ? 's' : ''}. This cannot be undone.`
-                                : deleteTarget?.type === 'list' && deleteTarget.counts
-                                  ? `This deletes ${deleteTarget.counts.tasks} task${deleteTarget.counts.tasks !== 1 ? 's' : ''}. This cannot be undone.`
-                                  : deleteTarget?.type === 'leave-space'
-                                    ? "You'll lose access to this space's lists and tasks."
-                                    : 'This cannot be undone.'}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
-                            Cancel
-                        </AlertDialogCancel>
+                onClose={() => setDeleteTarget(null)}
+                variant="alert"
+                title={
+                    deleteTarget?.type === 'leave-space'
+                        ? `Leave "${deleteTarget?.name}"?`
+                        : `Delete "${deleteTarget?.name}"?`
+                }
+                description={
+                    deleteTarget?.type === 'space' && deleteTarget.counts
+                        ? `This deletes ${deleteTarget.counts.lists} list${deleteTarget.counts.lists !== 1 ? 's' : ''} and ${deleteTarget.counts.tasks} task${deleteTarget.counts.tasks !== 1 ? 's' : ''}. This cannot be undone.`
+                        : deleteTarget?.type === 'list' && deleteTarget.counts
+                          ? `This deletes ${deleteTarget.counts.tasks} task${deleteTarget.counts.tasks !== 1 ? 's' : ''}. This cannot be undone.`
+                          : deleteTarget?.type === 'leave-space'
+                            ? "You'll lose access to this space's lists and tasks."
+                            : 'This cannot be undone.'
+                }
+                footer={
+                    <>
+                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
                             disabled={deleting}
@@ -633,9 +621,9 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
                             {deleting && <Loader size="xs" />}
                             {deleteTarget?.type === 'leave-space' ? 'Leave' : 'Delete'}
                         </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                    </>
+                }
+            />
         </div>
     );
 }

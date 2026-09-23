@@ -26,15 +26,10 @@ import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import {
-    AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import ModalShell from '@/components/ui/modal-shell';
 import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
 
@@ -279,18 +274,15 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                 spaceId={spaceId}
             />
 
-            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Tasks using this status will lose it. This cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
-                            Cancel
-                        </AlertDialogCancel>
+            <ModalShell
+                open={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                variant="alert"
+                title={<>Delete &ldquo;{deleteTarget?.name}&rdquo;?</>}
+                description="Tasks using this status will lose it. This cannot be undone."
+                footer={
+                    <>
+                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
                             disabled={deleting}
@@ -299,9 +291,9 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                             {deleting && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                    </>
+                }
+            />
         </div>
     );
 }

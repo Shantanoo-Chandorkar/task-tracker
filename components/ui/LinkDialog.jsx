@@ -3,13 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import ModalShell from '@/components/ui/modal-shell';
 import { normalizeLinkUrl } from '@/lib/validation';
 
 const LINK_TEXT_MAX_LENGTH = 300;
@@ -55,61 +49,16 @@ export default function LinkDialog({
     }
 
     return (
-        <Dialog open onOpenChange={(isDialogOpen) => !isDialogOpen && onClose()}>
-            <DialogContent
-                className="sm:max-w-md"
-                // The editor restores its own focus after saving; Radix would otherwise focus a stale trigger
-                onCloseAutoFocus={(focusEvent) => focusEvent.preventDefault()}
-            >
-                <DialogHeader>
-                    <DialogTitle>{isEditing ? 'Edit link' : 'Add link'}</DialogTitle>
-                </DialogHeader>
-
-                <div className="space-y-3 min-w-0">
-                    <div className="space-y-1">
-                        <label htmlFor="link-text" className="text-sm font-medium text-foreground">
-                            Text
-                        </label>
-                        <Input
-                            id="link-text"
-                            value={linkText}
-                            onChange={(changeEvent) => setLinkText(changeEvent.target.value)}
-                            onKeyDown={submitLinkOnEnterKey}
-                            placeholder="Text to display"
-                            maxLength={LINK_TEXT_MAX_LENGTH}
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label htmlFor="link-url" className="text-sm font-medium text-foreground">
-                            URL
-                        </label>
-                        <Input
-                            id="link-url"
-                            value={linkUrl}
-                            onChange={(changeEvent) => {
-                                setLinkUrl(changeEvent.target.value);
-                                setLinkUrlError('');
-                            }}
-                            onKeyDown={submitLinkOnEnterKey}
-                            placeholder="https://example.com"
-                            inputMode="url"
-                            autoCapitalize="none"
-                            autoCorrect="off"
-                            aria-invalid={Boolean(linkUrlError)}
-                            autoFocus
-                        />
-                        {linkUrlError && <p className="text-xs text-destructive">{linkUrlError}</p>}
-                    </div>
-                </div>
-
-                <DialogFooter>
+        <ModalShell
+            open
+            onClose={onClose}
+            title={isEditing ? 'Edit link' : 'Add link'}
+            // The editor restores its own focus after saving; Radix would otherwise focus a stale trigger
+            onCloseAutoFocus={(focusEvent) => focusEvent.preventDefault()}
+            footer={
+                <>
                     {isEditing && (
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            className="sm:mr-auto"
-                            onClick={onRemove}
-                        >
+                        <Button type="button" variant="ghost" className="sm:mr-auto" onClick={onRemove}>
                             Remove link
                         </Button>
                     )}
@@ -119,8 +68,45 @@ export default function LinkDialog({
                     <Button type="button" onClick={submitLink}>
                         Save
                     </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </>
+            }
+        >
+            <div className="space-y-3 min-w-0">
+                <div className="space-y-1">
+                    <label htmlFor="link-text" className="text-sm font-medium text-foreground">
+                        Text
+                    </label>
+                    <Input
+                        id="link-text"
+                        value={linkText}
+                        onChange={(changeEvent) => setLinkText(changeEvent.target.value)}
+                        onKeyDown={submitLinkOnEnterKey}
+                        placeholder="Text to display"
+                        maxLength={LINK_TEXT_MAX_LENGTH}
+                    />
+                </div>
+                <div className="space-y-1">
+                    <label htmlFor="link-url" className="text-sm font-medium text-foreground">
+                        URL
+                    </label>
+                    <Input
+                        id="link-url"
+                        value={linkUrl}
+                        onChange={(changeEvent) => {
+                            setLinkUrl(changeEvent.target.value);
+                            setLinkUrlError('');
+                        }}
+                        onKeyDown={submitLinkOnEnterKey}
+                        placeholder="https://example.com"
+                        inputMode="url"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        aria-invalid={Boolean(linkUrlError)}
+                        autoFocus
+                    />
+                    {linkUrlError && <p className="text-xs text-destructive">{linkUrlError}</p>}
+                </div>
+            </div>
+        </ModalShell>
     );
 }

@@ -13,13 +13,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
+import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
@@ -331,27 +325,25 @@ export default function TaskRowActions({
             />
 
             {/* Move-to destination picker - same bottom sheet on every breakpoint */}
-            <Sheet open={moveSheetOpen} onOpenChange={(open) => !open && setMoveSheetOpen(false)}>
-                <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
-                    <SheetHeader>
-                        <SheetTitle>Move to...</SheetTitle>
-                        <SheetDescription className="sr-only">
-                            Choose a task to move this one under
-                        </SheetDescription>
-                    </SheetHeader>
-                    <MoveDestinationList
-                        destinations={moveDestinations}
-                        onSelect={(targetId) => {
-                            setMoveSheetOpen(false);
-                            handleMoveTo(targetId);
-                        }}
-                        onSelectSublist={(sublistId) => {
-                            setMoveSheetOpen(false);
-                            handleMoveToSublist(sublistId);
-                        }}
-                    />
-                </SheetContent>
-            </Sheet>
+            <ModalShell
+                open={moveSheetOpen}
+                onClose={() => setMoveSheetOpen(false)}
+                variant="sheet"
+                title="Move to..."
+                contentClassName="max-h-[70vh] overflow-y-auto"
+            >
+                <MoveDestinationList
+                    destinations={moveDestinations}
+                    onSelect={(targetId) => {
+                        setMoveSheetOpen(false);
+                        handleMoveTo(targetId);
+                    }}
+                    onSelectSublist={(sublistId) => {
+                        setMoveSheetOpen(false);
+                        handleMoveToSublist(sublistId);
+                    }}
+                />
+            </ModalShell>
         </>
     );
 }

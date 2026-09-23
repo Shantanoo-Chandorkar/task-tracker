@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useColorNameForm } from '@/hooks/useColorNameForm';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
-import ResponsiveModal from '@/components/ui/responsive-modal';
+import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
@@ -20,8 +20,7 @@ import { createList, updateList } from '@/actions/list-actions';
 const LIST_NAME_MAX = 200;
 
 /**
- * Modal for creating or editing a List, rendered through the shared
- * ResponsiveModal container - same container as Task/Space creation.
+ * Modal for creating or editing a List, rendered through the shared ModalShell container.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open
@@ -30,6 +29,7 @@ const LIST_NAME_MAX = 200;
  * @param {string|null} [props.defaultSpaceId] - Space to pre-select in create mode
  */
 export default function ListFormDialog({ open, onClose, list = null, defaultSpaceId = null }) {
+    const formId = useId();
     const [spaceId, setSpaceId] = useState('');
     const { data: spaces = [] } = useSpacesQuery();
 
@@ -48,8 +48,28 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
         });
 
     return (
-        <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit List' : 'New List'}>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+        <ModalShell
+            open={open}
+            onClose={onClose}
+            title={isEditing ? 'Edit List' : 'New List'}
+            footer={
+                <>
+                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form={formId}
+                        disabled={!name.trim() || !spaceId || submitting}
+                        className="gap-1.5"
+                    >
+                        {submitting && <Loader size="xs" />}
+                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create list'}
+                    </Button>
+                </>
+            }
+        >
+            <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
                 <CharLimitField
                     label="List name"
                     currentLength={name.length}
@@ -88,21 +108,7 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
                         ))}
                     </SelectContent>
                 </Select>
-
-                <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-                        Cancel
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={!name.trim() || !spaceId || submitting}
-                        className="gap-1.5"
-                    >
-                        {submitting && <Loader size="xs" />}
-                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create list'}
-                    </Button>
-                </div>
             </form>
-        </ResponsiveModal>
+        </ModalShell>
     );
 }
