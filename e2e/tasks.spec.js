@@ -84,30 +84,39 @@ test.describe('tasks', () => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));
 
-        await taskRow(page, parentTitle).getByRole('button', { name: 'Mark as complete' }).click();
+        // Default viewport is mobile-sized, where the row's checkbox is hidden - go through the 3-dot menu.
+        await taskRow(page, parentTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Mark as complete' }).click();
         await expect(page.getByText(`Mark “${parentTitle}” complete?`)).toBeVisible();
         await expect(page.getByText('This will also mark 1 subtask as complete.')).toBeVisible();
         await page.getByRole('button', { name: 'Mark complete' }).click();
 
-        await expect(taskRow(page, parentTitle).getByRole('button', { name: 'Mark as incomplete' })).toBeVisible();
-        await expect(taskRow(page, childTitle).getByRole('button', { name: 'Mark as incomplete' })).toBeVisible();
+        // Checks status text, not the menu - reopening it right after a dialog closes is flaky (see e2e-test-quality.md).
+        await expect(taskRow(page, parentTitle).getByText('Done', { exact: true })).toBeVisible();
+        await expect(taskRow(page, childTitle).getByText('Done', { exact: true })).toBeVisible();
     });
 
     test('reopening a completed task with a completed subtask cascades after confirmation', async ({ page }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));
 
-        await taskRow(page, parentTitle).getByRole('button', { name: 'Mark as complete' }).click();
+        // Default viewport is mobile-sized, where the row's checkbox is hidden - go through the 3-dot menu.
+        await taskRow(page, parentTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Mark as complete' }).click();
         await page.getByRole('button', { name: 'Mark complete' }).click();
-        await expect(taskRow(page, parentTitle).getByRole('button', { name: 'Mark as incomplete' })).toBeVisible();
+        await expect(taskRow(page, parentTitle).getByText('Done', { exact: true })).toBeVisible();
+        // The confirm dialog's close animation must finish before the dropdown trigger below will reopen it.
+        await expect(page.getByText(`Mark “${parentTitle}” complete?`)).toBeHidden();
 
-        await taskRow(page, parentTitle).getByRole('button', { name: 'Mark as incomplete' }).click();
+        await taskRow(page, parentTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Mark as incomplete' }).click();
         await expect(page.getByText(`Mark “${parentTitle}” incomplete?`)).toBeVisible();
         await expect(page.getByText('This will also mark 1 subtask as incomplete.')).toBeVisible();
         await page.getByRole('button', { name: 'Mark incomplete' }).click();
 
-        await expect(taskRow(page, parentTitle).getByRole('button', { name: 'Mark as complete' })).toBeVisible();
-        await expect(taskRow(page, childTitle).getByRole('button', { name: 'Mark as complete' })).toBeVisible();
+        // Checks status text, not the menu - reopening it right after a dialog closes is flaky (see e2e-test-quality.md).
+        await expect(taskRow(page, parentTitle).getByText('To Do', { exact: true })).toBeVisible();
+        await expect(taskRow(page, childTitle).getByText('To Do', { exact: true })).toBeVisible();
     });
 
     test('moving a subtask via "Move to..." relocates it, and promotion returns it to root', async ({ page }) => {
