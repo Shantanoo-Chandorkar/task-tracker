@@ -108,10 +108,11 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
                     <GripVertical className="h-3.5 w-3.5" />
                 </button>
 
+                {/* Hidden below lg - mobile operates entirely through the 3-dot menu, which has the same action */}
                 <button
                     onClick={handleToggleComplete}
                     disabled={!canToggleComplete}
-                    className={`flex-shrink-0 flex h-4 w-4 items-center justify-center rounded border motion-safe:transition-colors ${
+                    className={`hidden lg:flex flex-shrink-0 h-4 w-4 items-center justify-center rounded border motion-safe:transition-colors ${
                         taskIsDone
                             ? 'border-metric bg-metric text-background'
                             : 'border-muted-foreground/40 hover:border-muted-foreground'
@@ -138,13 +139,13 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
                     )}
                 </button>
 
-                {/* Priority star - a plain outline when off, so it is tappable on mobile where there is no hover */}
+                {/* Hidden below lg - mobile operates entirely through the 3-dot menu, which has the same action */}
                 <button
                     onClick={(clickEvent) => {
                         clickEvent.stopPropagation();
                         togglePriority(task);
                     }}
-                    className="flex-shrink-0 flex items-center justify-center p-2 -m-2 focus:outline-none"
+                    className="hidden lg:flex flex-shrink-0 items-center justify-center p-2 -m-2 focus:outline-none"
                     aria-label={task.is_prioritised ? 'Remove from priority' : 'Put on priority'}
                     aria-pressed={Boolean(task.is_prioritised)}
                 >
