@@ -2,11 +2,11 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
+import { countSublistTasks } from '@/lib/tree';
 
 /**
  * GET /api/sublists/[id]
- * Returns one sublist plus its task_count, so delete confirmations can warn
- * exactly how many tasks a cascade would remove.
+ * Returns the sublist plus a task_count that includes nested subtasks, not just root tasks.
  */
 export const GET = withApiErrorHandling(async function GET(request, { params }) {
     const unauthorized = await requireAuthResponse();
@@ -15,16 +15,24 @@ export const GET = withApiErrorHandling(async function GET(request, { params }) 
     const { id: sublistId } = await params;
     const supabase = await createClient();
 
-    const [{ data: sublist, error }, { count: taskCount }] = await Promise.all([
-        supabase.from('sublists').select('*').eq('id', sublistId).single(),
-        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('sublist_id', sublistId),
-    ]);
+    const { data: sublist, error } = await supabase.from('sublists').select('*').eq('id', sublistId).single();
 
     if (error) {
         return NextResponse.json({ error: 'Sublist not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ ...sublist, task_count: taskCount ?? 0 });
+    const { data: listTasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select('id, parent_id, sublist_id')
+        .eq('list_id', sublist.list_id);
+
+    if (tasksError) {
+        throw tasksError;
+    }
+
+    const taskCount = countSublistTasks(sublistId, listTasks);
+
+    return NextResponse.json({ ...sublist, task_count: taskCount });
 });
 
 /**
