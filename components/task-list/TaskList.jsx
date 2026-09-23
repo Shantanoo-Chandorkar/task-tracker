@@ -28,16 +28,8 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import ModalShell from '@/components/ui/modal-shell';
 import { flatToTree, findDescendantIds, isStartOfUnprioritisedTier } from '@/lib/tree';
 import { useUIState } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
@@ -841,22 +833,18 @@ export default function TaskList({
             />
 
             {/* Delete sublist confirmation */}
-            <AlertDialog
+            <ModalShell
                 open={!!deleteSublistTarget}
-                onOpenChange={(open) => !open && setDeleteSublistTarget(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Delete &ldquo;{deleteSublistTarget?.name}&rdquo;?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {deleteSublistTarget?.taskCount != null
-                                ? `This deletes ${deleteSublistTarget.taskCount} task${deleteSublistTarget.taskCount !== 1 ? 's' : ''} inside it. This cannot be undone.`
-                                : 'This cannot be undone.'}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
+                onClose={() => setDeleteSublistTarget(null)}
+                variant="alert"
+                title={<>Delete &ldquo;{deleteSublistTarget?.name}&rdquo;?</>}
+                description={
+                    deleteSublistTarget?.taskCount != null
+                        ? `This deletes ${deleteSublistTarget.taskCount} task${deleteSublistTarget.taskCount !== 1 ? 's' : ''} inside it. This cannot be undone.`
+                        : 'This cannot be undone.'
+                }
+                footer={
+                    <>
                         <AlertDialogCancel onClick={() => setDeleteSublistTarget(null)}>
                             Cancel
                         </AlertDialogCancel>
@@ -868,9 +856,9 @@ export default function TaskList({
                             {deletingSublist && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                    </>
+                }
+            />
         </DndContext>
     );
 }

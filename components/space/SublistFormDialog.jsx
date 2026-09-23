@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useColorNameForm } from '@/hooks/useColorNameForm';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
-import ResponsiveModal from '@/components/ui/responsive-modal';
+import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
@@ -34,6 +34,7 @@ const SUBLIST_NAME_MAX = 200;
  * @param {string} [props.listId] - The list this sublist belongs to; omit to show a list picker
  */
 export default function SublistFormDialog({ open, onClose, sublist = null, listId }) {
+    const formId = useId();
     const isGlobalMode = !listId && !sublist;
     const [selectedListId, setSelectedListId] = useState('');
     const targetListId = listId ?? selectedListId;
@@ -57,12 +58,28 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
         });
 
     return (
-        <ResponsiveModal
+        <ModalShell
             open={open}
             onClose={onClose}
             title={isEditing ? 'Edit Sublist' : 'New Sublist'}
+            footer={
+                <>
+                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form={formId}
+                        disabled={!name.trim() || !targetListId || submitting}
+                        className="gap-1.5"
+                    >
+                        {submitting && <Loader size="xs" />}
+                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create sublist'}
+                    </Button>
+                </>
+            }
         >
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
                 {isGlobalMode && (
                     <Select value={selectedListId} onValueChange={setSelectedListId}>
                         <SelectTrigger className="w-full" disabled={submitting}>
@@ -105,21 +122,7 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
                         />
                     </div>
                 </CharLimitField>
-
-                <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-                        Cancel
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={!name.trim() || !targetListId || submitting}
-                        className="gap-1.5"
-                    >
-                        {submitting && <Loader size="xs" />}
-                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create sublist'}
-                    </Button>
-                </div>
             </form>
-        </ResponsiveModal>
+        </ModalShell>
     );
 }

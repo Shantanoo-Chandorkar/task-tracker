@@ -1,7 +1,8 @@
 'use client';
 
+import { useId } from 'react';
 import { useColorNameForm } from '@/hooks/useColorNameForm';
-import ResponsiveModal from '@/components/ui/responsive-modal';
+import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
@@ -11,7 +12,7 @@ import { createStatus, updateStatus } from '@/actions/status-actions';
 const STATUS_NAME_MAX = 100;
 
 /**
- * Modal for creating or editing a Status, rendered through the shared ResponsiveModal container.
+ * Modal for creating or editing a Status, rendered through the shared ModalShell container.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open
@@ -20,6 +21,7 @@ const STATUS_NAME_MAX = 100;
  * @param {string} props.spaceId - Space this status belongs to (create mode only)
  */
 export default function StatusFormDialog({ open, onClose, status = null, spaceId }) {
+    const formId = useId();
     const { isEditing, name, setName, color, setColor, submitting, error, handleSubmit } =
         useColorNameForm({
             open,
@@ -33,12 +35,28 @@ export default function StatusFormDialog({ open, onClose, status = null, spaceId
         });
 
     return (
-        <ResponsiveModal
+        <ModalShell
             open={open}
             onClose={onClose}
             title={isEditing ? 'Edit Status' : 'New Status'}
+            footer={
+                <>
+                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form={formId}
+                        disabled={!name.trim() || submitting}
+                        className="gap-1.5"
+                    >
+                        {submitting && <Loader size="xs" />}
+                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create status'}
+                    </Button>
+                </>
+            }
         >
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
                 <CharLimitField
                     label="Status name"
                     currentLength={name.length}
@@ -64,17 +82,7 @@ export default function StatusFormDialog({ open, onClose, status = null, spaceId
                         />
                     </div>
                 </CharLimitField>
-
-                <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-                        Cancel
-                    </Button>
-                    <Button type="submit" disabled={!name.trim() || submitting} className="gap-1.5">
-                        {submitting && <Loader size="xs" />}
-                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create status'}
-                    </Button>
-                </div>
             </form>
-        </ResponsiveModal>
+        </ModalShell>
     );
 }

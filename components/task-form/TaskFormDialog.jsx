@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
-import ResponsiveModal from '@/components/ui/responsive-modal';
+import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CharLimitField from '@/components/ui/CharLimitField';
@@ -27,7 +27,7 @@ const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 10000;
 
 /**
- * Modal for creating or editing a task, via the shared ResponsiveModal container.
+ * Modal for creating or editing a task, via the shared ModalShell container.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open
@@ -47,6 +47,7 @@ export default function TaskFormDialog({
     defaultSublistId = null,
     listId = null,
 }) {
+    const formId = useId();
     const queryClient = useQueryClient();
     const isEditing = Boolean(task);
     const isRootCreate = !isEditing && !parentId;
@@ -132,8 +133,23 @@ export default function TaskFormDialog({
     }
 
     return (
-        <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit Task' : 'New Task'}>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2 min-w-0">
+        <ModalShell
+            open={open}
+            onClose={onClose}
+            title={isEditing ? 'Edit Task' : 'New Task'}
+            footer={
+                <>
+                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" form={formId} disabled={submitting} className="gap-1.5">
+                        {submitting && <Loader size="xs" />}
+                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create task'}
+                    </Button>
+                </>
+            }
+        >
+            <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2 min-w-0">
                 {/* Title */}
                 <CharLimitField
                     label="Task title"
@@ -242,18 +258,7 @@ export default function TaskFormDialog({
                 </div>
 
                 {formError && <p className="text-xs text-destructive">{formError}</p>}
-
-                {/* Submit */}
-                <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-                        Cancel
-                    </Button>
-                    <Button type="submit" disabled={submitting} className="gap-1.5">
-                        {submitting && <Loader size="xs" />}
-                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create task'}
-                    </Button>
-                </div>
             </form>
-        </ResponsiveModal>
+        </ModalShell>
     );
 }
