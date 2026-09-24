@@ -58,3 +58,4 @@ next-env.d.ts
 
 # private docs (resume notes, etc.) - never committed
 /docs/
+scripts/
