@@ -1,4 +1,5 @@
 import { Geist, Geist_Mono } from 'next/font/google';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Toaster } from 'sonner';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { UIStateProvider } from '@/providers/UIStateProvider';
@@ -25,9 +26,7 @@ export const viewport = {
     themeColor: '#171717',
 };
 
-// Runs before first paint so the `dark` class is correct immediately, instead of always
-// painting dark first and flipping after hydration. Mirrors ThemeToggle.jsx's `getSnapshot()` -
-// kept in sync manually, since this runs outside the module graph before any bundled code does.
+// Avoids a theme flash before hydration; kept in sync with ThemeToggle.jsx by hand (outside the module graph).
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
@@ -59,6 +58,7 @@ export default function RootLayout({ children }) {
                     <UIStateProvider>{children}</UIStateProvider>
                 </QueryProvider>
                 <Toaster richColors position="bottom-right" />
+                <SpeedInsights />
             </body>
         </html>
     );
