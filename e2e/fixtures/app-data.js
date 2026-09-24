@@ -288,6 +288,8 @@ export async function approveJoinRequestViaUi(page, spaceSectionLocator, request
 export async function gotoFreshAfterExternalChange(page, path) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
+    // networkidle doesn't track the SW's own background cache write - see docs/e2e-test-quality.md #7.
+    await page.waitForTimeout(1000);
     await page.reload();
 }
 
