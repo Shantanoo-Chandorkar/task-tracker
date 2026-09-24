@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
-import { findDescendantIds, deepCloneSubtree } from '@/lib/tree';
+import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
 import { getNextPosition } from '@/lib/position';
 import {
@@ -13,13 +13,13 @@ import {
     getTaskListTree,
 } from '@/lib/task-completion';
 import { getCurrentUser } from '@/lib/auth/session';
+import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED, TASK_INVALID_PRIORITY } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength, sanitizeRichText } from '@/lib/validation';
 import {
     resolveSpacePermission,
     getSpaceIdForList,
-    getSpaceIdForTask,
     blockCreateForPermission,
     blockWriteForPermission,
 } from '@/lib/permissions/space-permissions';
@@ -53,34 +53,31 @@ function snapshotMaxRelativeDepth(node) {
  * @param {object} [fields.recurrence_rule]
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function createTask(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const createTask = withAuthenticatedAction(
+    '[tasks] create',
+    'Unexpected error creating task',
+    async (user, supabase, fields) => {
+        const title = sanitizeString(fields.title, true);
+        const description = sanitizeRichText(fields.description);
 
-    const title = sanitizeString(fields.title, true);
-    const description = sanitizeRichText(fields.description);
+        if (!title) {
+            return { data: null, error: 'Title is required' };
+        }
 
-    if (!title) {
-        return { data: null, error: 'Title is required' };
-    }
+        const titleError = checkMaxLength(title, 200, 'Title');
+        if (titleError) return { data: null, error: titleError.error };
 
-    const titleError = checkMaxLength(title, 200, 'Title');
-    if (titleError) return { data: null, error: titleError.error };
+        if (description) {
+            const descriptionError = checkMaxLength(description, 10000, 'Description');
+            if (descriptionError) return { data: null, error: descriptionError.error };
+        }
 
-    if (description) {
-        const descriptionError = checkMaxLength(description, 10000, 'Description');
-        if (descriptionError) return { data: null, error: descriptionError.error };
-    }
-
-    if (!fields.list_id) {
-        return { data: null, error: 'A list is required' };
-    }
-    if (fields.sublist_id && fields.parent_id) {
-        return { data: null, error: "A subtask can't belong to a sublist directly" };
-    }
-
-    try {
-        const supabase = await createClient();
+        if (!fields.list_id) {
+            return { data: null, error: 'A list is required' };
+        }
+        if (fields.sublist_id && fields.parent_id) {
+            return { data: null, error: "A subtask can't belong to a sublist directly" };
+        }
 
         const spaceId = await getSpaceIdForList(supabase, fields.list_id);
         const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
@@ -164,11 +161,8 @@ export async function createTask(fields) {
         }
 
         return { data: createdTask, error: null };
-    } catch (thrown) {
-        console.error('[tasks] create threw', { listId: fields.list_id, detail: thrown?.message });
-        return { data: null, error: 'Unexpected error creating task' };
-    }
-}
+    },
+);
 
 /**
  * Updates specific fields on an existing task.
@@ -177,14 +171,11 @@ export async function createTask(fields) {
  * @param {object} fields - Partial task fields to update
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function updateTask(taskId, fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!taskId) return { data: null, error: 'Task ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const updateTask = withAuthenticatedAction(
+    '[tasks] update',
+    'Unexpected error updating task',
+    async (user, supabase, taskId, fields) => {
+        if (!taskId) return { data: null, error: 'Task ID is required' };
 
         const { data: existingTask } = await supabase
             .from('tasks')
@@ -311,11 +302,8 @@ export async function updateTask(taskId, fields) {
         }
 
         return { data: updatedTask, error: null };
-    } catch (thrown) {
-        console.error('[tasks] update threw', { taskId, detail: thrown?.message });
-        return { data: null, error: 'Unexpected error updating task' };
-    }
-}
+    },
+);
 
 /**
  * Marks a task and all its descendants (any depth) as done in one update. Used when
@@ -325,14 +313,11 @@ export async function updateTask(taskId, fields) {
  * @param {string} taskId - Root task to complete along with its descendants
  * @returns {{ error: string|null }}
  */
-export async function completeTaskAndDescendants(taskId) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!taskId) return { error: 'Task ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const completeTaskAndDescendants = withAuthenticatedAction(
+    '[tasks] complete-cascade',
+    'Unexpected error completing tasks',
+    async (user, supabase, taskId) => {
+        if (!taskId) return { error: 'Task ID is required' };
 
         const { task, listTasks } = await getTaskListTree(supabase, taskId);
         if (!task) return { error: 'Task not found' };
@@ -370,11 +355,9 @@ export async function completeTaskAndDescendants(taskId) {
             return { error: null, completedCount, totalCount: idsToComplete.length };
         }
         return { error: null };
-    } catch (thrown) {
-        console.error('[tasks] complete-cascade threw', { taskId, detail: thrown?.message });
-        return { error: 'Unexpected error completing tasks' };
-    }
-}
+    },
+    { hasData: false },
+);
 
 /**
  * Marks a task and all its descendants as the default (not-done) status in one update.
@@ -383,14 +366,11 @@ export async function completeTaskAndDescendants(taskId) {
  * @param {string} taskId - Root task to uncomplete along with its descendants
  * @returns {{ error: string|null }}
  */
-export async function uncompleteTaskAndDescendants(taskId) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!taskId) return { error: 'Task ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const uncompleteTaskAndDescendants = withAuthenticatedAction(
+    '[tasks] uncomplete-cascade',
+    'Unexpected error uncompleting tasks',
+    async (user, supabase, taskId) => {
+        if (!taskId) return { error: 'Task ID is required' };
 
         const { task, listTasks } = await getTaskListTree(supabase, taskId);
         if (!task) return { error: 'Task not found' };
@@ -432,11 +412,9 @@ export async function uncompleteTaskAndDescendants(taskId) {
             };
         }
         return { error: null };
-    } catch (thrown) {
-        console.error('[tasks] uncomplete-cascade threw', { taskId, detail: thrown?.message });
-        return { error: 'Unexpected error uncompleting tasks' };
-    }
-}
+    },
+    { hasData: false },
+);
 
 /**
  * Deletes a task by ID. Cascades to children via the database ON DELETE CASCADE constraint.
@@ -444,14 +422,11 @@ export async function uncompleteTaskAndDescendants(taskId) {
  * @param {string} id - Task ID to delete
  * @returns {{ error: string|null }}
  */
-export async function deleteTask(id) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!id) return { error: 'Task ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const deleteTask = withAuthenticatedAction(
+    '[tasks] delete',
+    'Unexpected error deleting task',
+    async (user, supabase, id) => {
+        if (!id) return { error: 'Task ID is required' };
 
         const { data: existingTask } = await supabase
             .from('tasks')
@@ -482,11 +457,9 @@ export async function deleteTask(id) {
         }
 
         return { error: null };
-    } catch (thrown) {
-        console.error('[tasks] delete threw', { id, detail: thrown?.message });
-        return { error: 'Unexpected error deleting task' };
-    }
-}
+    },
+    { hasData: false },
+);
 
 /**
  * Deletes a task and re-parents its direct children to the deleted task's parent.
@@ -498,14 +471,11 @@ export async function deleteTask(id) {
  * @param {string} taskId - ID of the task to delete
  * @returns {{ error: string|null }}
  */
-export async function deleteTaskAndReparentChildren(taskId) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!taskId) return { error: 'Task ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const deleteTaskAndReparentChildren = withAuthenticatedAction(
+    '[tasks] reparent-delete',
+    'Unexpected error during reparent-delete',
+    async (user, supabase, taskId) => {
+        if (!taskId) return { error: 'Task ID is required' };
 
         const { data: task, error: taskError } = await supabase
             .from('tasks')
@@ -605,16 +575,16 @@ export async function deleteTaskAndReparentChildren(taskId) {
         if (deleteError || !deletedTask) return { error: 'Task not found' };
 
         return { error: null };
-    } catch (thrown) {
-        console.error('[tasks] reparent-delete threw', { taskId, detail: thrown?.message });
-        return { error: 'Unexpected error during reparent-delete' };
-    }
-}
+    },
+    { hasData: false },
+);
 
 /**
  * Duplicates a task and its whole subtree, inserting the copy as the next
  * sibling right after the original. Generates new UUIDs for every node so
  * the duplicate is fully independent. Appends ' (copy)' to the root title.
+ *
+ * Not built on withAuthenticatedAction - its catch also runs toGuestLimitResult on the thrown error.
  *
  * @param {string} taskId - Task to duplicate
  * @returns {{ error: string|null }}
@@ -770,4 +740,248 @@ async function insertSnapshotNode(
     for (const child of children) {
         await insertSnapshotNode(supabase, child, newId, false, listId, createdBy);
     }
+}
+
+/**
+ * Moves a task to a new parent, list, and/or sibling position, recomputing depth for it and every descendant.
+ *
+ * @param {string} taskId - Task to move
+ * @param {object} fields
+ * @param {string|null} [fields.newParentId] - New parent task, or null/omitted to move to root
+ * @param {string|null} [fields.afterSiblingId] - Sibling to insert after, or null to append
+ * @param {boolean} [fields.shouldPrependToStart] - Insert as the first sibling instead
+ * @param {string} [fields.listId] - Target list, defaults to the task's current list
+ * @param {string|null} [fields.sublistId] - Target sublist for a root-level move
+ * @returns {{ data: object|null, error: string|null, code?: string }}
+ */
+export const moveTask = withAuthenticatedAction(
+    '[tasks] move',
+    'Unexpected error moving task',
+    async (user, supabase, taskId, fields) => {
+        const { newParentId, afterSiblingId, shouldPrependToStart, listId, sublistId } = fields;
+
+        const { data: task, error: taskError } = await supabase
+            .from('tasks')
+            .select('*, lists(space_id)')
+            .eq('id', taskId)
+            .single();
+
+        if (taskError || !task) return { data: null, error: 'Task not found' };
+
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            task.lists?.space_id,
+            user.id,
+        );
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: task.created_by === user.id,
+        });
+        if (permissionBlock) return { data: null, ...permissionBlock };
+
+        // Defense in depth - a self/descendant reparent creates a cycle that hangs every tree walker.
+        if (newParentId === taskId) {
+            return { data: null, error: 'A task cannot be its own parent' };
+        }
+        if (newParentId) {
+            const { data: allTasksInList } = await supabase
+                .from('tasks')
+                .select('id, parent_id')
+                .eq('list_id', task.list_id);
+            const descendantIds = findDescendantIds(taskId, allTasksInList || []);
+            if (descendantIds.has(newParentId)) {
+                return { data: null, error: 'Cannot move a task into its own descendant' };
+            }
+        }
+
+        const targetListId = listId ?? task.list_id;
+        const listChanged = targetListId !== task.list_id;
+
+        if (sublistId && newParentId) {
+            return { data: null, error: "A subtask can't belong to a sublist directly" };
+        }
+
+        let newDepth = 0;
+        if (newParentId) {
+            const { data: newParent } = await supabase
+                .from('tasks')
+                .select('depth')
+                .eq('id', newParentId)
+                .single();
+            if (newParent) newDepth = newParent.depth + 1;
+        }
+
+        const depthDelta = newDepth - task.depth;
+
+        // Cap applies to the deepest descendant too - reparenting carries the whole subtree's shape.
+        // MAX_DEPTH_CONSTANT
+        const nestingMode = await getNestingMode();
+        if (nestingMode === 'finite' && depthDelta > 0) {
+            const { data: allTasksForDepthCheck } = await supabase
+                .from('tasks')
+                .select('id, parent_id, depth')
+                .eq('list_id', task.list_id);
+            const descendantIds = findDescendantIds(taskId, allTasksForDepthCheck || []);
+            const descendantDepths = [...descendantIds].map(
+                (descendantId) =>
+                    allTasksForDepthCheck.find((listTask) => listTask.id === descendantId)?.depth ??
+                    task.depth,
+            );
+            const maxCurrentDepth = Math.max(task.depth, ...descendantDepths);
+            if (maxCurrentDepth + depthDelta > FINITE_MAX_DEPTH) {
+                return { data: null, error: 'Move would exceed maximum nesting depth' };
+            }
+        }
+
+        if (depthDelta !== 0 || listChanged) {
+            await updateDescendants(
+                supabase,
+                taskId,
+                depthDelta,
+                task.list_id,
+                listChanged ? targetListId : null,
+            );
+        }
+
+        // Root sublist target: explicit sublistId, else the promoted task's original root ancestor's sublist.
+        let resolvedSublistId = null;
+        if (!newParentId) {
+            if (sublistId !== undefined) {
+                resolvedSublistId = sublistId ?? null;
+            } else if (task.parent_id) {
+                const { data: allTasksInList } = await supabase
+                    .from('tasks')
+                    .select('id, parent_id, sublist_id')
+                    .eq('list_id', task.list_id);
+                const ancestors = findAncestors(taskId, allTasksInList || []);
+                const rootAncestor = ancestors[ancestors.length - 1];
+                resolvedSublistId = rootAncestor?.sublist_id ?? null;
+            } else {
+                resolvedSublistId = task.sublist_id ?? null;
+            }
+
+            if (resolvedSublistId) {
+                const { data: sublist } = await supabase
+                    .from('sublists')
+                    .select('list_id')
+                    .eq('id', resolvedSublistId)
+                    .single();
+                if (!sublist || sublist.list_id !== targetListId) {
+                    return { data: null, error: 'Sublist does not belong to this list' };
+                }
+            }
+        }
+
+        let siblingsQuery;
+        if (newParentId) {
+            siblingsQuery = supabase
+                .from('tasks')
+                .select('id, position')
+                .eq('parent_id', newParentId)
+                .neq('id', taskId)
+                .order('position', { ascending: true });
+        } else {
+            siblingsQuery = supabase
+                .from('tasks')
+                .select('id, position')
+                .eq('list_id', targetListId)
+                .is('parent_id', null)
+                .neq('id', taskId)
+                .order('position', { ascending: true });
+            siblingsQuery = resolvedSublistId
+                ? siblingsQuery.eq('sublist_id', resolvedSublistId)
+                : siblingsQuery.is('sublist_id', null);
+        }
+
+        const { data: siblings } = await siblingsQuery;
+        const newPosition = computeNewPosition(
+            siblings || [],
+            afterSiblingId,
+            shouldPrependToStart,
+        );
+
+        const { data: updatedTask, error } = await supabase
+            .from('tasks')
+            .update({
+                parent_id: newParentId ?? null,
+                sublist_id: newParentId ? null : resolvedSublistId,
+                depth: newDepth,
+                position: newPosition,
+                list_id: targetListId,
+            })
+            .eq('id', taskId)
+            .select()
+            .single();
+
+        if (error) {
+            return { data: null, error: 'Failed to move task' };
+        }
+
+        return { data: updatedTask, error: null };
+    },
+);
+
+/**
+ * Cascades a depth delta (and list_id, if changing) to every descendant of a moved task.
+ *
+ * @param {object} supabase - Supabase client
+ * @param {string} taskId - Root of the subtree whose descendants need updating
+ * @param {number} depthDelta - Amount to add to each descendant's current depth
+ * @param {string} currentListId - List the subtree currently lives in, before the move
+ * @param {string|null} newListId - List to move descendants into, or null if the list isn't changing
+ */
+async function updateDescendants(supabase, taskId, depthDelta, currentListId, newListId) {
+    const { data: allTasks } = await supabase
+        .from('tasks')
+        .select('id, parent_id, depth')
+        .eq('list_id', currentListId);
+    if (!allTasks) return;
+
+    const descendants = [];
+    const queue = [taskId];
+
+    while (queue.length > 0) {
+        const currentId = queue.shift();
+        const children = allTasks.filter((task) => task.parent_id === currentId);
+        for (const child of children) {
+            descendants.push(child);
+            queue.push(child.id);
+        }
+    }
+
+    // For v1 with typically shallow trees, individual updates are acceptable
+    for (const descendant of descendants) {
+        const updates = { depth: descendant.depth + depthDelta };
+        if (newListId) updates.list_id = newListId;
+        await supabase.from('tasks').update(updates).eq('id', descendant.id);
+    }
+}
+
+/**
+ * Computes the new position for a task inserted among the given siblings, using fractional indexing.
+ *
+ * @param {{ id: string, position: number }[]} siblings - Sorted sibling list (excluding the moving task)
+ * @param {string|null} afterSiblingId - ID of the sibling to insert after, or null to append at the end
+ * @param {boolean} [shouldPrependToStart] - If true, insert as the new first sibling instead (overrides afterSiblingId)
+ * @returns {number} New position value
+ */
+function computeNewPosition(siblings, afterSiblingId, shouldPrependToStart) {
+    if (shouldPrependToStart) {
+        const firstSibling = siblings[0];
+        return getPositionBetween(null, firstSibling?.position ?? null);
+    }
+
+    if (!afterSiblingId) {
+        const lastSibling = siblings[siblings.length - 1];
+        return getPositionBetween(lastSibling?.position ?? null, null);
+    }
+
+    const afterSiblingIndex = siblings.findIndex((sibling) => sibling.id === afterSiblingId);
+    if (afterSiblingIndex === -1) {
+        const lastSibling = siblings[siblings.length - 1];
+        return getPositionBetween(lastSibling?.position ?? null, null);
+    }
+
+    const beforePosition = siblings[afterSiblingIndex].position;
+    const afterPosition = siblings[afterSiblingIndex + 1]?.position ?? null;
+    return getPositionBetween(beforePosition, afterPosition);
 }

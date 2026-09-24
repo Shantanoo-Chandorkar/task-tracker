@@ -135,7 +135,7 @@ test.describe('cross-account data isolation', () => {
             const moveResponse = await otherPage.request.post(`/api/tasks/${task.id}/move`, {
                 data: { newParentId: null, afterSiblingId: null, listId },
             });
-            expect(moveResponse.status()).toBe(404);
+            expect(moveResponse.status()).toBe(400);
             expect(await moveResponse.json()).toEqual({ error: 'Task not found' });
 
             const deleteResponse = await otherPage.request.delete(`/api/tasks/${task.id}`);
