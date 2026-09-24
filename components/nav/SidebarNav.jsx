@@ -14,17 +14,20 @@ import LogoutButton from '@/components/nav/LogoutButton';
  *
  * @param {object} props
  * @param {Function} [props.onNavigate] - Called after a link is clicked (used to close the mobile drawer)
+ * @param {object[]} [props.initialSpaces] - SSR-fetched spaces, so the LISTS section never hydration-mismatches
+ * @param {object[]} [props.initialLists] - SSR-fetched lists, so the LISTS section never hydration-mismatches
+ * @param {object|null} [props.initialProfile] - SSR-fetched profile, so the footer name never hydration-mismatches
  */
-export default function SidebarNav({ onNavigate }) {
+export default function SidebarNav({ onNavigate, initialSpaces, initialLists, initialProfile }) {
     const params = useParams();
     const pathname = usePathname();
     const currentListId = params?.listId;
     const isHomeActive = pathname === '/';
     const isSpacesActive = pathname.startsWith('/spaces');
 
-    const { data: spaces = [] } = useSpacesQuery();
-    const { data: lists = [] } = useListsQuery();
-    const { data: profile } = useCurrentUserProfileQuery();
+    const { data: spaces = [] } = useSpacesQuery({ initialData: initialSpaces });
+    const { data: lists = [] } = useListsQuery({ initialData: initialLists });
+    const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
 
     const displayName = profile?.is_guest ? 'Guest' : profile?.display_name || profile?.email || 'User';
     const initials = displayName
@@ -131,7 +134,7 @@ export default function SidebarNav({ onNavigate }) {
                     </div>
                     <div className="flex flex-shrink-0 items-center gap-1">
                         <ThemeToggle />
-                        <LogoutButton onNavigate={onNavigate} />
+                        <LogoutButton onNavigate={onNavigate} initialProfile={initialProfile} />
                     </div>
                 </div>
             </div>

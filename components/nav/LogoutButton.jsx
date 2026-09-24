@@ -16,12 +16,13 @@ import { clearAllCaches } from '@/lib/cache';
  *
  * @param {object} props
  * @param {Function} [props.onNavigate] - Called after sign-out (used to close the mobile drawer)
+ * @param {object|null} [props.initialProfile] - SSR-fetched profile, so the aria-label never hydration-mismatches
  */
-export default function LogoutButton({ onNavigate }) {
+export default function LogoutButton({ onNavigate, initialProfile }) {
     const router = useRouter();
     const queryClient = useQueryClient();
     const [isPending, setIsPending] = useState(false);
-    const { data: profile } = useCurrentUserProfileQuery();
+    const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
     const logoutLabel = profile?.is_guest ? 'End guest session' : 'Log out';
 
     async function handleLogout() {

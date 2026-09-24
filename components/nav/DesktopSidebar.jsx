@@ -8,8 +8,13 @@ import { openSearch } from './GlobalSearch';
 /**
  * Persistent left sidebar shown at `lg` (1024px) and above - app name header,
  * search trigger, and the shared SidebarNav content.
+ *
+ * @param {object} props
+ * @param {object[]} props.initialSpaces - SSR-fetched spaces, forwarded to SidebarNav
+ * @param {object[]} props.initialLists - SSR-fetched lists, forwarded to SidebarNav
+ * @param {object|null} props.initialProfile - SSR-fetched profile, forwarded to SidebarNav
  */
-export default function DesktopSidebar() {
+export default function DesktopSidebar({ initialSpaces, initialLists, initialProfile }) {
     return (
         <aside className="hidden lg:flex sticky top-0 h-screen w-[20%] flex-shrink-0 flex-col border-r border-border bg-sidebar p-3">
             <Link
@@ -28,7 +33,11 @@ export default function DesktopSidebar() {
                 </span>
                 <kbd className="rounded border border-border bg-muted px-1 text-[10px]">⌘K</kbd>
             </button>
-            <SidebarNav />
+            <SidebarNav
+                initialSpaces={initialSpaces}
+                initialLists={initialLists}
+                initialProfile={initialProfile}
+            />
         </aside>
     );
 }
