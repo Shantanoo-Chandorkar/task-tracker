@@ -39,6 +39,7 @@ export default async function TaskDetailPage({ params }) {
                 taskId={taskId}
                 initialTasks={normalizedTasks}
                 initialStatuses={statuses || []}
+                initialLists={list ? [{ id: listId, space_id: list.space_id }] : []}
             />
         </div>
     );

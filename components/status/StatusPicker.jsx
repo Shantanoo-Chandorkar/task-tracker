@@ -30,7 +30,7 @@ export default function StatusPicker({ task, flatList }) {
     const queryClient = useQueryClient();
     const [pending, setPending] = useState(false);
     const spaceId = useSpaceIdForList(task.list_id);
-    const { data: statuses = [] } = useStatusesQuery(spaceId);
+    const { data: statuses = [], isLoading: isStatusesLoading } = useStatusesQuery(spaceId);
     const { doneStatus, defaultStatus, setComplete, confirmState, closeConfirm, confirmCascade } =
         useTaskCompletion(task.list_id);
 
@@ -73,13 +73,15 @@ export default function StatusPicker({ task, flatList }) {
     }
 
     const currentStatus = statuses.find((status) => status.id === task.status_id);
+    // Separates "not resolved yet" from "confirmed no status" to avoid an SSR hydration flash.
+    const isResolvingStatus = !spaceId || isStatusesLoading;
 
     return (
         <>
             <Select value={task.status_id ?? ''} onValueChange={handleChange} disabled={pending}>
                 <SelectTrigger className="h-auto border-0 bg-transparent p-0 focus:ring-0 shadow-none w-auto min-w-0 [&>svg]:hidden">
                     <SelectValue>
-                        {pending ? (
+                        {pending || isResolvingStatus ? (
                             <Loader size="xs" className="text-muted-foreground" />
                         ) : currentStatus ? (
                             <StatusBadge name={currentStatus.name} color={currentStatus.color} />

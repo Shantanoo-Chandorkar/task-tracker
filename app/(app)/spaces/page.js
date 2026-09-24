@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth/session';
+import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
+import { getCurrentUserProfile } from '@/lib/profile';
 import SpaceListManager from '@/components/space/SpaceListManager';
 
 /**
@@ -16,6 +18,10 @@ export default async function SpacesPage() {
         supabase.from('lists').select('*').order('position', { ascending: true }),
     ]);
 
+    const spacesWithPermission = await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null);
+    // Matches /api/profile's computation, so the client refetch never hydration-mismatches this field.
+    const initialProfile = user ? await getCurrentUserProfile(supabase, user) : null;
+
     return (
         <div className="px-4 md:px-8 py-8">
             <div className="mb-8">
@@ -26,9 +32,10 @@ export default async function SpacesPage() {
             </div>
 
             <SpaceListManager
-                initialSpaces={spaces || []}
+                initialSpaces={spacesWithPermission}
                 initialLists={lists || []}
                 currentUserId={user?.id ?? null}
+                initialProfile={initialProfile}
             />
         </div>
     );

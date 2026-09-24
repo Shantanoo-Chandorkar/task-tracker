@@ -98,6 +98,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
                 size="icon"
                 className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
                 onClick={() => onEditRequest(list)}
+                aria-label="Edit list"
             >
                 <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -106,6 +107,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
                 size="icon"
                 className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
                 onClick={() => onDeleteRequest(list)}
+                aria-label="Delete list"
             >
                 <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -123,6 +125,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
  * @param {object} props.space - Space to display
  * @param {object[]} props.lists - Lists belonging to this space
  * @param {boolean} props.isOwner - Whether the current user owns this space
+ * @param {object|null} [props.initialProfile] - SSR-fetched profile, so canShareSpace never hydration-mismatches
  * @param {Function} props.onEditSpaceRequest - Called with the space to open it for editing
  * @param {Function} props.onDeleteSpaceRequest - Called with the space to ask for delete confirmation
  * @param {Function} props.onAddListRequest - Called with the space id to open list creation for it
@@ -134,6 +137,7 @@ function SpaceSection({
     space,
     lists,
     isOwner,
+    initialProfile,
     onEditSpaceRequest,
     onDeleteSpaceRequest,
     onAddListRequest,
@@ -143,7 +147,7 @@ function SpaceSection({
 }) {
     const [statusesOpen, setStatusesOpen] = useState(false);
     const [sharingOpen, setSharingOpen] = useState(false);
-    const { data: profile } = useCurrentUserProfileQuery();
+    const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
     // Guests cannot share; the button stays hidden until the profile confirms a registered user
     const canShareSpace = isOwner && profile?.is_guest === false;
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -190,6 +194,7 @@ function SpaceSection({
                             size="icon"
                             className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
                             onClick={() => onEditSpaceRequest(space)}
+                            aria-label="Edit space"
                         >
                             <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -198,6 +203,7 @@ function SpaceSection({
                             size="icon"
                             className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
                             onClick={() => onDeleteSpaceRequest(space)}
+                            aria-label="Delete space"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -291,10 +297,11 @@ function SpaceSection({
  * @param {object[]} props.initialSpaces - SSR-fetched spaces for initial hydration
  * @param {object[]} props.initialLists - SSR-fetched lists (all spaces) for initial hydration
  * @param {string} props.currentUserId - Signed-in user's ID, to tell owned spaces from shared ones
+ * @param {object|null} [props.initialProfile] - SSR-fetched profile, so canJoinSpaces never hydration-mismatches
  */
-export default function SpaceListManager({ initialSpaces, initialLists, currentUserId }) {
+export default function SpaceListManager({ initialSpaces, initialLists, currentUserId, initialProfile }) {
     const queryClient = useQueryClient();
-    const { data: profile } = useCurrentUserProfileQuery();
+    const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
     const canJoinSpaces = profile?.is_guest === false;
     const [spaceDialog, setSpaceDialog] = useState({ open: false, space: null });
     const [listDialog, setListDialog] = useState({ open: false, list: null, defaultSpaceId: null });
@@ -505,6 +512,7 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
                                 key={space.id}
                                 space={space}
                                 isOwner
+                                initialProfile={initialProfile}
                                 lists={lists.filter((list) => list.space_id === space.id)}
                                 onEditSpaceRequest={(space) =>
                                     setSpaceDialog({ open: true, space })
@@ -538,6 +546,7 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
                                     key={space.id}
                                     space={space}
                                     isOwner={false}
+                                    initialProfile={initialProfile}
                                     lists={lists.filter((list) => list.space_id === space.id)}
                                     onAddListRequest={(spaceId) =>
                                         setListDialog({

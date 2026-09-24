@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/session';
 import TaskList from '@/components/task-list/TaskList';
 import { attachTaskCounts } from '@/lib/list-task-counts';
+import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
 
 /**
  * List task-tree page (Server Component) - fetches everything server-side for zero-waterfall hydration.
@@ -9,6 +11,7 @@ import { attachTaskCounts } from '@/lib/list-task-counts';
 export default async function ListPage({ params }) {
     const { listId } = await params;
     const supabase = await createClient();
+    const user = await getCurrentUser();
 
     const [
         { data: list },
@@ -58,6 +61,8 @@ export default async function ListPage({ params }) {
 
     // Matches /api/lists' computation, so the client refetch never hydration-mismatches this field.
     const listsWithCounts = await attachTaskCounts(supabase, lists || []);
+    // Matches /api/spaces' computation, so the client refetch never hydration-mismatches this field.
+    const spacesWithPermission = await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null);
 
     return (
         <div className="px-4 md:px-8 py-6">
@@ -65,9 +70,10 @@ export default async function ListPage({ params }) {
                 listId={listId}
                 initialTasks={normalizedTasks}
                 initialStatuses={statuses || []}
-                initialSpaces={spaces || []}
+                initialSpaces={spacesWithPermission}
                 initialLists={listsWithCounts}
                 initialSublists={sublists || []}
+                currentUserId={user?.id ?? null}
             />
         </div>
     );

@@ -160,11 +160,15 @@ function RichTextToolbar({ editor }) {
  */
 export default function RichTextEditor({ value, onChange, maxLength = 10000, placeholder = '' }) {
     const editor = useEditor({
+        // Already the default here ('use client') - set explicitly only to silence the console warning.
+        immediatelyRender: false,
         extensions: [
             StarterKit.configure({
                 // Headings and code blocks are out of scope for task descriptions
                 heading: false,
                 codeBlock: false,
+                // StarterKit bundles its own Link under the same name since tiptap v3 - disabled to avoid the clash.
+                link: false,
             }),
             Link.configure({
                 openOnClick: false,

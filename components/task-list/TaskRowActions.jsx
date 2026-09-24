@@ -47,6 +47,8 @@ import { bustPageCache } from '@/lib/service-worker-cache';
  * @param {boolean} [props.canAddSubtask] - Whether depth allows a subtask; default true
  * @param {string} props.listId - The list this task belongs to
  * @param {Function} [props.onDeleted] - Called after delete, so a task's own detail page can navigate away
+ * @param {string|null} [props.currentUserId] - Caller's user id, for row-level ownership checks
+ * @param {'owner'|'full'|'restricted'|'read_only'|null} [props.myPermission] - Caller's tier for this space
  */
 export default function TaskRowActions({
     task,
@@ -55,6 +57,8 @@ export default function TaskRowActions({
     canAddSubtask = true,
     listId,
     onDeleted,
+    currentUserId,
+    myPermission,
 }) {
     const queryClient = useQueryClient();
     const [editOpen, setEditOpen] = useState(false);
@@ -62,6 +66,10 @@ export default function TaskRowActions({
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const isRootTask = !task.parent_id;
+
+    // UX hints only - RLS and the app-layer pre-checks are the real backstop if a control is missed.
+    const canCreate = myPermission !== 'read_only';
+    const canEditRow = canCreate && (myPermission !== 'restricted' || task.created_by === currentUserId);
 
     const { data: sublists = [] } = useSublistsQuery(listId);
 
@@ -147,10 +155,18 @@ export default function TaskRowActions({
         setDeleteOpen(false);
         setPending(true);
         const toastId = toast.loading('Deleting task...');
-        const { error } =
-            strategy === 'reparent'
-                ? await deleteTaskAndReparentChildren(task.id)
-                : await deleteTask(task.id);
+
+        let error;
+        try {
+            ({ error } =
+                strategy === 'reparent'
+                    ? await deleteTaskAndReparentChildren(task.id)
+                    : await deleteTask(task.id));
+        } catch {
+            setPending(false);
+            toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+            return;
+        }
         setPending(false);
 
         if (error) {
@@ -177,11 +193,19 @@ export default function TaskRowActions({
     async function performMove(body, successMessage) {
         setPending(true);
         const toastId = toast.loading('Moving task...');
-        const response = await fetch(`/api/tasks/${task.id}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
+
+        let response;
+        try {
+            response = await fetch(`/api/tasks/${task.id}/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+        } catch {
+            setPending(false);
+            toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+            return;
+        }
         const moveResponseBody = await response.json().catch(() => null);
         setPending(false);
 
@@ -225,7 +249,15 @@ export default function TaskRowActions({
     async function handleDuplicate() {
         setPending(true);
         const toastId = toast.loading('Duplicating task...');
-        const { error } = await duplicateTask(task.id);
+
+        let error;
+        try {
+            ({ error } = await duplicateTask(task.id));
+        } catch {
+            setPending(false);
+            toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+            return;
+        }
         setPending(false);
 
         if (error) {
@@ -262,37 +294,61 @@ export default function TaskRowActions({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-40">
-                        <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => setEditOpen(true)}
+                            disabled={!canEditRow}
+                            className={!canEditRow ? 'opacity-40' : ''}
+                        >
+                            Edit
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={handleToggleComplete}
-                            disabled={!doneStatus || !defaultStatus}
-                            className={!doneStatus || !defaultStatus ? 'opacity-40' : ''}
+                            disabled={!doneStatus || !defaultStatus || !canEditRow}
+                            className={!doneStatus || !defaultStatus || !canEditRow ? 'opacity-40' : ''}
                         >
                             {taskIsDone ? 'Mark as incomplete' : 'Mark as complete'}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => togglePriority(task)}>
+                        <DropdownMenuItem
+                            onClick={() => togglePriority(task)}
+                            disabled={!canEditRow}
+                            className={!canEditRow ? 'opacity-40' : ''}
+                        >
                             {task.is_prioritised ? 'Remove from priority' : 'Put on priority'}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={onAddSubtask}
-                            disabled={!canAddSubtask}
-                            className={!canAddSubtask ? 'opacity-40' : ''}
+                            disabled={!canAddSubtask || !canCreate}
+                            className={!canAddSubtask || !canCreate ? 'opacity-40' : ''}
                         >
                             Add Subtask
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={handleDuplicate}>Duplicate</DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={handleDuplicate}
+                            disabled={!canCreate}
+                            className={!canCreate ? 'opacity-40' : ''}
+                        >
+                            Duplicate
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
 
                         {/* Promote - only for non-root tasks */}
                         {canPromote && (
-                            <DropdownMenuItem onClick={handlePromote}>
+                            <DropdownMenuItem
+                                onClick={handlePromote}
+                                disabled={!canEditRow}
+                                className={!canEditRow ? 'opacity-40' : ''}
+                            >
                                 Promote to sibling
                             </DropdownMenuItem>
                         )}
 
                         {moveDestinations.length > 0 && (
-                            <DropdownMenuItem onClick={() => setMoveSheetOpen(true)}>
+                            <DropdownMenuItem
+                                onClick={() => setMoveSheetOpen(true)}
+                                disabled={!canEditRow}
+                                className={!canEditRow ? 'opacity-40' : ''}
+                            >
                                 Move to...
                             </DropdownMenuItem>
                         )}
@@ -300,7 +356,10 @@ export default function TaskRowActions({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             onClick={() => setDeleteOpen(true)}
-                            className="text-destructive focus:text-destructive"
+                            disabled={!canEditRow}
+                            className={
+                                canEditRow ? 'text-destructive focus:text-destructive' : 'opacity-40'
+                            }
                         >
                             Delete
                         </DropdownMenuItem>

@@ -56,17 +56,34 @@ export function useTaskCompletion(listId) {
     const runCascade = useCallback(
         async (taskId, listId, isComplete) => {
             const toastId = toast.loading(isComplete ? 'Marking complete...' : 'Marking incomplete...');
-            const { error } = isComplete
-                ? await completeTaskAndDescendants(taskId)
-                : await uncompleteTaskAndDescendants(taskId);
 
-            if (error) {
-                toast.error(error, { id: toastId });
+            let result;
+            try {
+                result = isComplete
+                    ? await completeTaskAndDescendants(taskId)
+                    : await uncompleteTaskAndDescendants(taskId);
+            } catch {
+                toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+                return;
+            }
+
+            if (result.error) {
+                toast.error(result.error, { id: toastId });
                 return;
             }
 
             await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
             bustPageCache({ urls: [`/lists/${listId}`] });
+
+            // RLS silently skips descendants the caller doesn't own, so surface the real count.
+            if (result.completedCount !== undefined && result.completedCount < result.totalCount) {
+                toast.info(
+                    `${isComplete ? 'Completed' : 'Reopened'} ${result.completedCount} of ${result.totalCount} tasks - you can only update tasks you created`,
+                    { id: toastId },
+                );
+                return;
+            }
+
             toast.dismiss(toastId);
         },
         [queryClient],
@@ -87,7 +104,14 @@ export function useTaskCompletion(listId) {
 
             const targetStatus = isComplete ? doneStatus : defaultStatus;
             const toastId = toast.loading(isComplete ? 'Marking complete...' : 'Marking incomplete...');
-            const { error } = await updateTask(task.id, { status_id: targetStatus.id });
+
+            let error;
+            try {
+                ({ error } = await updateTask(task.id, { status_id: targetStatus.id }));
+            } catch {
+                toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+                return;
+            }
 
             if (error) {
                 toast.error(error, { id: toastId });

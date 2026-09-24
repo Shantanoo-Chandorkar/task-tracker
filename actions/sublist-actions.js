@@ -7,6 +7,12 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
+import {
+    resolveSpacePermission,
+    getSpaceIdForList,
+    blockCreateForPermission,
+    blockWriteForPermission,
+} from '@/lib/permissions/space-permissions';
 
 /**
  * Creates a new sublist under a list. Appends it after the last existing sublist in that list.
@@ -35,6 +41,11 @@ export async function createSublist(fields) {
     try {
         const supabase = await createClient();
 
+        const spaceId = await getSpaceIdForList(supabase, fields.list_id);
+        const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
+        const permissionBlock = blockCreateForPermission(permissionLevel);
+        if (permissionBlock) return { data: null, ...permissionBlock };
+
         const position = await getNextPosition(supabase, 'sublists', { list_id: fields.list_id });
 
         const { data: createdSublist, error } = await supabase
@@ -44,6 +55,7 @@ export async function createSublist(fields) {
                 list_id: fields.list_id,
                 color: fields.color ?? '#6b7280',
                 position,
+                created_by: user.id,
             })
             .select()
             .single();
@@ -85,14 +97,27 @@ export async function updateSublist(sublistId, fields) {
     try {
         const supabase = await createClient();
 
+        const { data: existingSublist } = await supabase
+            .from('sublists')
+            .select('created_by, lists(space_id)')
+            .eq('id', sublistId)
+            .maybeSingle();
+        if (!existingSublist) return { data: null, error: 'Sublist not found' };
+
+        const permissionLevel = await resolveSpacePermission(supabase, existingSublist.lists?.space_id, user.id);
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: existingSublist.created_by === user.id,
+        });
+        if (permissionBlock) return { data: null, ...permissionBlock };
+
         const { data: updatedSublist, error } = await supabase
             .from('sublists')
             .update(fields)
             .eq('id', sublistId)
             .select()
-            .single();
+            .maybeSingle();
 
-        if (error) {
+        if (error || !updatedSublist) {
             return { data: null, error: 'Failed to update sublist' };
         }
 
@@ -119,10 +144,28 @@ export async function deleteSublist(sublistId) {
     try {
         const supabase = await createClient();
 
-        const { error } = await supabase.from('sublists').delete().eq('id', sublistId);
+        const { data: existingSublist } = await supabase
+            .from('sublists')
+            .select('created_by, lists(space_id)')
+            .eq('id', sublistId)
+            .maybeSingle();
+        if (!existingSublist) return { error: 'Sublist not found' };
 
-        if (error) {
-            return { error: 'Failed to delete sublist' };
+        const permissionLevel = await resolveSpacePermission(supabase, existingSublist.lists?.space_id, user.id);
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: existingSublist.created_by === user.id,
+        });
+        if (permissionBlock) return permissionBlock;
+
+        const { data: deletedSublist, error } = await supabase
+            .from('sublists')
+            .delete()
+            .eq('id', sublistId)
+            .select()
+            .maybeSingle();
+
+        if (error || !deletedSublist) {
+            return { error: 'Sublist not found' };
         }
 
         revalidateTag('sublists', { expire: 0 });

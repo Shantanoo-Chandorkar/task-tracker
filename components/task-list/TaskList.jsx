@@ -43,6 +43,7 @@ import { useUIState } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
+import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
 import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
@@ -102,6 +103,9 @@ function siblingScopedCollisionDetection(args) {
  * @param {string} props.listId
  * @param {Function} props.onAddTask - Called to open task creation for this status
  * @param {Function} props.onFocusTask - Called with a task's id when its row is clicked
+ * @param {boolean} props.canWrite - Whether the caller may create tasks (false for read-only collaborators)
+ * @param {string|null} props.currentUserId - Caller's user id, for row-level ownership checks
+ * @param {'owner'|'full'|'restricted'|'read_only'|null} props.myPermission - Caller's tier for this space
  */
 function StatusGroup({
     status,
@@ -113,6 +117,9 @@ function StatusGroup({
     listId,
     onAddTask,
     onFocusTask,
+    canWrite,
+    currentUserId,
+    myPermission,
 }) {
     if (tasks.length === 0) return null;
 
@@ -151,19 +158,28 @@ function StatusGroup({
                             <Fragment key={task.id}>
                                 {isStartOfUnprioritisedTier(tasks, taskIndex) && <PriorityTierDivider />}
                                 <div onClick={() => onFocusTask(task.id)}>
-                                    <TaskRow task={task} depth={0} flatList={flatList} listId={listId} />
+                                    <TaskRow
+                                        task={task}
+                                        depth={0}
+                                        flatList={flatList}
+                                        listId={listId}
+                                        currentUserId={currentUserId}
+                                        myPermission={myPermission}
+                                    />
                                 </div>
                             </Fragment>
                         ))}
                     </SortableContext>
 
-                    <button
-                        className="flex items-center gap-1.5 px-8 py-1.5 rounded-md text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted motion-safe:transition-colors w-full text-left"
-                        onClick={onAddTask}
-                    >
-                        <Plus className="h-3 w-3" />
-                        Add Task
-                    </button>
+                    {canWrite && (
+                        <button
+                            className="flex items-center gap-1.5 px-8 py-1.5 rounded-md text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted motion-safe:transition-colors w-full text-left"
+                            onClick={onAddTask}
+                        >
+                            <Plus className="h-3 w-3" />
+                            Add Task
+                        </button>
+                    )}
                 </>
             )}
         </section>
@@ -291,6 +307,7 @@ function SublistHeader({
  * @param {object[]} [props.initialSpaces] - SSR-fetched spaces, passed through to ListHeader
  * @param {object[]} [props.initialLists] - SSR-fetched lists, passed through to ListHeader
  * @param {object[]} [props.initialSublists] - SSR-fetched sublists for this list
+ * @param {string|null} [props.currentUserId] - Caller's user id, for row-level ownership checks
  */
 export default function TaskList({
     listId,
@@ -299,6 +316,7 @@ export default function TaskList({
     initialSpaces,
     initialLists,
     initialSublists,
+    currentUserId,
 }) {
     const queryClient = useQueryClient();
 
@@ -325,10 +343,14 @@ export default function TaskList({
         initialData: initialTasks,
     });
 
-    const spaceId = useSpaceIdForList(listId);
+    const spaceId = useSpaceIdForList(listId, { initialData: initialLists });
     const { data: statuses = [] } = useStatusesQuery(spaceId, { initialData: initialStatuses });
 
     const { data: sublists = [] } = useSublistsQuery(listId, { initialData: initialSublists });
+
+    // A UX hint only - RLS and the app-layer pre-checks are the real backstop if a control is missed.
+    const myPermission = usePermissionForSpace(spaceId, { initialData: initialSpaces });
+    const canWrite = myPermission !== 'read_only';
 
     const tree = useMemo(() => flatToTree(flatList), [flatList]);
     const rootTasks = tree; // flatToTree already returns only root nodes
@@ -611,14 +633,16 @@ export default function TaskList({
                     <p className="text-muted-foreground text-sm mb-4">
                         No tasks yet. Add your first task to get started.
                     </p>
-                    <Button
-                        onClick={() =>
-                            setCreateDialog({ open: true, parentId: null, sublistId: null })
-                        }
-                    >
-                        <Plus className="h-4 w-4 mr-1" />
-                        New Task
-                    </Button>
+                    {canWrite && (
+                        <Button
+                            onClick={() =>
+                                setCreateDialog({ open: true, parentId: null, sublistId: null })
+                            }
+                        >
+                            <Plus className="h-4 w-4 mr-1" />
+                            New Task
+                        </Button>
+                    )}
                 </div>
                 <TaskFormDialog
                     open={createDialog.open}
@@ -685,7 +709,7 @@ export default function TaskList({
                                             })
                                         }
                                     />
-                                    {!isCollapsed && (
+                                    {!isCollapsed && canWrite && (
                                         <button
                                             className="flex items-center gap-1.5 ml-4 md:ml-8 mr-2 my-0.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted motion-safe:transition-colors"
                                             onClick={() =>
@@ -754,6 +778,9 @@ export default function TaskList({
                                                         sublistId: bucket.sublist?.id ?? null,
                                                     })
                                                 }
+                                                canWrite={canWrite}
+                                                currentUserId={currentUserId}
+                                                myPermission={myPermission}
                                             />
                                         ))}
                                         <StatusGroup
@@ -772,6 +799,9 @@ export default function TaskList({
                                                     sublistId: bucket.sublist?.id ?? null,
                                                 })
                                             }
+                                            canWrite={canWrite}
+                                            currentUserId={currentUserId}
+                                            myPermission={myPermission}
                                         />
                                     </>
                                 )}
@@ -780,14 +810,16 @@ export default function TaskList({
                     })}
                 </SortableContext>
 
-                <button
-                    type="button"
-                    onClick={() => setSublistDialog({ open: true, sublist: null })}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40 hover:bg-muted/50 motion-safe:transition-colors"
-                >
-                    <Plus className="h-4 w-4" />
-                    Create New Sublist
-                </button>
+                {canWrite && (
+                    <button
+                        type="button"
+                        onClick={() => setSublistDialog({ open: true, sublist: null })}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40 hover:bg-muted/50 motion-safe:transition-colors"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Create New Sublist
+                    </button>
+                )}
             </div>
 
             {/* Create task dialog */}

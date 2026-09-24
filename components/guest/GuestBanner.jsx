@@ -13,10 +13,12 @@ const WARNING_SECONDS = 120;
  * Persistent notice shown to guests only: what guest mode is, a live countdown, and a way to sign up.
  * At 0:00 it sends the browser to the login page, where the proxy ends the session.
  *
- * @returns {JSX.Element|null} Null for registered users and while the profile is still loading.
+ * @param {object} props
+ * @param {object|null} [props.initialProfile] - SSR-fetched profile, so this never hydration-mismatches
+ * @returns {JSX.Element|null} Null for registered users.
  */
-export default function GuestBanner() {
-    const { data: profile, dataUpdatedAt } = useCurrentUserProfileQuery();
+export default function GuestBanner({ initialProfile }) {
+    const { data: profile, dataUpdatedAt } = useCurrentUserProfileQuery({ initialData: initialProfile });
     const bannerRef = useRef(null);
     const hasRedirectedRef = useRef(false);
     const [nowMs, setNowMs] = useState(() => Date.now());

@@ -16,6 +16,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';
 import { useCollaboratorsQuery } from '@/hooks/useCollaboratorsQuery';
@@ -23,7 +24,10 @@ import {
     approveJoinRequest,
     rejectJoinRequest,
     removeCollaborator,
+    updateCollaboratorPermission,
 } from '@/actions/collaboration-actions';
+
+const PERMISSION_LEVEL_LABELS = { full: 'Full', restricted: 'Restricted', read_only: 'Read-only' };
 
 async function copyToClipboard(text, label) {
     try {
@@ -103,6 +107,23 @@ export default function SpaceSharingSection({ space }) {
         await refetch();
     }
 
+    async function handlePermissionChange(collaboratorId, newPermissionLevel) {
+        const toastId = toast.loading('Updating permission...');
+        let result;
+        try {
+            result = await updateCollaboratorPermission({ collaboratorId, permissionLevel: newPermissionLevel });
+        } catch {
+            toast.error('Could not reach the server. Try again.', { id: toastId });
+            return;
+        }
+        if (result.error) {
+            toast.error(result.error, { id: toastId });
+            return;
+        }
+        toast.success('Permission updated', { id: toastId });
+        await refetch();
+    }
+
     return (
         <div className="space-y-3">
             <div>
@@ -113,6 +134,7 @@ export default function SpaceSharingSection({ space }) {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 flex-shrink-0"
+                        aria-label="Copy space ID"
                         onClick={() => copyToClipboard(space.id, 'Space ID')}
                     >
                         <Copy className="h-3 w-3" />
@@ -153,6 +175,7 @@ export default function SpaceSharingSection({ space }) {
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+                                        aria-label="Approve request"
                                         onClick={() => handleApprove(request.id)}
                                     >
                                         <Check className="h-4 w-4" />
@@ -161,6 +184,7 @@ export default function SpaceSharingSection({ space }) {
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7 text-destructive hover:text-destructive"
+                                        aria-label="Reject request"
                                         onClick={() =>
                                             setConfirmTarget({
                                                 action: 'reject',
@@ -188,20 +212,43 @@ export default function SpaceSharingSection({ space }) {
                                 className="flex items-center justify-between gap-2 px-3 py-2"
                             >
                                 <span className="text-sm truncate">{collaborator.requester_email}</span>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                    onClick={() =>
-                                        setConfirmTarget({
-                                            action: 'remove',
-                                            targetId: collaborator.id,
-                                            label: collaborator.requester_email,
-                                        })
-                                    }
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    <Select
+                                        value={collaborator.permission_level}
+                                        onValueChange={(newPermissionLevel) =>
+                                            handlePermissionChange(collaborator.id, newPermissionLevel)
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            className="h-7 w-auto text-xs"
+                                            aria-label={`Permission for ${collaborator.requester_email}`}
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(PERMISSION_LEVEL_LABELS).map(([level, label]) => (
+                                                <SelectItem key={level} value={level}>
+                                                    {label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                        aria-label="Remove collaborator"
+                                        onClick={() =>
+                                            setConfirmTarget({
+                                                action: 'remove',
+                                                targetId: collaborator.id,
+                                                label: collaborator.requester_email,
+                                            })
+                                        }
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </div>
                         ))}
                     </div>

@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
+import { resolveSpacePermission, blockCreateForPermission, blockWriteForPermission } from '@/lib/permissions/space-permissions';
 
 /**
  * Creates a new status. Appends it after the last existing status in its space.
@@ -35,6 +36,10 @@ export async function createStatus(fields) {
     try {
         const supabase = await createClient();
 
+        const permissionLevel = await resolveSpacePermission(supabase, fields.space_id, user.id);
+        const permissionBlock = blockCreateForPermission(permissionLevel);
+        if (permissionBlock) return { data: null, ...permissionBlock };
+
         const position = await getNextPosition(supabase, 'statuses', { space_id: fields.space_id });
 
         const { data: createdStatus, error } = await supabase
@@ -44,6 +49,7 @@ export async function createStatus(fields) {
                 color: fields.color ?? '#6b7280',
                 position,
                 space_id: fields.space_id,
+                created_by: user.id,
             })
             .select()
             .single();
@@ -97,14 +103,27 @@ export async function updateStatus(id, fields) {
     try {
         const supabase = await createClient();
 
+        const { data: existingStatus } = await supabase
+            .from('statuses')
+            .select('space_id, created_by')
+            .eq('id', id)
+            .maybeSingle();
+        if (!existingStatus) return { data: null, error: 'Status not found' };
+
+        const permissionLevel = await resolveSpacePermission(supabase, existingStatus.space_id, user.id);
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: existingStatus.created_by === user.id,
+        });
+        if (permissionBlock) return { data: null, ...permissionBlock };
+
         const { data: updatedStatus, error } = await supabase
             .from('statuses')
             .update(updates)
             .eq('id', id)
             .select()
-            .single();
+            .maybeSingle();
 
-        if (error) {
+        if (error || !updatedStatus) {
             return { data: null, error: 'Failed to update status' };
         }
 
@@ -134,11 +153,17 @@ export async function deleteStatus(id) {
 
         const { data: target } = await supabase
             .from('statuses')
-            .select('is_default, code, space_id')
+            .select('is_default, code, space_id, created_by')
             .eq('id', id)
             .single();
 
         if (!target) return { error: 'Status not found' };
+
+        const permissionLevel = await resolveSpacePermission(supabase, target.space_id, user.id);
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: target.created_by === user.id,
+        });
+        if (permissionBlock) return permissionBlock;
 
         // Scoped to this status's own space -- other spaces' statuses must never affect
         // whether this is "the last remaining" one.
@@ -158,10 +183,10 @@ export async function deleteStatus(id) {
             return { error: 'Cannot delete a built-in status' };
         }
 
-        const { error } = await supabase.from('statuses').delete().eq('id', id);
+        const { data: deletedStatus, error } = await supabase.from('statuses').delete().eq('id', id).select().maybeSingle();
 
-        if (error) {
-            return { error: 'Failed to delete status' };
+        if (error || !deletedStatus) {
+            return { error: 'Status not found' };
         }
 
         revalidateTag('statuses', { expire: 0 });

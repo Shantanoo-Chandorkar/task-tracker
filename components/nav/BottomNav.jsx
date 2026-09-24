@@ -9,14 +9,18 @@ import QuickCreateFab from './QuickCreateFab';
 
 /**
  * Mobile bottom navigation - Home / Tasks / Spaces / Settings, with a center-FAB quick-create.
+ *
+ * @param {object} props
+ * @param {object[]} [props.initialSpaces] - SSR-fetched spaces, so the Tasks link's href never hydration-mismatches
+ * @param {object[]} [props.initialLists] - SSR-fetched lists, so the Tasks link's href never hydration-mismatches
  */
-export default function BottomNav() {
+export default function BottomNav({ initialSpaces, initialLists }) {
     const pathname = usePathname();
     const params = useParams();
     const listId = params?.listId;
 
-    const { data: spaces } = useSpacesQuery();
-    const { data: lists } = useListsQuery();
+    const { data: spaces } = useSpacesQuery({ initialData: initialSpaces });
+    const { data: lists } = useListsQuery({ initialData: initialLists });
 
     const firstSpaceWithList = (spaces || []).find((space) =>
         (lists || []).some((list) => list.space_id === space.id),

@@ -25,8 +25,9 @@ import RichTextRenderer from '@/components/ui/RichTextRenderer';
  * @param {string} props.taskId - Task being viewed
  * @param {object[]} props.initialTasks - SSR-fetched flat task list for this list (hydrates the query)
  * @param {object[]} [props.initialStatuses] - Seeds the query cache so SubtaskTree's checkboxes don't hydrate-mismatch
+ * @param {object[]} [props.initialLists] - SSR-fetched single-list array, so spaceId resolves synchronously on first paint
  */
-export default function TaskDetail({ listId, taskId, initialTasks, initialStatuses }) {
+export default function TaskDetail({ listId, taskId, initialTasks, initialStatuses, initialLists }) {
     const router = useRouter();
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
 
@@ -41,7 +42,7 @@ export default function TaskDetail({ listId, taskId, initialTasks, initialStatus
     });
 
     // Seeds the shared ['statuses', spaceId] cache so SubtaskTree's checkboxes don't hydrate-mismatch on mount.
-    const spaceId = useSpaceIdForList(listId);
+    const spaceId = useSpaceIdForList(listId, { initialData: initialLists });
     useStatusesQuery(spaceId, { initialData: initialStatuses });
 
     const task = flatList.find((task) => task.id === taskId);
