@@ -612,12 +612,23 @@ export default function TaskList({
 
         setDeletingSublist(true);
         const toastId = toast.loading('Deleting sublist...');
-        const { error } = await deleteSublist(deleteSublistTarget.id);
+
+        let result;
+        try {
+            result = await deleteSublist(deleteSublistTarget.id);
+        } catch {
+            setDeletingSublist(false);
+            setDeleteSublistTarget(null);
+            toast.error('Could not reach the server. Check your connection and try again.', {
+                id: toastId,
+            });
+            return;
+        }
         setDeletingSublist(false);
         setDeleteSublistTarget(null);
 
-        if (error) {
-            toast.error(error, { id: toastId });
+        if (result.error) {
+            toast.error(result.error, { id: toastId });
             return;
         }
 

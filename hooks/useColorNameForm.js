@@ -65,11 +65,18 @@ export function useColorNameForm({
         const fields = { name: name.trim(), color, ...buildFields() };
 
         setSubmitting(true);
-        const { error } = isEditing ? await update(entity.id, fields) : await create(fields);
+        let result;
+        try {
+            result = isEditing ? await update(entity.id, fields) : await create(fields);
+        } catch {
+            setSubmitting(false);
+            setError('Could not reach the server. Check your connection and try again.');
+            return;
+        }
         setSubmitting(false);
 
-        if (error) {
-            setError(error);
+        if (result.error) {
+            setError(result.error);
             return;
         }
 
