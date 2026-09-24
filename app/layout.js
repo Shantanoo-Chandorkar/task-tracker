@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Toaster } from 'sonner';
@@ -41,7 +42,9 @@ const THEME_INIT_SCRIPT = `
  * True app root -- html/body scaffold, fonts, theme init, and providers shared by both the
  * (app) and (auth) route groups. Nav chrome lives in app/(app)/layout.js instead.
  */
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+    const nonce = (await headers()).get('x-nonce');
+
     return (
         <html
             lang="en"
@@ -49,7 +52,7 @@ export default function RootLayout({ children }) {
             suppressHydrationWarning
         >
             <head>
-                <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+                <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
             </head>
             <body className="flex flex-col bg-background text-foreground">
                 <NavigationProgressBar />

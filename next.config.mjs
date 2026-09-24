@@ -4,6 +4,7 @@ const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'tr
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    poweredByHeader: false,
     async headers() {
         return [
             {
@@ -11,6 +12,14 @@ const nextConfig = {
                 // byte-comparison update check silently never sees a new version.
                 source: '/sw.js',
                 headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }],
+            },
+            {
+                // CSP is set per-request in proxy.js instead, since it needs a fresh nonce every time.
+                source: '/(.*)',
+                headers: [
+                    { key: 'X-Frame-Options', value: 'DENY' },
+                    { key: 'X-Content-Type-Options', value: 'nosniff' },
+                ],
             },
         ];
     },
