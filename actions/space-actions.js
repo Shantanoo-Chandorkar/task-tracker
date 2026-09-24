@@ -75,12 +75,19 @@ export async function updateSpace(id, fields) {
         if (nameError) return { data: null, error: nameError.error };
     }
 
+    const { name, color, position } = fields;
+    const updates = {
+        ...(name !== undefined && { name }),
+        ...(color !== undefined && { color }),
+        ...(position !== undefined && { position }),
+    };
+
     try {
         const supabase = await createClient();
 
         const { data: updatedSpace, error } = await supabase
             .from('spaces')
-            .update(fields)
+            .update(updates)
             .eq('id', id)
             .select()
             .single();

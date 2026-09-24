@@ -203,7 +203,26 @@ export async function updateTask(taskId, fields) {
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
-        const updates = { ...fields };
+        const {
+            title,
+            description,
+            status_id,
+            due_date,
+            sublist_id,
+            is_prioritised,
+            is_recurring,
+            recurrence_rule,
+        } = fields;
+        const updates = {
+            ...(title !== undefined && { title }),
+            ...(description !== undefined && { description }),
+            ...(status_id !== undefined && { status_id }),
+            ...(due_date !== undefined && { due_date }),
+            ...(sublist_id !== undefined && { sublist_id }),
+            ...(is_prioritised !== undefined && { is_prioritised }),
+            ...(is_recurring !== undefined && { is_recurring }),
+            ...(recurrence_rule !== undefined && { recurrence_rule }),
+        };
 
         if ('title' in updates) {
             updates.title = sanitizeString(updates.title, true);

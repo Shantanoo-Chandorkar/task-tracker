@@ -111,9 +111,16 @@ export async function updateList(id, fields) {
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
+        const { name, color, position } = fields;
+        const updates = {
+            ...(name !== undefined && { name }),
+            ...(color !== undefined && { color }),
+            ...(position !== undefined && { position }),
+        };
+
         const { data: updatedList, error } = await supabase
             .from('lists')
-            .update(fields)
+            .update(updates)
             .eq('id', id)
             .select()
             .maybeSingle();

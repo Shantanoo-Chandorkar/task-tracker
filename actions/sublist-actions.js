@@ -112,9 +112,16 @@ export async function updateSublist(sublistId, fields) {
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
+        const { name, color, position } = fields;
+        const updates = {
+            ...(name !== undefined && { name }),
+            ...(color !== undefined && { color }),
+            ...(position !== undefined && { position }),
+        };
+
         const { data: updatedSublist, error } = await supabase
             .from('sublists')
-            .update(fields)
+            .update(updates)
             .eq('id', sublistId)
             .select()
             .maybeSingle();
