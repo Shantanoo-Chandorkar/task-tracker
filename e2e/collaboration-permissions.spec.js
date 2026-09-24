@@ -22,8 +22,16 @@ async function createOwnedSpaceAndList(ownerPage) {
     await ownerPage.goto('/spaces');
     const spaceName = await createSpace(ownerPage);
     const listName = await createList(ownerPage, spaceName);
-    const { data: space } = await adminClient().from('spaces').select('id').eq('name', spaceName).single();
-    const { data: list } = await adminClient().from('lists').select('id').eq('name', listName).single();
+    const { data: space } = await adminClient()
+        .from('spaces')
+        .select('id')
+        .eq('name', spaceName)
+        .single();
+    const { data: list } = await adminClient()
+        .from('lists')
+        .select('id')
+        .eq('name', listName)
+        .single();
     return { spaceName, spaceId: space.id, listId: list.id };
 }
 
@@ -44,11 +52,17 @@ async function onboardCollaborator(browser, ownerPage, spaceName, spaceId) {
     await loginAs(collaboratorPage, collaborator);
     await collaboratorPage.goto('/spaces');
     await requestToJoinViaUi(collaboratorPage, spaceId);
-    await expect(collaboratorPage.getByText('Request sent - the owner will be notified.')).toBeVisible();
+    await expect(
+        collaboratorPage.getByText('Request sent - the owner will be notified.'),
+    ).toBeVisible();
 
     await ownerPage.goto('/spaces');
     await openSharingPanel(spaceSection(ownerPage, spaceName));
-    await approveJoinRequestViaUi(ownerPage, spaceSection(ownerPage, spaceName), collaborator.email);
+    await approveJoinRequestViaUi(
+        ownerPage,
+        spaceSection(ownerPage, spaceName),
+        collaborator.email,
+    );
 
     return { collaborator, collaboratorPage, context };
 }
@@ -69,7 +83,7 @@ async function setCollaboratorPermission(ownerPage, collaboratorEmail, label) {
 }
 
 test.describe('collaboration permission tiers', () => {
-    test('a restricted collaborator can create and edit their own task, not someone else\'s', async ({
+    test("a restricted collaborator can create and edit their own task, not someone else's", async ({
         page,
         browser,
         testUser,
@@ -79,7 +93,12 @@ test.describe('collaboration permission tiers', () => {
         await page.goto(`/lists/${listId}`);
         const ownerTaskTitle = await createTask(page);
 
-        const { collaborator, collaboratorPage, context } = await onboardCollaborator(browser, page, spaceName, spaceId);
+        const { collaborator, collaboratorPage, context } = await onboardCollaborator(
+            browser,
+            page,
+            spaceName,
+            spaceId,
+        );
         try {
             const createResponse = await collaboratorPage.request.post('/api/tasks', {
                 data: { title: 'Collaborator task', list_id: listId },
@@ -87,15 +106,25 @@ test.describe('collaboration permission tiers', () => {
             expect(createResponse.status()).toBe(201);
             const createdTask = await createResponse.json();
 
-            const editOwnResponse = await collaboratorPage.request.patch(`/api/tasks/${createdTask.id}`, {
-                data: { title: 'Edited by collaborator' },
-            });
+            const editOwnResponse = await collaboratorPage.request.patch(
+                `/api/tasks/${createdTask.id}`,
+                {
+                    data: { title: 'Edited by collaborator' },
+                },
+            );
             expect(editOwnResponse.status()).toBe(200);
 
-            const { data: ownerTask } = await adminClient().from('tasks').select('id').eq('title', ownerTaskTitle).single();
-            const editOthersResponse = await collaboratorPage.request.patch(`/api/tasks/${ownerTask.id}`, {
-                data: { title: 'hijacked' },
-            });
+            const { data: ownerTask } = await adminClient()
+                .from('tasks')
+                .select('id')
+                .eq('title', ownerTaskTitle)
+                .single();
+            const editOthersResponse = await collaboratorPage.request.patch(
+                `/api/tasks/${ownerTask.id}`,
+                {
+                    data: { title: 'hijacked' },
+                },
+            );
             expect(editOthersResponse.status()).toBe(400);
             expect((await editOthersResponse.json()).code).toBe('PERMISSION_RESTRICTED_NOT_OWN');
 
@@ -109,7 +138,12 @@ test.describe('collaboration permission tiers', () => {
         await loginAs(page, testUser);
         const { spaceName, spaceId, listId } = await createOwnedSpaceAndList(page);
 
-        const { collaborator, collaboratorPage, context } = await onboardCollaborator(browser, page, spaceName, spaceId);
+        const { collaborator, collaboratorPage, context } = await onboardCollaborator(
+            browser,
+            page,
+            spaceName,
+            spaceId,
+        );
         try {
             await setCollaboratorPermission(page, collaborator.email, 'Read-only');
 
@@ -135,13 +169,25 @@ test.describe('collaboration permission tiers', () => {
         await page.goto(`/lists/${listId}`);
         const ownerTaskTitle = await createTask(page);
 
-        const { collaborator, collaboratorPage, context } = await onboardCollaborator(browser, page, spaceName, spaceId);
+        const { collaborator, collaboratorPage, context } = await onboardCollaborator(
+            browser,
+            page,
+            spaceName,
+            spaceId,
+        );
         try {
-            const { data: ownerTask } = await adminClient().from('tasks').select('id').eq('title', ownerTaskTitle).single();
+            const { data: ownerTask } = await adminClient()
+                .from('tasks')
+                .select('id')
+                .eq('title', ownerTaskTitle)
+                .single();
 
-            const blockedResponse = await collaboratorPage.request.patch(`/api/tasks/${ownerTask.id}`, {
-                data: { title: 'still restricted' },
-            });
+            const blockedResponse = await collaboratorPage.request.patch(
+                `/api/tasks/${ownerTask.id}`,
+                {
+                    data: { title: 'still restricted' },
+                },
+            );
             expect(blockedResponse.status()).toBe(400);
 
             await setCollaboratorPermission(page, collaborator.email, 'Full');
@@ -154,9 +200,12 @@ test.describe('collaboration permission tiers', () => {
                 .single();
             expect(updatedCollaborator.permission_level).toBe('full');
 
-            const allowedResponse = await collaboratorPage.request.patch(`/api/tasks/${ownerTask.id}`, {
-                data: { title: 'edited after upgrade' },
-            });
+            const allowedResponse = await collaboratorPage.request.patch(
+                `/api/tasks/${ownerTask.id}`,
+                {
+                    data: { title: 'edited after upgrade' },
+                },
+            );
             expect(allowedResponse.status()).toBe(200);
 
             await context.close();
@@ -165,23 +214,41 @@ test.describe('collaboration permission tiers', () => {
         }
     });
 
-    test('a full collaborator is unaffected by tier restrictions', async ({ page, browser, testUser }) => {
+    test('a full collaborator is unaffected by tier restrictions', async ({
+        page,
+        browser,
+        testUser,
+    }) => {
         await loginAs(page, testUser);
         const { spaceName, spaceId, listId } = await createOwnedSpaceAndList(page);
         await page.goto(`/lists/${listId}`);
         const ownerTaskTitle = await createTask(page);
 
-        const { collaborator, collaboratorPage, context } = await onboardCollaborator(browser, page, spaceName, spaceId);
+        const { collaborator, collaboratorPage, context } = await onboardCollaborator(
+            browser,
+            page,
+            spaceName,
+            spaceId,
+        );
         try {
             await setCollaboratorPermission(page, collaborator.email, 'Full');
 
-            const { data: ownerTask } = await adminClient().from('tasks').select('id').eq('title', ownerTaskTitle).single();
-            const editResponse = await collaboratorPage.request.patch(`/api/tasks/${ownerTask.id}`, {
-                data: { title: 'edited by full collaborator' },
-            });
+            const { data: ownerTask } = await adminClient()
+                .from('tasks')
+                .select('id')
+                .eq('title', ownerTaskTitle)
+                .single();
+            const editResponse = await collaboratorPage.request.patch(
+                `/api/tasks/${ownerTask.id}`,
+                {
+                    data: { title: 'edited by full collaborator' },
+                },
+            );
             expect(editResponse.status()).toBe(200);
 
-            const deleteResponse = await collaboratorPage.request.delete(`/api/tasks/${ownerTask.id}`);
+            const deleteResponse = await collaboratorPage.request.delete(
+                `/api/tasks/${ownerTask.id}`,
+            );
             expect(deleteResponse.status()).toBe(200);
 
             await context.close();
@@ -198,7 +265,12 @@ test.describe('collaboration permission tiers', () => {
         await loginAs(page, testUser);
         const { spaceName, spaceId, listId } = await createOwnedSpaceAndList(page);
 
-        const { collaborator, collaboratorPage, context } = await onboardCollaborator(browser, page, spaceName, spaceId);
+        const { collaborator, collaboratorPage, context } = await onboardCollaborator(
+            browser,
+            page,
+            spaceName,
+            spaceId,
+        );
         try {
             await collaboratorPage.goto(`/lists/${listId}`);
             const parentTitle = await createTask(collaboratorPage);
@@ -214,12 +286,20 @@ test.describe('collaboration permission tiers', () => {
             await loginAs(freshCollaboratorPage, collaborator);
             await freshCollaboratorPage.goto(`/lists/${listId}`);
 
-            await taskRow(freshCollaboratorPage, parentTitle).getByRole('button', { name: 'Mark as complete' }).click();
-            await expect(freshCollaboratorPage.getByText(`Mark “${parentTitle}” complete?`)).toBeVisible();
+            // Default viewport is mobile-sized, where the row's checkbox is hidden - go through the 3-dot menu.
+            await taskRow(freshCollaboratorPage, parentTitle)
+                .getByRole('button', { name: 'More actions' })
+                .click();
+            await freshCollaboratorPage.getByRole('menuitem', { name: 'Mark as complete' }).click();
+            await expect(
+                freshCollaboratorPage.getByText(`Mark “${parentTitle}” complete?`),
+            ).toBeVisible();
             await freshCollaboratorPage.getByRole('button', { name: 'Mark complete' }).click();
 
             await expect(
-                freshCollaboratorPage.getByText('Completed 1 of 2 tasks - you can only update tasks you created'),
+                freshCollaboratorPage.getByText(
+                    'Completed 1 of 2 tasks - you can only update tasks you created',
+                ),
             ).toBeVisible();
 
             const { data: parentTask } = await adminClient()
