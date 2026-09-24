@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
@@ -49,7 +48,6 @@ export async function createSpace(fields) {
             return { data: null, error: 'Failed to create space' };
         }
 
-        revalidateTag('spaces', { expire: 0 });
         return { data: createdSpace, error: null };
     } catch (thrown) {
         console.error('[spaces] create threw', { detail: thrown?.message });
@@ -91,7 +89,6 @@ export async function updateSpace(id, fields) {
             return { data: null, error: 'Failed to update space' };
         }
 
-        revalidateTag('spaces', { expire: 0 });
         return { data: updatedSpace, error: null };
     } catch (thrown) {
         console.error('[spaces] update threw', { id, detail: thrown?.message });
@@ -120,9 +117,6 @@ export async function deleteSpace(id) {
             return { error: 'Failed to delete space' };
         }
 
-        revalidateTag('spaces', { expire: 0 });
-        revalidateTag('lists', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
     } catch (thrown) {
         console.error('[spaces] delete threw', { id, detail: thrown?.message });

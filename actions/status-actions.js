@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
@@ -64,8 +63,6 @@ export async function createStatus(fields) {
             return { data: null, error: 'Failed to create status' };
         }
 
-        revalidateTag('statuses', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { data: createdStatus, error: null };
     } catch (thrown) {
         console.error('[statuses] create threw', { detail: thrown?.message });
@@ -135,8 +132,6 @@ export async function updateStatus(id, fields) {
             return { data: null, error: 'Failed to update status' };
         }
 
-        revalidateTag('statuses', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { data: updatedStatus, error: null };
     } catch (thrown) {
         console.error('[statuses] update threw', { id, detail: thrown?.message });
@@ -202,8 +197,6 @@ export async function deleteStatus(id) {
             return { error: 'Status not found' };
         }
 
-        revalidateTag('statuses', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
     } catch (thrown) {
         console.error('[statuses] delete threw', { id, detail: thrown?.message });

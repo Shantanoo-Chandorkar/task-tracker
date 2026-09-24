@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
 import { findDescendantIds, deepCloneSubtree } from '@/lib/tree';
@@ -164,7 +163,6 @@ export async function createTask(fields) {
             return { data: null, error: 'Failed to create task' };
         }
 
-        revalidateTag('task-tree', { expire: 0 });
         return { data: createdTask, error: null };
     } catch (thrown) {
         console.error('[tasks] create threw', { listId: fields.list_id, detail: thrown?.message });
@@ -292,7 +290,6 @@ export async function updateTask(taskId, fields) {
             return { data: null, error: 'Failed to update task' };
         }
 
-        revalidateTag('task-tree', { expire: 0 });
         return { data: updatedTask, error: null };
     } catch (thrown) {
         console.error('[tasks] update threw', { taskId, detail: thrown?.message });
@@ -347,8 +344,6 @@ export async function completeTaskAndDescendants(taskId) {
             });
             return { error: 'Failed to mark tasks complete' };
         }
-
-        revalidateTag('task-tree', { expire: 0 });
 
         const completedCount = updatedRows?.length ?? 0;
         if (completedCount < idsToComplete.length) {
@@ -408,8 +403,6 @@ export async function uncompleteTaskAndDescendants(taskId) {
             return { error: 'Failed to mark tasks incomplete' };
         }
 
-        revalidateTag('task-tree', { expire: 0 });
-
         const uncompletedCount = updatedRows?.length ?? 0;
         if (uncompletedCount < idsToUncomplete.length) {
             return {
@@ -468,7 +461,6 @@ export async function deleteTask(id) {
             return { error: 'Task not found' };
         }
 
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
     } catch (thrown) {
         console.error('[tasks] delete threw', { id, detail: thrown?.message });
@@ -592,7 +584,6 @@ export async function deleteTaskAndReparentChildren(taskId) {
 
         if (deleteError || !deletedTask) return { error: 'Task not found' };
 
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
     } catch (thrown) {
         console.error('[tasks] reparent-delete threw', { taskId, detail: thrown?.message });
@@ -681,7 +672,6 @@ export async function duplicateTask(taskId) {
             newPosition,
         );
 
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
     } catch (thrown) {
         console.error('[tasks] duplicate threw', { taskId, detail: thrown?.message });

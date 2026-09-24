@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
@@ -66,7 +65,6 @@ export async function createSublist(fields) {
             return { data: null, error: 'Failed to create sublist' };
         }
 
-        revalidateTag('sublists', { expire: 0 });
         return { data: createdSublist, error: null };
     } catch (thrown) {
         console.error('[sublists] create threw', { detail: thrown?.message });
@@ -125,7 +123,6 @@ export async function updateSublist(sublistId, fields) {
             return { data: null, error: 'Failed to update sublist' };
         }
 
-        revalidateTag('sublists', { expire: 0 });
         return { data: updatedSublist, error: null };
     } catch (thrown) {
         console.error('[sublists] update threw', { sublistId, detail: thrown?.message });
@@ -176,8 +173,6 @@ export async function deleteSublist(sublistId) {
             return { error: 'Sublist not found' };
         }
 
-        revalidateTag('sublists', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
     } catch (thrown) {
         console.error('[sublists] delete threw', { sublistId, detail: thrown?.message });

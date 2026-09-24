@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { getPositionBetween } from '@/lib/fractional-index';
 import { findAncestors, findDescendantIds } from '@/lib/tree';
@@ -209,7 +208,6 @@ export async function POST(request, { params }) {
             return NextResponse.json({ error: 'Failed to move task' }, { status: 500 });
         }
 
-        revalidateTag('task-tree', { expire: 0 });
         return NextResponse.json(updated);
     } catch {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

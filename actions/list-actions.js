@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
 import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
@@ -65,7 +64,6 @@ export async function createList(fields) {
             return { data: null, error: 'Failed to create list' };
         }
 
-        revalidateTag('lists', { expire: 0 });
         return { data: createdList, error: null };
     } catch (thrown) {
         console.error('[lists] create threw', { detail: thrown?.message });
@@ -124,7 +122,6 @@ export async function updateList(id, fields) {
             return { data: null, error: 'Failed to update list' };
         }
 
-        revalidateTag('lists', { expire: 0 });
         return { data: updatedList, error: null };
     } catch (thrown) {
         console.error('[lists] update threw', { id, detail: thrown?.message });
@@ -176,8 +173,6 @@ export async function deleteList(id) {
             return { error: 'List not found' };
         }
 
-        revalidateTag('lists', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
     } catch (thrown) {
         console.error('[lists] delete threw', { id, detail: thrown?.message });

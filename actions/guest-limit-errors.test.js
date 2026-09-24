@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/session', () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createSessionClient }));
-vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }));
 
 const { createSpace } = await import('./space-actions');
 const { createList } = await import('./list-actions');
