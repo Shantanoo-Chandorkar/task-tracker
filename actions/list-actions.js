@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
+import { resolveSpacePermission, blockCreateForPermission, blockWriteForPermission } from '@/lib/permissions/space-permissions';
 
 /**
  * Creates a new list under a space. Appends it after the last existing list
@@ -36,6 +37,10 @@ export async function createList(fields) {
     try {
         const supabase = await createClient();
 
+        const permissionLevel = await resolveSpacePermission(supabase, fields.space_id, user.id);
+        const permissionBlock = blockCreateForPermission(permissionLevel);
+        if (permissionBlock) return { data: null, ...permissionBlock };
+
         const position = await getNextPosition(supabase, 'lists', { space_id: fields.space_id });
 
         const { data: createdList, error } = await supabase
@@ -45,6 +50,7 @@ export async function createList(fields) {
                 space_id: fields.space_id,
                 color: fields.color ?? '#6b7280',
                 position,
+                created_by: user.id,
             })
             .select()
             .single();
@@ -86,14 +92,27 @@ export async function updateList(id, fields) {
     try {
         const supabase = await createClient();
 
+        const { data: existingList } = await supabase
+            .from('lists')
+            .select('space_id, created_by')
+            .eq('id', id)
+            .maybeSingle();
+        if (!existingList) return { data: null, error: 'List not found' };
+
+        const permissionLevel = await resolveSpacePermission(supabase, existingList.space_id, user.id);
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: existingList.created_by === user.id,
+        });
+        if (permissionBlock) return { data: null, ...permissionBlock };
+
         const { data: updatedList, error } = await supabase
             .from('lists')
             .update(fields)
             .eq('id', id)
             .select()
-            .single();
+            .maybeSingle();
 
-        if (error) {
+        if (error || !updatedList) {
             return { data: null, error: 'Failed to update list' };
         }
 
@@ -121,10 +140,23 @@ export async function deleteList(id) {
     try {
         const supabase = await createClient();
 
-        const { error } = await supabase.from('lists').delete().eq('id', id);
+        const { data: existingList } = await supabase
+            .from('lists')
+            .select('space_id, created_by')
+            .eq('id', id)
+            .maybeSingle();
+        if (!existingList) return { error: 'List not found' };
 
-        if (error) {
-            return { error: 'Failed to delete list' };
+        const permissionLevel = await resolveSpacePermission(supabase, existingList.space_id, user.id);
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: existingList.created_by === user.id,
+        });
+        if (permissionBlock) return permissionBlock;
+
+        const { data: deletedList, error } = await supabase.from('lists').delete().eq('id', id).select().maybeSingle();
+
+        if (error || !deletedList) {
+            return { error: 'List not found' };
         }
 
         revalidateTag('lists', { expire: 0 });

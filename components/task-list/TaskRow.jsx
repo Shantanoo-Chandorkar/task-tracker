@@ -38,8 +38,10 @@ export function PriorityTierDivider() {
  * @param {number} props.depth - Current depth (0 = root)
  * @param {object[]} props.flatList - Full flat task list passed through for rearrange operations
  * @param {string} props.listId - The list this task tree belongs to
+ * @param {string|null} [props.currentUserId] - Caller's user id, for row-level ownership checks
+ * @param {'owner'|'full'|'restricted'|'read_only'|null} [props.myPermission] - Caller's tier for this space
  */
-function TaskRow({ task, depth, flatList, listId }) {
+function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission }) {
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
     const expandKey = `task-row:${task.id}`;
     const isExpanded = useUIFlag(expandKey);
@@ -202,6 +204,8 @@ function TaskRow({ task, depth, flatList, listId }) {
                     }}
                     canAddSubtask={canAddSubtask}
                     listId={listId}
+                    currentUserId={currentUserId}
+                    myPermission={myPermission}
                 />
             </div>
 
@@ -244,6 +248,8 @@ function TaskRow({ task, depth, flatList, listId }) {
                                     depth={depth + 1}
                                     flatList={flatList}
                                     listId={listId}
+                                    currentUserId={currentUserId}
+                                    myPermission={myPermission}
                                 />
                             </Fragment>
                         ))}

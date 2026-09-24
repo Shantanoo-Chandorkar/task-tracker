@@ -5,6 +5,7 @@ import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { blockGuestAction } from '@/lib/guest/guest-guards';
 import { NOT_AUTHENTICATED, SPACE_NOT_FOUND, ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
+import { COLLABORATOR_PERMISSION_LEVELS } from '@/lib/permissions/space-permissions';
 import { sendJoinRequestEmail } from '@/lib/email/notifications/send-join-request-email';
 import { sendJoinDecisionEmail } from '@/lib/email/notifications/send-join-decision-email';
 import { sendCollaboratorLeftEmail } from '@/lib/email/notifications/send-collaborator-left-email';
@@ -221,6 +222,47 @@ export async function removeCollaborator(fields) {
         return { error: null, code: null };
     } catch {
         return { error: 'Unexpected error removing collaborator', code: null };
+    }
+}
+
+/**
+ * Changes an accepted collaborator's permission tier. Owner-only via the same UPDATE RLS policy
+ * approveJoinRequest uses (`is_space_owner`), so an update affecting zero rows means either the
+ * collaborator doesn't exist or the caller isn't the owner.
+ *
+ * @param {object} fields
+ * @param {string} fields.collaboratorId
+ * @param {'full'|'restricted'|'read_only'} fields.permissionLevel
+ * @returns {{ data: object|null, error: string|null, code: string|null }}
+ */
+export async function updateCollaboratorPermission(fields) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+
+    const guestBlock = blockGuestAction(user);
+    if (guestBlock) return { data: null, ...guestBlock };
+
+    if (!COLLABORATOR_PERMISSION_LEVELS.includes(fields.permissionLevel)) {
+        return { data: null, error: 'Invalid permission level', code: null };
+    }
+
+    try {
+        const supabase = await createClient();
+        const { data: updatedRow, error } = await supabase
+            .from('space_collaborators')
+            .update({ permission_level: fields.permissionLevel })
+            .eq('id', fields.collaboratorId)
+            .eq('status', 'accepted')
+            .select()
+            .maybeSingle();
+
+        if (error || !updatedRow) {
+            return { data: null, error: 'Collaborator not found', code: REQUEST_NOT_FOUND };
+        }
+
+        return { data: updatedRow, error: null, code: null };
+    } catch {
+        return { data: null, error: 'Unexpected error updating permission', code: null };
     }
 }
 
