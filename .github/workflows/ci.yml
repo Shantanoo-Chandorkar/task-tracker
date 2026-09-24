@@ -1,0 +1,29 @@
+name: CI
+
+on:
+    pull_request:
+    push:
+        branches: [master, develop]
+
+jobs:
+    checks:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '22.13.0'
+                  cache: 'npm'
+
+            - run: npm ci
+
+            - run: npm run lint
+
+            - run: npm run format:check
+
+            # Scoped to production dependencies: lighthouse (a devDependency used only for local
+            # perf audits) pulls in transitive high-severity CVEs that never ship to production,
+            # already accepted in bucket-4-perf-findings.md. --omit=dev keeps the gate meaningful
+            # instead of permanently red over a dev-only tool.
+            - run: npm audit --omit=dev --audit-level=high
