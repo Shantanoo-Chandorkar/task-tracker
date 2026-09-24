@@ -41,6 +41,16 @@ test.describe('spaces', () => {
 
     // name-too-long test dropped: maxLength truncates fill(), unreachable via UI - see docs/e2e-test-quality.md.
 
+    test('requesting to join a space with an invalid ID shows an inline error', async ({ page }) => {
+        await page.getByRole('button', { name: 'Join a space' }).click();
+        const dialog = page.getByRole('dialog');
+        await dialog.getByPlaceholder('Paste the space ID').fill('not-a-uuid');
+        await dialog.getByRole('button', { name: 'Request to join' }).click();
+
+        await expect(dialog.getByText('Enter a valid space ID')).toBeVisible();
+        await expect(dialog).toBeVisible();
+    });
+
     test('a second account cannot fetch a space it does not own', async ({ page, browser }) => {
         const spaceName = await createSpace(page);
         const { data: space } = await adminClient()
