@@ -127,7 +127,7 @@ test.describe('guest mode', () => {
         expect(patchResponse.status()).toBe(400);
 
         const deleteResponse = await otherPage.request.delete(`/api/tasks/${task.id}`);
-        expect(deleteResponse.status()).toBe(200);
+        expect(deleteResponse.status()).toBe(400);
 
         const { data: rowsStillPresent } = await adminClient().from('tasks').select('id').eq('id', task.id);
         expect(rowsStillPresent).toHaveLength(1);

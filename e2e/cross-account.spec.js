@@ -26,7 +26,7 @@ test.describe('cross-account data isolation', () => {
             expect(patchResponse.status()).toBe(400);
 
             const deleteResponse = await otherPage.request.delete(`/api/lists/${list.id}`);
-            expect(deleteResponse.status()).toBe(200);
+            expect(deleteResponse.status()).toBe(400);
 
             const { data: rowsStillPresent } = await adminClient().from('lists').select('id').eq('id', list.id);
             expect(rowsStillPresent).toHaveLength(1);
@@ -68,7 +68,7 @@ test.describe('cross-account data isolation', () => {
             expect(patchResponse.status()).toBe(400);
 
             const deleteResponse = await otherPage.request.delete(`/api/sublists/${sublist.id}`);
-            expect(deleteResponse.status()).toBe(200);
+            expect(deleteResponse.status()).toBe(400);
 
             const { data: rowsStillPresent } = await adminClient()
                 .from('sublists')
@@ -115,7 +115,7 @@ test.describe('cross-account data isolation', () => {
             expect(await moveResponse.json()).toEqual({ error: 'Task not found' });
 
             const deleteResponse = await otherPage.request.delete(`/api/tasks/${task.id}`);
-            expect(deleteResponse.status()).toBe(200);
+            expect(deleteResponse.status()).toBe(400);
 
             const { data: rowsStillPresent } = await adminClient().from('tasks').select('id').eq('id', task.id);
             expect(rowsStillPresent).toHaveLength(1);

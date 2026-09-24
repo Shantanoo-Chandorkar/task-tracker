@@ -90,11 +90,13 @@ test.describe('collaboration', () => {
 
             const { data: collaborator } = await adminClient()
                 .from('space_collaborators')
-                .select('status')
+                .select('status, permission_level')
                 .eq('space_id', spaceId)
                 .eq('user_id', requester.id)
                 .single();
             expect(collaborator.status).toBe('accepted');
+            // A new approval defaults to 'restricted', not 'full' - the owner escalates deliberately.
+            expect(collaborator.permission_level).toBe('restricted');
         } finally {
             await deleteTestUser(requester.id);
         }
