@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { requireAuthResponse } from '@/lib/api-response';
+import { requireAuthResponse, withApiErrorHandling } from '@/lib/api-response';
 
 const RESULTS_PER_CATEGORY = 8;
 
@@ -22,59 +22,55 @@ function escapeIlike(value) {
  * matches per category. An empty/whitespace query returns empty results
  * immediately rather than scanning every row.
  */
-export async function GET(request) {
+export const GET = withApiErrorHandling(async function GET(request) {
     const unauthorized = await requireAuthResponse();
     if (unauthorized) return unauthorized;
 
-    try {
-        const searchQuery = (request.nextUrl.searchParams.get('q') ?? '').trim();
+    const searchQuery = (request.nextUrl.searchParams.get('q') ?? '').trim();
 
-        if (!searchQuery) {
-            return NextResponse.json({ tasks: [], lists: [], spaces: [] });
-        }
-
-        const supabase = await createClient();
-        const pattern = `%${escapeIlike(searchQuery)}%`;
-
-        const [
-            { data: tasks, error: tasksError },
-            { data: lists, error: listsError },
-            { data: spaces, error: spacesError },
-        ] = await Promise.all([
-            supabase
-                .from('tasks')
-                .select('id, title, list_id, lists(name)')
-                .ilike('title', pattern)
-                .limit(RESULTS_PER_CATEGORY),
-            supabase
-                .from('lists')
-                .select('id, name, space_id')
-                .ilike('name', pattern)
-                .limit(RESULTS_PER_CATEGORY),
-            supabase
-                .from('spaces')
-                .select('id, name')
-                .ilike('name', pattern)
-                .limit(RESULTS_PER_CATEGORY),
-        ]);
-
-        if (tasksError || listsError || spacesError) {
-            return NextResponse.json({ error: 'Search failed' }, { status: 500 });
-        }
-
-        const normalizedTasks = (tasks || []).map((task) => ({
-            id: task.id,
-            title: task.title,
-            list_id: task.list_id,
-            list_name: task.lists?.name ?? null,
-        }));
-
-        return NextResponse.json({
-            tasks: normalizedTasks,
-            lists: lists || [],
-            spaces: spaces || [],
-        });
-    } catch {
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (!searchQuery) {
+        return NextResponse.json({ tasks: [], lists: [], spaces: [] });
     }
-}
+
+    const supabase = await createClient();
+    const pattern = `%${escapeIlike(searchQuery)}%`;
+
+    const [
+        { data: tasks, error: tasksError },
+        { data: lists, error: listsError },
+        { data: spaces, error: spacesError },
+    ] = await Promise.all([
+        supabase
+            .from('tasks')
+            .select('id, title, list_id, lists(name)')
+            .ilike('title', pattern)
+            .limit(RESULTS_PER_CATEGORY),
+        supabase
+            .from('lists')
+            .select('id, name, space_id')
+            .ilike('name', pattern)
+            .limit(RESULTS_PER_CATEGORY),
+        supabase
+            .from('spaces')
+            .select('id, name')
+            .ilike('name', pattern)
+            .limit(RESULTS_PER_CATEGORY),
+    ]);
+
+    if (tasksError || listsError || spacesError) {
+        return NextResponse.json({ error: 'Search failed' }, { status: 500 });
+    }
+
+    const normalizedTasks = (tasks || []).map((task) => ({
+        id: task.id,
+        title: task.title,
+        list_id: task.list_id,
+        list_name: task.lists?.name ?? null,
+    }));
+
+    return NextResponse.json({
+        tasks: normalizedTasks,
+        lists: lists || [],
+        spaces: spaces || [],
+    });
+});
