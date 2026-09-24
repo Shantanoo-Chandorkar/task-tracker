@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
@@ -9,7 +10,6 @@ import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CharLimitField from '@/components/ui/CharLimitField';
-import RichTextEditor from '@/components/ui/RichTextEditor';
 import {
     Select,
     SelectContent,
@@ -25,6 +25,16 @@ import { bustPageCache } from '@/lib/service-worker-cache';
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 10000;
+
+// Tiptap is heavy and only needed once this dialog actually opens - keeps it out of the list page's initial bundle.
+const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex min-h-[200px] items-center justify-center">
+            <Loader />
+        </div>
+    ),
+});
 
 /**
  * Modal for creating or editing a task, via the shared ModalShell container.
