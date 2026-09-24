@@ -1,12 +1,9 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
-import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
-import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
+import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import {
     resolveSpacePermission,
     getSpaceIdForList,
@@ -23,23 +20,20 @@ import {
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function createSublist(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const createSublist = withAuthenticatedAction(
+    '[sublists] create',
+    'Unexpected error creating sublist',
+    async (user, supabase, fields) => {
+        const name = sanitizeString(fields.name, true);
+        if (!name) {
+            return { data: null, error: 'Sublist name is required' };
+        }
+        const nameError = checkMaxLength(name, 200, 'Sublist name');
+        if (nameError) return { data: null, error: nameError.error };
 
-    const name = sanitizeString(fields.name, true);
-    if (!name) {
-        return { data: null, error: 'Sublist name is required' };
-    }
-    const nameError = checkMaxLength(name, 200, 'Sublist name');
-    if (nameError) return { data: null, error: nameError.error };
-
-    if (!fields.list_id) {
-        return { data: null, error: 'A list is required' };
-    }
-
-    try {
-        const supabase = await createClient();
+        if (!fields.list_id) {
+            return { data: null, error: 'A list is required' };
+        }
 
         const spaceId = await getSpaceIdForList(supabase, fields.list_id);
         const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
@@ -66,13 +60,9 @@ export async function createSublist(fields) {
             return { data: null, error: 'Failed to create sublist' };
         }
 
-        revalidateTag('sublists', { expire: 0 });
         return { data: createdSublist, error: null };
-    } catch (thrown) {
-        console.error('[sublists] create threw', { detail: thrown?.message });
-        return { data: null, error: 'Unexpected error creating sublist' };
-    }
-}
+    },
+);
 
 /**
  * Updates specific fields on a sublist (name, color, position).
@@ -81,21 +71,18 @@ export async function createSublist(fields) {
  * @param {object} fields - Partial sublist fields to update
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function updateSublist(sublistId, fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const updateSublist = withAuthenticatedAction(
+    '[sublists] update',
+    'Unexpected error updating sublist',
+    async (user, supabase, sublistId, fields) => {
+        if (!sublistId) return { data: null, error: 'Sublist ID is required' };
 
-    if (!sublistId) return { data: null, error: 'Sublist ID is required' };
-
-    if ('name' in fields) {
-        fields.name = sanitizeString(fields.name, true);
-        if (!fields.name) return { data: null, error: 'Sublist name is required' };
-        const nameError = checkMaxLength(fields.name, 200, 'Sublist name');
-        if (nameError) return { data: null, error: nameError.error };
-    }
-
-    try {
-        const supabase = await createClient();
+        if ('name' in fields) {
+            fields.name = sanitizeString(fields.name, true);
+            if (!fields.name) return { data: null, error: 'Sublist name is required' };
+            const nameError = checkMaxLength(fields.name, 200, 'Sublist name');
+            if (nameError) return { data: null, error: nameError.error };
+        }
 
         const { data: existingSublist } = await supabase
             .from('sublists')
@@ -104,15 +91,27 @@ export async function updateSublist(sublistId, fields) {
             .maybeSingle();
         if (!existingSublist) return { data: null, error: 'Sublist not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingSublist.lists?.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingSublist.lists?.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingSublist.created_by === user.id,
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
+        // Explicit allowlist, not { ...fields } - an unlisted field must never reach the update.
+        const { name, color, position } = fields;
+        const updates = {
+            ...(name !== undefined && { name }),
+            ...(color !== undefined && { color }),
+            ...(position !== undefined && { position }),
+        };
+
         const { data: updatedSublist, error } = await supabase
             .from('sublists')
-            .update(fields)
+            .update(updates)
             .eq('id', sublistId)
             .select()
             .maybeSingle();
@@ -121,13 +120,9 @@ export async function updateSublist(sublistId, fields) {
             return { data: null, error: 'Failed to update sublist' };
         }
 
-        revalidateTag('sublists', { expire: 0 });
         return { data: updatedSublist, error: null };
-    } catch (thrown) {
-        console.error('[sublists] update threw', { sublistId, detail: thrown?.message });
-        return { data: null, error: 'Unexpected error updating sublist' };
-    }
-}
+    },
+);
 
 /**
  * Deletes a sublist, cascading to its tasks - callers should warn with the task count first.
@@ -135,14 +130,11 @@ export async function updateSublist(sublistId, fields) {
  * @param {string} sublistId - Sublist ID to delete
  * @returns {{ error: string|null }}
  */
-export async function deleteSublist(sublistId) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!sublistId) return { error: 'Sublist ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const deleteSublist = withAuthenticatedAction(
+    '[sublists] delete',
+    'Unexpected error deleting sublist',
+    async (user, supabase, sublistId) => {
+        if (!sublistId) return { error: 'Sublist ID is required' };
 
         const { data: existingSublist } = await supabase
             .from('sublists')
@@ -151,7 +143,11 @@ export async function deleteSublist(sublistId) {
             .maybeSingle();
         if (!existingSublist) return { error: 'Sublist not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingSublist.lists?.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingSublist.lists?.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingSublist.created_by === user.id,
         });
@@ -168,11 +164,7 @@ export async function deleteSublist(sublistId) {
             return { error: 'Sublist not found' };
         }
 
-        revalidateTag('sublists', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch (thrown) {
-        console.error('[sublists] delete threw', { sublistId, detail: thrown?.message });
-        return { error: 'Unexpected error deleting sublist' };
-    }
-}
+    },
+    { hasData: false },
+);

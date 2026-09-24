@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { findCompletedDescendants, findIncompleteDescendants } from '@/lib/tree';
-import { updateTask, completeTaskAndDescendants, uncompleteTaskAndDescendants } from '@/actions/task-actions';
+import {
+    updateTask,
+    completeTaskAndDescendants,
+    uncompleteTaskAndDescendants,
+} from '@/actions/task-actions';
 import { bustPageCache } from '@/lib/service-worker-cache';
 
 /**
@@ -55,7 +59,9 @@ export function useTaskCompletion(listId) {
 
     const runCascade = useCallback(
         async (taskId, listId, isComplete) => {
-            const toastId = toast.loading(isComplete ? 'Marking complete...' : 'Marking incomplete...');
+            const toastId = toast.loading(
+                isComplete ? 'Marking complete...' : 'Marking incomplete...',
+            );
 
             let result;
             try {
@@ -63,7 +69,9 @@ export function useTaskCompletion(listId) {
                     ? await completeTaskAndDescendants(taskId)
                     : await uncompleteTaskAndDescendants(taskId);
             } catch {
-                toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+                toast.error('Could not reach the server. Check your connection and try again.', {
+                    id: toastId,
+                });
                 return;
             }
 
@@ -103,13 +111,17 @@ export function useTaskCompletion(listId) {
             }
 
             const targetStatus = isComplete ? doneStatus : defaultStatus;
-            const toastId = toast.loading(isComplete ? 'Marking complete...' : 'Marking incomplete...');
+            const toastId = toast.loading(
+                isComplete ? 'Marking complete...' : 'Marking incomplete...',
+            );
 
             let error;
             try {
                 ({ error } = await updateTask(task.id, { status_id: targetStatus.id }));
             } catch {
-                toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+                toast.error('Could not reach the server. Check your connection and try again.', {
+                    id: toastId,
+                });
                 return;
             }
 

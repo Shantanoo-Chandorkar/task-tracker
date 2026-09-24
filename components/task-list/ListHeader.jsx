@@ -27,7 +27,9 @@ export default function ListHeader({ listId, initialSpaces, initialLists, childr
     return (
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                {currentSpace && <p className="text-xs text-muted-foreground">{currentSpace.name}</p>}
+                {currentSpace && (
+                    <p className="text-xs text-muted-foreground">{currentSpace.name}</p>
+                )}
                 <div className="mt-1 flex items-center gap-2">
                     <span
                         className="h-2.5 w-2.5 flex-shrink-0 rounded-full"

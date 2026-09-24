@@ -6,7 +6,12 @@ import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { blockGuestAction } from '@/lib/guest/guest-guards';
 import { AUTH_ERROR_CODES } from '@/lib/auth/error-codes';
-import { checkRateLimit, recordFailedAttempt, resetAttempts, getClientIp } from '@/lib/auth/rate-limit';
+import {
+    checkRateLimit,
+    recordFailedAttempt,
+    resetAttempts,
+    getClientIp,
+} from '@/lib/auth/rate-limit';
 import { sendPasswordResetEmail } from '@/lib/email/notifications/send-password-reset-email';
 import { sendSignupConfirmationEmail } from '@/lib/email/notifications/send-signup-confirmation-email';
 import { sendExistingAccountEmail } from '@/lib/email/notifications/send-existing-account-email';
@@ -75,19 +80,22 @@ export async function signUpAction(fields) {
 
         const supabase = createAdminClient();
         // handle_new_user() (migration 0005) reads this into profiles.display_name on insert.
-        const { data: generatedLink, error: generateLinkError } = await supabase.auth.admin.generateLink({
-            type: 'signup',
-            email,
-            password,
-            options: { data: { display_name: displayName } },
-        });
+        const { data: generatedLink, error: generateLinkError } =
+            await supabase.auth.admin.generateLink({
+                type: 'signup',
+                email,
+                password,
+                options: { data: { display_name: displayName } },
+            });
 
         if (generateLinkError) {
             if (generateLinkError.code === 'user_already_exists') {
                 const { data: recoveryLink } = await supabase.auth.admin.generateLink({
                     type: 'recovery',
                     email,
-                    options: { redirectTo: `${process.env.SITE_URL}/auth/confirm?next=/reset-password` },
+                    options: {
+                        redirectTo: `${process.env.SITE_URL}/auth/confirm?next=/reset-password`,
+                    },
                 });
                 if (recoveryLink) {
                     const loginLink = `${process.env.SITE_URL}/auth/confirm?token_hash=${recoveryLink.properties.hashed_token}&type=recovery&next=/reset-password`;
@@ -203,7 +211,11 @@ export async function requestPasswordResetAction(fields) {
     const ipAddress = getClientIp(await headers());
 
     try {
-        const { isLocked, retryAfterMinutes } = await checkRateLimit('password_reset', email, ipAddress);
+        const { isLocked, retryAfterMinutes } = await checkRateLimit(
+            'password_reset',
+            email,
+            ipAddress,
+        );
         if (isLocked) {
             return {
                 error: LOCKOUT_ERROR_MESSAGE(retryAfterMinutes),

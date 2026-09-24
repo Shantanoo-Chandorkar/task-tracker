@@ -18,7 +18,9 @@ import StatusBadge from '@/components/status/StatusBadge';
 export default function HomeTaskSection({ title, tasks, emptyMessage, showsPriorityStar = false }) {
     return (
         <section aria-label={title}>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{title}</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                {title}
+            </h2>
             {tasks.length === 0 ? (
                 <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
                     {emptyMessage}
@@ -32,10 +34,15 @@ export default function HomeTaskSection({ title, tasks, emptyMessage, showsPrior
                                 className="flex items-center gap-2 px-3 py-3 hover:bg-muted/50 motion-safe:transition-colors"
                             >
                                 {showsPriorityStar && (
-                                    <Star aria-hidden="true" className="h-3.5 w-3.5 flex-shrink-0 fill-amber-400 text-amber-400" />
+                                    <Star
+                                        aria-hidden="true"
+                                        className="h-3.5 w-3.5 flex-shrink-0 fill-amber-400 text-amber-400"
+                                    />
                                 )}
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-sm text-foreground">{task.title}</span>
+                                    <span className="block truncate text-sm text-foreground">
+                                        {task.title}
+                                    </span>
                                     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                         {task.list_color && (
                                             <span
@@ -51,7 +58,11 @@ export default function HomeTaskSection({ title, tasks, emptyMessage, showsPrior
                                         )}
                                     </span>
                                 </span>
-                                <StatusBadge name={task.status_name} color={task.status_color} className="flex-shrink-0" />
+                                <StatusBadge
+                                    name={task.status_name}
+                                    color={task.status_color}
+                                    className="flex-shrink-0"
+                                />
                             </Link>
                         </li>
                     ))}

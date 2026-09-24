@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
@@ -9,7 +10,6 @@ import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CharLimitField from '@/components/ui/CharLimitField';
-import RichTextEditor from '@/components/ui/RichTextEditor';
 import {
     Select,
     SelectContent,
@@ -25,6 +25,16 @@ import { bustPageCache } from '@/lib/service-worker-cache';
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 10000;
+
+// Tiptap is heavy and only needed once this dialog actually opens - keeps it out of the list page's initial bundle.
+const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex min-h-[200px] items-center justify-center">
+            <Loader />
+        </div>
+    ),
+});
 
 /**
  * Modal for creating or editing a task, via the shared ModalShell container.
@@ -108,28 +118,39 @@ export default function TaskFormDialog({
             status_id: statusId || null,
             due_date: dueDate || null,
             parent_id: isEditing ? task.parent_id : (parentId ?? null),
-            ...(isEditing ? {} : { list_id: listId, sublist_id: isRootCreate ? sublistId || null : null }),
+            ...(isEditing
+                ? {}
+                : { list_id: listId, sublist_id: isRootCreate ? sublistId || null : null }),
             is_recurring: isRecurring,
             recurrence_rule: isRecurring ? recurrenceRule : null,
         };
 
-        const { error } = isEditing ? await updateTask(task.id, fields) : await createTask(fields);
+        try {
+            const { error } = isEditing
+                ? await updateTask(task.id, fields)
+                : await createTask(fields);
 
-        setSubmitting(false);
+            if (error) {
+                setFormError(error);
+                toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
+                return;
+            }
 
-        if (error) {
-            setFormError(error);
-            toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
-            return;
+            toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
+            onClose();
+            // Not awaited - the dialog closes immediately instead of blocking on this refetch.
+            queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
+            // A new task changes the list's total count - the sidebar's ['lists'] query needs telling.
+            if (!isEditing) queryClient.invalidateQueries({ queryKey: ['lists'] });
+            bustPageCache({ urls: [`/lists/${listId ?? task?.list_id}`] });
+        } catch {
+            // A rejected server action means the request never completed (offline, server down)
+            const message = 'Could not save. Check your connection and try again.';
+            setFormError(message);
+            toast.error(message);
+        } finally {
+            setSubmitting(false);
         }
-
-        toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
-        onClose();
-        // Not awaited - the dialog closes immediately instead of blocking on this refetch.
-        queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
-        // A new task changes the list's total count - the sidebar's ['lists'] query needs telling.
-        if (!isEditing) queryClient.invalidateQueries({ queryKey: ['lists'] });
-        bustPageCache({ urls: [`/lists/${listId ?? task?.list_id}`] });
     }
 
     return (

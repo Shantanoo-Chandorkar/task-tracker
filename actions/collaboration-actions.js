@@ -1,10 +1,8 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
-import { getCurrentUser } from '@/lib/auth/session';
-import { blockGuestAction } from '@/lib/guest/guest-guards';
-import { NOT_AUTHENTICATED, SPACE_NOT_FOUND, ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
+import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
+import { SPACE_NOT_FOUND, ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
 import { COLLABORATOR_PERMISSION_LEVELS } from '@/lib/permissions/space-permissions';
 import { sendJoinRequestEmail } from '@/lib/email/notifications/send-join-request-email';
 import { sendJoinDecisionEmail } from '@/lib/email/notifications/send-join-decision-email';
@@ -21,19 +19,15 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  * @param {string} fields.spaceId - UUID of the space to join
  * @returns {{ data: object|null, error: string|null, code: string|null }}
  */
-export async function requestToJoinSpace(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const requestToJoinSpace = withAuthenticatedAction(
+    '[collaboration] join-request',
+    'Unexpected error sending join request',
+    async (user, supabase, fields) => {
+        const spaceId = (fields.spaceId ?? '').trim();
+        if (!UUID_PATTERN.test(spaceId)) {
+            return { data: null, error: 'Enter a valid space ID', code: null };
+        }
 
-    const guestBlock = blockGuestAction(user);
-    if (guestBlock) return { data: null, ...guestBlock };
-
-    const spaceId = (fields.spaceId ?? '').trim();
-    if (!UUID_PATTERN.test(spaceId)) {
-        return { data: null, error: 'Enter a valid space ID', code: null };
-    }
-
-    try {
         const adminSupabase = createAdminClient();
         const { data: targetSpace } = await adminSupabase
             .from('spaces')
@@ -48,7 +42,6 @@ export async function requestToJoinSpace(fields) {
             return { data: null, error: 'You already own this space', code: null };
         }
 
-        const supabase = await createClient();
         const { data: createdRequest, error } = await supabase
             .from('space_collaborators')
             .insert({ space_id: spaceId, user_id: user.id, requester_email: user.email })
@@ -56,15 +49,18 @@ export async function requestToJoinSpace(fields) {
             .single();
 
         if (error?.code === '23505') {
-            return { data: null, error: 'You already requested or joined this space', code: ALREADY_MEMBER };
+            return {
+                data: null,
+                error: 'You already requested or joined this space',
+                code: ALREADY_MEMBER,
+            };
         }
         if (error) {
             return { data: null, error: 'Failed to send join request', code: null };
         }
 
-        const { data: ownerAuthUser, error: ownerLookupError } = await adminSupabase.auth.admin.getUserById(
-            targetSpace.owner_id,
-        );
+        const { data: ownerAuthUser, error: ownerLookupError } =
+            await adminSupabase.auth.admin.getUserById(targetSpace.owner_id);
         if (ownerAuthUser?.user?.email) {
             await sendJoinRequestEmail(ownerAuthUser.user.email, targetSpace.name, user.email);
         } else {
@@ -75,10 +71,9 @@ export async function requestToJoinSpace(fields) {
         }
 
         return { data: createdRequest, error: null, code: null };
-    } catch {
-        return { data: null, error: 'Unexpected error sending join request', code: null };
-    }
-}
+    },
+    { blockGuest: true },
+);
 
 /**
  * Approves a pending join request. RLS restricts the update to the space's own owner, so an
@@ -88,15 +83,10 @@ export async function requestToJoinSpace(fields) {
  * @param {string} fields.requestId
  * @returns {{ data: object|null, error: string|null, code: string|null }}
  */
-export async function approveJoinRequest(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    const guestBlock = blockGuestAction(user);
-    if (guestBlock) return { data: null, ...guestBlock };
-
-    try {
-        const supabase = await createClient();
+export const approveJoinRequest = withAuthenticatedAction(
+    '[collaboration] approve-request',
+    'Unexpected error approving request',
+    async (user, supabase, fields) => {
         const { data: acceptedRow, error } = await supabase
             .from('space_collaborators')
             .update({ status: 'accepted' })
@@ -124,10 +114,9 @@ export async function approveJoinRequest(fields) {
         }
 
         return { data: acceptedRow, error: null, code: null };
-    } catch {
-        return { data: null, error: 'Unexpected error approving request', code: null };
-    }
-}
+    },
+    { blockGuest: true },
+);
 
 /**
  * Rejects (deletes) a pending join request. Same owner-only RLS guarantee as approve.
@@ -136,15 +125,10 @@ export async function approveJoinRequest(fields) {
  * @param {string} fields.requestId
  * @returns {{ error: string|null, code: string|null }}
  */
-export async function rejectJoinRequest(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    const guestBlock = blockGuestAction(user);
-    if (guestBlock) return guestBlock;
-
-    try {
-        const supabase = await createClient();
+export const rejectJoinRequest = withAuthenticatedAction(
+    '[collaboration] reject-request',
+    'Unexpected error rejecting request',
+    async (user, supabase, fields) => {
         const { data: rejectedRow, error } = await supabase
             .from('space_collaborators')
             .delete()
@@ -172,10 +156,9 @@ export async function rejectJoinRequest(fields) {
         }
 
         return { error: null, code: null };
-    } catch {
-        return { error: 'Unexpected error rejecting request', code: null };
-    }
-}
+    },
+    { blockGuest: true, hasData: false },
+);
 
 /**
  * Removes an accepted collaborator from a space. Owner-only via the same DELETE RLS policy.
@@ -184,15 +167,10 @@ export async function rejectJoinRequest(fields) {
  * @param {string} fields.collaboratorId
  * @returns {{ error: string|null, code: string|null }}
  */
-export async function removeCollaborator(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    const guestBlock = blockGuestAction(user);
-    if (guestBlock) return guestBlock;
-
-    try {
-        const supabase = await createClient();
+export const removeCollaborator = withAuthenticatedAction(
+    '[collaboration] remove-collaborator',
+    'Unexpected error removing collaborator',
+    async (user, supabase, fields) => {
         const { data: removedRow, error } = await supabase
             .from('space_collaborators')
             .delete()
@@ -220,10 +198,9 @@ export async function removeCollaborator(fields) {
         }
 
         return { error: null, code: null };
-    } catch {
-        return { error: 'Unexpected error removing collaborator', code: null };
-    }
-}
+    },
+    { blockGuest: true, hasData: false },
+);
 
 /**
  * Changes an accepted collaborator's permission tier. Owner-only via the same UPDATE RLS policy
@@ -235,19 +212,14 @@ export async function removeCollaborator(fields) {
  * @param {'full'|'restricted'|'read_only'} fields.permissionLevel
  * @returns {{ data: object|null, error: string|null, code: string|null }}
  */
-export async function updateCollaboratorPermission(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const updateCollaboratorPermission = withAuthenticatedAction(
+    '[collaboration] update-permission',
+    'Unexpected error updating permission',
+    async (user, supabase, fields) => {
+        if (!COLLABORATOR_PERMISSION_LEVELS.includes(fields.permissionLevel)) {
+            return { data: null, error: 'Invalid permission level', code: null };
+        }
 
-    const guestBlock = blockGuestAction(user);
-    if (guestBlock) return { data: null, ...guestBlock };
-
-    if (!COLLABORATOR_PERMISSION_LEVELS.includes(fields.permissionLevel)) {
-        return { data: null, error: 'Invalid permission level', code: null };
-    }
-
-    try {
-        const supabase = await createClient();
         const { data: updatedRow, error } = await supabase
             .from('space_collaborators')
             .update({ permission_level: fields.permissionLevel })
@@ -261,10 +233,9 @@ export async function updateCollaboratorPermission(fields) {
         }
 
         return { data: updatedRow, error: null, code: null };
-    } catch {
-        return { data: null, error: 'Unexpected error updating permission', code: null };
-    }
-}
+    },
+    { blockGuest: true },
+);
 
 /**
  * Cancels the caller's own pending request, or leaves a space they've been accepted into --
@@ -274,15 +245,10 @@ export async function updateCollaboratorPermission(fields) {
  * @param {string} fields.spaceId
  * @returns {{ error: string|null, code: string|null }}
  */
-export async function leaveSpace(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    const guestBlock = blockGuestAction(user);
-    if (guestBlock) return guestBlock;
-
-    try {
-        const supabase = await createClient();
+export const leaveSpace = withAuthenticatedAction(
+    '[collaboration] leave-space',
+    'Unexpected error leaving space',
+    async (user, supabase, fields) => {
         const { data: removedRow, error } = await supabase
             .from('space_collaborators')
             .delete()
@@ -308,12 +274,19 @@ export async function leaveSpace(fields) {
                 const { data: ownerAuthUser, error: ownerLookupError } =
                     await adminSupabase.auth.admin.getUserById(space.owner_id);
                 if (ownerAuthUser?.user?.email) {
-                    await sendCollaboratorLeftEmail(ownerAuthUser.user.email, space.name, user.email);
+                    await sendCollaboratorLeftEmail(
+                        ownerAuthUser.user.email,
+                        space.name,
+                        user.email,
+                    );
                 } else {
-                    console.error('[collaboration] could not resolve owner email for leave notice', {
-                        spaceId: removedRow.space_id,
-                        detail: ownerLookupError?.message,
-                    });
+                    console.error(
+                        '[collaboration] could not resolve owner email for leave notice',
+                        {
+                            spaceId: removedRow.space_id,
+                            detail: ownerLookupError?.message,
+                        },
+                    );
                 }
             } else {
                 console.error('[collaboration] could not resolve space for leave notice', {
@@ -324,7 +297,6 @@ export async function leaveSpace(fields) {
         }
 
         return { error: null, code: null };
-    } catch {
-        return { error: 'Unexpected error leaving space', code: null };
-    }
-}
+    },
+    { blockGuest: true, hasData: false },
+);

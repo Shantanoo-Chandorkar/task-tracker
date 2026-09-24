@@ -114,12 +114,19 @@ const SubtaskTreeNode = memo(function SubtaskTreeNode({
                     />
                     <span className="flex-1 truncate">{node.title}</span>
                     {hasChildren && (
-                        <span className="text-xs text-muted-foreground">{node.children.length}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {node.children.length}
+                        </span>
                     )}
                 </Link>
             </div>
             {hasChildren && isExpanded && (
-                <SubtaskTree nodes={node.children} listId={listId} flatList={flatList} depth={depth + 1} />
+                <SubtaskTree
+                    nodes={node.children}
+                    listId={listId}
+                    flatList={flatList}
+                    depth={depth + 1}
+                />
             )}
         </div>
     );

@@ -13,7 +13,9 @@ export function useCollaboratorsQuery(spaceId, options = {}) {
     return useQuery({
         queryKey: ['space-collaborators', spaceId, 'accepted'],
         queryFn: async () => {
-            const response = await fetch(`/api/space-collaborators?space_id=${spaceId}&status=accepted`);
+            const response = await fetch(
+                `/api/space-collaborators?space_id=${spaceId}&status=accepted`,
+            );
             if (!response.ok) throw new Error('Failed to fetch collaborators');
             return response.json();
         },

@@ -28,19 +28,19 @@ Task Tracker is a mobile-first, installable task manager with nested subtasks, i
 
 ## Tech Stack
 
-| Concern | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Language | JavaScript (ES2024), Node 22.13+ |
-| Styling / UI | Tailwind CSS v4, shadcn/ui on Radix |
-| Database and auth | Supabase (PostgreSQL, Row Level Security, Supabase Auth via `@supabase/ssr`) |
-| Server state | TanStack Query v5 |
-| Drag and drop | @dnd-kit/sortable |
-| Rich text | TipTap, sanitised with `xss` |
-| Recurrence | rrule + date-fns |
-| Email | Brevo SMTP through nodemailer |
-| Bot check (guest button) | Cloudflare Turnstile, verified in our own server |
-| Testing | Vitest |
+| Concern                  | Technology                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| Framework                | Next.js 16 (App Router, Turbopack)                                           |
+| Language                 | JavaScript (ES2024), Node 22.13+                                             |
+| Styling / UI             | Tailwind CSS v4, shadcn/ui on Radix                                          |
+| Database and auth        | Supabase (PostgreSQL, Row Level Security, Supabase Auth via `@supabase/ssr`) |
+| Server state             | TanStack Query v5                                                            |
+| Drag and drop            | @dnd-kit/sortable                                                            |
+| Rich text                | TipTap, sanitised with `xss`                                                 |
+| Recurrence               | rrule + date-fns                                                             |
+| Email                    | Brevo SMTP through nodemailer                                                |
+| Bot check (guest button) | Cloudflare Turnstile, verified in our own server                             |
+| Testing                  | Vitest                                                                       |
 
 ---
 
@@ -81,16 +81,16 @@ task-tracker/
 
 Create a project at [supabase.com](https://supabase.com), then run the migrations in `supabase/migrations/` **in order** in the SQL Editor. That folder is listed in `.gitignore`, so it lives on the author's machine and not in the repository.
 
-| Migration | Adds |
-|---|---|
-| 0001-0004 | Base tables, RLS, spaces and lists, status codes and due dates, sublists |
-| 0005-0006 | User profiles (created by a trigger on sign-up) and a backfill |
-| 0007-0008 | Space ownership and per-owner RLS, statuses per space (default statuses created by a trigger) |
-| 0009, 0012 | `auth_rate_limits` table for sign-in, password-reset and sign-up lockouts |
-| 0010-0011 | Sharing (`space_collaborators`) and the fix for a policy recursion |
-| 0013 | `tasks.is_prioritised` (the priority star) |
-| 0014 | Guest service: `guest_create` rate-limit type and `purge_expired_guests()` on a 10-minute `pg_cron` schedule |
-| 0015 | Guest protection: helper functions, restrictive RLS policies, cap and text-limit triggers, conversion block (run it block by block; the rollback is at the bottom of the file) |
+| Migration  | Adds                                                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0001-0004  | Base tables, RLS, spaces and lists, status codes and due dates, sublists                                                                                                       |
+| 0005-0006  | User profiles (created by a trigger on sign-up) and a backfill                                                                                                                 |
+| 0007-0008  | Space ownership and per-owner RLS, statuses per space (default statuses created by a trigger)                                                                                  |
+| 0009, 0012 | `auth_rate_limits` table for sign-in, password-reset and sign-up lockouts                                                                                                      |
+| 0010-0011  | Sharing (`space_collaborators`) and the fix for a policy recursion                                                                                                             |
+| 0013       | `tasks.is_prioritised` (the priority star)                                                                                                                                     |
+| 0014       | Guest service: `guest_create` rate-limit type and `purge_expired_guests()` on a 10-minute `pg_cron` schedule                                                                   |
+| 0015       | Guest protection: helper functions, restrictive RLS policies, cap and text-limit triggers, conversion block (run it block by block; the rollback is at the bottom of the file) |
 
 Dashboard settings to check (Authentication):
 
@@ -105,14 +105,14 @@ Dashboard settings to check (Authentication):
 
 Copy `.env.example` to `.env.local` and fill it in:
 
-| Variable | Purpose |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Project URL and publishable key (Project Settings > API). Supabase uses `PUBLISHABLE_KEY`, not the legacy `ANON_KEY` |
-| `SUPABASE_SECRET_KEY` | Server-only, bypasses RLS. Used by the admin client, rate limits, the guest seed and the cron. Never `NEXT_PUBLIC_` |
-| `CRON_SECRET` | Random string; authenticates `/api/cron/recurrence` |
-| `SITE_URL` | App origin for email links. Never taken from request headers |
-| `BREVO_SMTP_HOST`, `BREVO_SMTP_PORT`, `BREVO_SMTP_USER`, `BREVO_SMTP_PASS`, `EMAIL_FROM` | Email sending |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile for the guest button. Leave both empty to run without the check. The secret is server-only |
+| Variable                                                                                 | Purpose                                                                                                              |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                       | Project URL and publishable key (Project Settings > API). Supabase uses `PUBLISHABLE_KEY`, not the legacy `ANON_KEY` |
+| `SUPABASE_SECRET_KEY`                                                                    | Server-only, bypasses RLS. Used by the admin client, rate limits, the guest seed and the cron. Never `NEXT_PUBLIC_`  |
+| `CRON_SECRET`                                                                            | Random string; authenticates `/api/cron/recurrence`                                                                  |
+| `SITE_URL`                                                                               | App origin for email links. Never taken from request headers                                                         |
+| `BREVO_SMTP_HOST`, `BREVO_SMTP_PORT`, `BREVO_SMTP_USER`, `BREVO_SMTP_PASS`, `EMAIL_FROM` | Email sending                                                                                                        |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`                                 | Cloudflare Turnstile for the guest button. Leave both empty to run without the check. The secret is server-only      |
 
 ### 3. Cloudflare Turnstile (for the guest button)
 
@@ -145,7 +145,7 @@ npm run lint      # ESLint
 
 A visitor can click **Try as guest** on the login page and get a private, pre-seeded space (lists, sublists, subtasks, starred and recurring tasks) for **30 minutes**, with no sign-up. The banner says not to enter anything sensitive, because guest data is temporary and not private in the way an account is.
 
-**How it works.** A guest is a Supabase *anonymous user*: a real user row with `is_anonymous = true`, using the normal `authenticated` role. So the existing owner-only RLS already isolates guests from each other and from real users. The guest code lives in `lib/guest/`, `actions/guest-actions.js` and migrations 0014 and 0015; the rest of the app gets small guards that do nothing for registered users.
+**How it works.** A guest is a Supabase _anonymous user_: a real user row with `is_anonymous = true`, using the normal `authenticated` role. So the existing owner-only RLS already isolates guests from each other and from real users. The guest code lives in `lib/guest/`, `actions/guest-actions.js` and migrations 0014 and 0015; the rest of the app gets small guards that do nothing for registered users.
 
 **Starting a session** (`startGuestSession`): already-signed-in check, then the per-IP limit (**5 attempts per hour**, every attempt counts), then a Cloudflare Turnstile check, then anonymous sign-in, then the sample space is inserted. If seeding fails the half-built guest is deleted.
 
@@ -158,14 +158,14 @@ A visitor can click **Try as guest** on the login page and get a private, pre-se
 
 **What a guest cannot do**, enforced both in the app and in the database (so calling Supabase directly does not get around it):
 
-| Rule | App | Database (0015) |
-|---|---|---|
-| Use the app past 30 minutes | proxy, `getCurrentUser`, session route | restrictive RLS policy on every content table |
-| Share, request to join, approve, change password | `blockGuestAction` in six server actions | restrictive policy on `space_collaborators` (also blocks requests *to* a guest's space) |
-| Create more than 1 space, 3 lists, 6 sublists, 60 tasks, 8 statuses | friendly `GUEST_LIMIT_REACHED` message | `BEFORE INSERT` triggers |
-| Store oversized text (names and titles over 200, descriptions over 10000, recurrence rules over 2000 bytes) | app validation | same triggers |
-| Turn into a registered account (email, phone, password, identity link) | n/a | trigger on `auth.users` |
-| Run the purge function | n/a | execute revoked from every API role |
+| Rule                                                                                                        | App                                      | Database (0015)                                                                         |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
+| Use the app past 30 minutes                                                                                 | proxy, `getCurrentUser`, session route   | restrictive RLS policy on every content table                                           |
+| Share, request to join, approve, change password                                                            | `blockGuestAction` in six server actions | restrictive policy on `space_collaborators` (also blocks requests _to_ a guest's space) |
+| Create more than 1 space, 3 lists, 6 sublists, 60 tasks, 8 statuses                                         | friendly `GUEST_LIMIT_REACHED` message   | `BEFORE INSERT` triggers                                                                |
+| Store oversized text (names and titles over 200, descriptions over 10000, recurrence rules over 2000 bytes) | app validation                           | same triggers                                                                           |
+| Turn into a registered account (email, phone, password, identity link)                                      | n/a                                      | trigger on `auth.users`                                                                 |
+| Run the purge function                                                                                      | n/a                                      | execute revoked from every API role                                                     |
 
 Limits are defined in `lib/guest/guest-config.js` and repeated in `0015_guest_protection.sql`; the verification script fails if they drift apart.
 

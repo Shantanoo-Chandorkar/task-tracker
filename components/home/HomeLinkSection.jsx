@@ -14,7 +14,9 @@ import Link from 'next/link';
 export default function HomeLinkSection({ title, links, emptyMessage }) {
     return (
         <section aria-label={title}>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{title}</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                {title}
+            </h2>
             {links.length === 0 ? (
                 <p className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
                     {emptyMessage}
@@ -31,8 +33,12 @@ export default function HomeLinkSection({ title, links, emptyMessage }) {
                                     className="h-2 w-2 flex-shrink-0 rounded-full bg-muted-foreground/40"
                                     style={link.color ? { backgroundColor: link.color } : undefined}
                                 />
-                                <span className="min-w-0 flex-1 truncate text-sm text-foreground">{link.name}</span>
-                                <span className="flex-shrink-0 text-xs text-muted-foreground">{link.subtitle}</span>
+                                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                                    {link.name}
+                                </span>
+                                <span className="flex-shrink-0 text-xs text-muted-foreground">
+                                    {link.subtitle}
+                                </span>
                             </Link>
                         </li>
                     ))}

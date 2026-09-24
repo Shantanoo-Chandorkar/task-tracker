@@ -31,7 +31,8 @@ export default function AuthKeepAlive() {
                 if (response.status !== 401) return;
 
                 const { code: errorCode } = await response.json();
-                if (errorCode === GUEST_ERROR_CODES.SESSION_EXPIRED) window.location.assign('/login?reason=guest-expired');
+                if (errorCode === GUEST_ERROR_CODES.SESSION_EXPIRED)
+                    window.location.assign('/login?reason=guest-expired');
                 else if (errorCode === NOT_AUTHENTICATED) window.location.assign('/login');
             } catch {
                 // Offline or server unreachable: the session is untouched, so stay put and retry on the next trigger

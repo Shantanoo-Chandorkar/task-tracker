@@ -22,8 +22,14 @@ export default function MobileTopBar({ initialSpaces, initialLists, initialProfi
     const params = useParams();
     const listId = params?.listId;
 
-    const { data: spaces = [] } = useSpacesQuery({ enabled: Boolean(listId), initialData: initialSpaces });
-    const { data: lists = [] } = useListsQuery({ enabled: Boolean(listId), initialData: initialLists });
+    const { data: spaces = [] } = useSpacesQuery({
+        enabled: Boolean(listId),
+        initialData: initialSpaces,
+    });
+    const { data: lists = [] } = useListsQuery({
+        enabled: Boolean(listId),
+        initialData: initialLists,
+    });
 
     const currentList = listId ? lists.find((list) => list.id === listId) : null;
     const currentSpace = currentList

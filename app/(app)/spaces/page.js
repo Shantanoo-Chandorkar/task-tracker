@@ -18,7 +18,11 @@ export default async function SpacesPage() {
         supabase.from('lists').select('*').order('position', { ascending: true }),
     ]);
 
-    const spacesWithPermission = await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null);
+    const spacesWithPermission = await attachMyPermissionLevel(
+        supabase,
+        spaces || [],
+        user?.id ?? null,
+    );
     // Matches /api/profile's computation, so the client refetch never hydration-mismatches this field.
     const initialProfile = user ? await getCurrentUserProfile(supabase, user) : null;
 

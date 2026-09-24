@@ -1,12 +1,9 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
-import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
-import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
+import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 
 /**
  * Creates a new space. Appends it after the last existing space.
@@ -16,19 +13,16 @@ import { sanitizeString, checkMaxLength } from '@/lib/validation';
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function createSpace(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    const name = sanitizeString(fields.name, true);
-    if (!name) {
-        return { data: null, error: 'Space name is required' };
-    }
-    const nameError = checkMaxLength(name, 100, 'Space name');
-    if (nameError) return { data: null, error: nameError.error };
-
-    try {
-        const supabase = await createClient();
+export const createSpace = withAuthenticatedAction(
+    '[spaces] create',
+    'Unexpected error creating space',
+    async (user, supabase, fields) => {
+        const name = sanitizeString(fields.name, true);
+        if (!name) {
+            return { data: null, error: 'Space name is required' };
+        }
+        const nameError = checkMaxLength(name, 100, 'Space name');
+        if (nameError) return { data: null, error: nameError.error };
 
         const position = await getNextPosition(supabase, 'spaces', {});
 
@@ -49,13 +43,9 @@ export async function createSpace(fields) {
             return { data: null, error: 'Failed to create space' };
         }
 
-        revalidateTag('spaces', { expire: 0 });
         return { data: createdSpace, error: null };
-    } catch (thrown) {
-        console.error('[spaces] create threw', { detail: thrown?.message });
-        return { data: null, error: 'Unexpected error creating space' };
-    }
-}
+    },
+);
 
 /**
  * Updates specific fields on a space (name, color, position).
@@ -64,25 +54,30 @@ export async function createSpace(fields) {
  * @param {object} fields - Partial space fields to update
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function updateSpace(id, fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const updateSpace = withAuthenticatedAction(
+    '[spaces] update',
+    'Unexpected error updating space',
+    async (user, supabase, id, fields) => {
+        if (!id) return { data: null, error: 'Space ID is required' };
 
-    if (!id) return { data: null, error: 'Space ID is required' };
-    
-    if ('name' in fields) {
-        fields.name = sanitizeString(fields.name, true);
-        if (!fields.name) return { data: null, error: 'Space name is required' };
-        const nameError = checkMaxLength(fields.name, 100, 'Space name');
-        if (nameError) return { data: null, error: nameError.error };
-    }
+        if ('name' in fields) {
+            fields.name = sanitizeString(fields.name, true);
+            if (!fields.name) return { data: null, error: 'Space name is required' };
+            const nameError = checkMaxLength(fields.name, 100, 'Space name');
+            if (nameError) return { data: null, error: nameError.error };
+        }
 
-    try {
-        const supabase = await createClient();
+        // Explicit allowlist, not { ...fields } - an unlisted field must never reach the update.
+        const { name, color, position } = fields;
+        const updates = {
+            ...(name !== undefined && { name }),
+            ...(color !== undefined && { color }),
+            ...(position !== undefined && { position }),
+        };
 
         const { data: updatedSpace, error } = await supabase
             .from('spaces')
-            .update(fields)
+            .update(updates)
             .eq('id', id)
             .select()
             .single();
@@ -91,13 +86,9 @@ export async function updateSpace(id, fields) {
             return { data: null, error: 'Failed to update space' };
         }
 
-        revalidateTag('spaces', { expire: 0 });
         return { data: updatedSpace, error: null };
-    } catch (thrown) {
-        console.error('[spaces] update threw', { id, detail: thrown?.message });
-        return { data: null, error: 'Unexpected error updating space' };
-    }
-}
+    },
+);
 
 /**
  * Deletes a space. Cascades to its lists and their tasks (ON DELETE CASCADE).
@@ -105,14 +96,11 @@ export async function updateSpace(id, fields) {
  * @param {string} id - Space ID to delete
  * @returns {{ error: string|null }}
  */
-export async function deleteSpace(id) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!id) return { error: 'Space ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const deleteSpace = withAuthenticatedAction(
+    '[spaces] delete',
+    'Unexpected error deleting space',
+    async (user, supabase, id) => {
+        if (!id) return { error: 'Space ID is required' };
 
         const { error } = await supabase.from('spaces').delete().eq('id', id);
 
@@ -120,12 +108,7 @@ export async function deleteSpace(id) {
             return { error: 'Failed to delete space' };
         }
 
-        revalidateTag('spaces', { expire: 0 });
-        revalidateTag('lists', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch (thrown) {
-        console.error('[spaces] delete threw', { id, detail: thrown?.message });
-        return { error: 'Unexpected error deleting space' };
-    }
-}
+    },
+    { hasData: false },
+);

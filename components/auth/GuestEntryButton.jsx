@@ -9,7 +9,8 @@ import { startGuestSession } from '@/actions/guest-actions';
 import { clearAllCaches } from '@/lib/cache';
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+const TURNSTILE_SCRIPT_URL =
+    'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
 let turnstileScriptPromise = null;
 
@@ -65,11 +66,16 @@ export default function GuestEntryButton() {
                     'error-callback': () => setCaptchaToken(null),
                 });
             })
-            .catch(() => setErrorMessage('Could not load the security check. Refresh the page and try again.'));
+            .catch(() =>
+                setErrorMessage(
+                    'Could not load the security check. Refresh the page and try again.',
+                ),
+            );
 
         return () => {
             isCancelled = true;
-            if (captchaWidgetIdRef.current !== null) window.turnstile?.remove(captchaWidgetIdRef.current);
+            if (captchaWidgetIdRef.current !== null)
+                window.turnstile?.remove(captchaWidgetIdRef.current);
             captchaWidgetIdRef.current = null;
         };
     }, []);
@@ -79,7 +85,8 @@ export default function GuestEntryButton() {
      */
     function resetCaptcha() {
         setCaptchaToken(null);
-        if (captchaWidgetIdRef.current !== null) window.turnstile?.reset(captchaWidgetIdRef.current);
+        if (captchaWidgetIdRef.current !== null)
+            window.turnstile?.reset(captchaWidgetIdRef.current);
     }
 
     /**
@@ -117,8 +124,8 @@ export default function GuestEntryButton() {
     return (
         <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-                Just looking around? Try a 30-minute guest session with sample data. Guest data is temporary and not
-                private, so do not enter anything sensitive.
+                Just looking around? Try a 30-minute guest session with sample data. Guest data is
+                temporary and not private, so do not enter anything sensitive.
             </p>
 
             {TURNSTILE_SITE_KEY && <div ref={captchaContainerRef} />}

@@ -20,7 +20,10 @@ import {
  */
 async function expectRowBelow(lowerRow, upperRow) {
     await expect(async () => {
-        const [lowerBox, upperBox] = await Promise.all([lowerRow.boundingBox(), upperRow.boundingBox()]);
+        const [lowerBox, upperBox] = await Promise.all([
+            lowerRow.boundingBox(),
+            upperRow.boundingBox(),
+        ]);
         expect(lowerBox.y).toBeGreaterThan(upperBox.y);
     }).toPass();
 }
@@ -36,12 +39,18 @@ test.describe('drag-and-drop reorder', () => {
         const secondSpaceName = await createSpace(page);
 
         await dragHandleDown(spaceSection(page, firstSpaceName));
-        await expectRowBelow(spaceSection(page, firstSpaceName), spaceSection(page, secondSpaceName));
+        await expectRowBelow(
+            spaceSection(page, firstSpaceName),
+            spaceSection(page, secondSpaceName),
+        );
         // The reorder is only optimistic until this toast confirms the position actually saved.
         await expect(page.getByText('Order saved')).toBeVisible();
 
         await page.reload();
-        await expectRowBelow(spaceSection(page, firstSpaceName), spaceSection(page, secondSpaceName));
+        await expectRowBelow(
+            spaceSection(page, firstSpaceName),
+            spaceSection(page, secondSpaceName),
+        );
     });
 
     test('reordering lists within a space persists after reload', async ({ page }) => {
@@ -51,11 +60,17 @@ test.describe('drag-and-drop reorder', () => {
         const secondListName = await createList(page, spaceName);
 
         await dragHandleDown(listRow(page, spaceName, firstListName));
-        await expectRowBelow(listRow(page, spaceName, firstListName), listRow(page, spaceName, secondListName));
+        await expectRowBelow(
+            listRow(page, spaceName, firstListName),
+            listRow(page, spaceName, secondListName),
+        );
         await expect(page.getByText('Order saved')).toBeVisible();
 
         await page.reload();
-        await expectRowBelow(listRow(page, spaceName, firstListName), listRow(page, spaceName, secondListName));
+        await expectRowBelow(
+            listRow(page, spaceName, firstListName),
+            listRow(page, spaceName, secondListName),
+        );
     });
 
     test('reordering sublists within a list persists after reload', async ({ page }) => {
@@ -69,11 +84,17 @@ test.describe('drag-and-drop reorder', () => {
         const secondSublistName = await createSublist(page, spaceName, listName);
 
         await dragHandleDown(sublistRow(page, firstSublistName));
-        await expectRowBelow(sublistRow(page, firstSublistName), sublistRow(page, secondSublistName));
+        await expectRowBelow(
+            sublistRow(page, firstSublistName),
+            sublistRow(page, secondSublistName),
+        );
         await expect(page.getByText('Order updated')).toBeVisible();
 
         await page.reload();
-        await expectRowBelow(sublistRow(page, firstSublistName), sublistRow(page, secondSublistName));
+        await expectRowBelow(
+            sublistRow(page, firstSublistName),
+            sublistRow(page, secondSublistName),
+        );
     });
 
     test('reordering tasks in the same status bucket persists after reload', async ({ page }) => {

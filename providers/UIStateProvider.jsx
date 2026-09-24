@@ -52,7 +52,11 @@ export function UIStateProvider({ children }) {
  * @returns {{flags: Object<string, boolean>, toggleFlag: Function, setFlag: Function}}
  */
 export function useUIState() {
-    const snapshot = useSyncExternalStore(subscribe, () => flags, () => flags);
+    const snapshot = useSyncExternalStore(
+        subscribe,
+        () => flags,
+        () => flags,
+    );
     return { flags: snapshot, toggleFlag, setFlag };
 }
 

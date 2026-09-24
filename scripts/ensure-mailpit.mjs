@@ -5,7 +5,10 @@ import { join } from 'node:path';
 // Downloads the Mailpit binary (SMTP catcher for reading test emails) if not already installed.
 
 export const MAILPIT_INSTALL_DIR = join(process.cwd(), '.tools', 'mailpit');
-export const MAILPIT_BINARY_PATH = join(MAILPIT_INSTALL_DIR, process.platform === 'win32' ? 'mailpit.exe' : 'mailpit');
+export const MAILPIT_BINARY_PATH = join(
+    MAILPIT_INSTALL_DIR,
+    process.platform === 'win32' ? 'mailpit.exe' : 'mailpit',
+);
 
 /**
  * Downloads and extracts the Mailpit binary for the current platform if it isn't already
@@ -22,7 +25,9 @@ export async function ensureMailpitInstalled() {
     const platformName = PLATFORM_NAMES[process.platform];
     const archName = ARCH_NAMES[process.arch];
     if (!platformName || !archName) {
-        throw new Error(`Unsupported platform for Mailpit auto-download: ${process.platform}/${process.arch}`);
+        throw new Error(
+            `Unsupported platform for Mailpit auto-download: ${process.platform}/${process.arch}`,
+        );
     }
 
     // Windows ships zip-capable tar; Linux's GNU tar only extracts tar.gz.
@@ -42,7 +47,9 @@ export async function ensureMailpitInstalled() {
 
     // Absolute path: Git-for-Windows' GNU tar (no zip support) can shadow System32's real tar on PATH.
     const tarCommand =
-        process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+        process.platform === 'win32'
+            ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+            : 'tar';
     execFileSync(tarCommand, ['-xf', archivePath, '-C', MAILPIT_INSTALL_DIR]);
 
     if (!existsSync(MAILPIT_BINARY_PATH)) {
@@ -75,10 +82,16 @@ export function killProcessOnPort(port) {
                 netstatOutput
                     .split('\n')
                     .map((line) => line.trim().split(/\s+/))
-                    .filter((columns) => columns[0] === 'TCP' && columns[1]?.endsWith(`:${port}`) && columns[3] === 'LISTENING')
+                    .filter(
+                        (columns) =>
+                            columns[0] === 'TCP' &&
+                            columns[1]?.endsWith(`:${port}`) &&
+                            columns[3] === 'LISTENING',
+                    )
                     .map((columns) => columns[4]),
             );
-            for (const pid of pids) execFileSync('taskkill', ['/F', '/T', '/PID', pid], { stdio: 'ignore' });
+            for (const pid of pids)
+                execFileSync('taskkill', ['/F', '/T', '/PID', pid], { stdio: 'ignore' });
         } else {
             const pids = execFileSync('lsof', ['-ti', `:${port}`], { encoding: 'utf8' }).trim();
             if (pids) execFileSync('kill', ['-9', ...pids.split('\n')]);

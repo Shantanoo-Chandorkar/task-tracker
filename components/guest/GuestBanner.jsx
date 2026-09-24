@@ -18,7 +18,9 @@ const WARNING_SECONDS = 120;
  * @returns {JSX.Element|null} Null for registered users.
  */
 export default function GuestBanner({ initialProfile }) {
-    const { data: profile, dataUpdatedAt } = useCurrentUserProfileQuery({ initialData: initialProfile });
+    const { data: profile, dataUpdatedAt } = useCurrentUserProfileQuery({
+        initialData: initialProfile,
+    });
     const bannerRef = useRef(null);
     const hasRedirectedRef = useRef(false);
     const [nowMs, setNowMs] = useState(() => Date.now());
@@ -32,7 +34,9 @@ export default function GuestBanner({ initialProfile }) {
     }, [isGuest]);
 
     // The seconds left come from the server at fetch time, so the browser clock cannot make the countdown wrong
-    const secondsLeft = isGuest ? Math.max(0, profile.guest_seconds_left - Math.floor((nowMs - dataUpdatedAt) / 1000)) : null;
+    const secondsLeft = isGuest
+        ? Math.max(0, profile.guest_seconds_left - Math.floor((nowMs - dataUpdatedAt) / 1000))
+        : null;
 
     useEffect(() => {
         if (secondsLeft === 0 && !hasRedirectedRef.current) {
@@ -47,7 +51,10 @@ export default function GuestBanner({ initialProfile }) {
         if (!isGuest || !bannerElement) return undefined;
 
         const publishHeight = () =>
-            document.documentElement.style.setProperty(BANNER_HEIGHT_CSS_VARIABLE, `${bannerElement.offsetHeight}px`);
+            document.documentElement.style.setProperty(
+                BANNER_HEIGHT_CSS_VARIABLE,
+                `${bannerElement.offsetHeight}px`,
+            );
         publishHeight();
         const resizeObserver = new ResizeObserver(publishHeight);
         resizeObserver.observe(bannerElement);
@@ -70,8 +77,8 @@ export default function GuestBanner({ initialProfile }) {
             className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs text-foreground"
         >
             <p className="min-w-0 flex-1 basis-56">
-                <strong className="font-semibold">Guest mode.</strong> Do not add sensitive information: everything is
-                deleted when this session ends.
+                <strong className="font-semibold">Guest mode.</strong> Do not add sensitive
+                information: everything is deleted when this session ends.
             </p>
             <div className="flex flex-shrink-0 items-center gap-3">
                 <span

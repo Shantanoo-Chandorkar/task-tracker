@@ -36,7 +36,12 @@ export default class FailureLogReporter {
     onEnd(result) {
         if (this.failures.length === 0) return;
 
-        const runDir = join(process.cwd(), 'test-results', 'runs', new Date().toISOString().replace(/[:.]/g, '-'));
+        const runDir = join(
+            process.cwd(),
+            'test-results',
+            'runs',
+            new Date().toISOString().replace(/[:.]/g, '-'),
+        );
         mkdirSync(runDir, { recursive: true });
 
         const lines = [

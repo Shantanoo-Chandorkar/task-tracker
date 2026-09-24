@@ -148,7 +148,9 @@ function StatusGroup({
                     >
                         {tasks.map((task, taskIndex) => (
                             <Fragment key={task.id}>
-                                {isStartOfUnprioritisedTier(tasks, taskIndex) && <PriorityTierDivider />}
+                                {isStartOfUnprioritisedTier(tasks, taskIndex) && (
+                                    <PriorityTierDivider />
+                                )}
                                 <div onClick={() => onFocusTask(task.id)}>
                                     <TaskRow
                                         task={task}
@@ -251,8 +253,12 @@ function SublistHeader({
                     className="h-2.5 w-2.5 rounded-full flex-shrink-0"
                     style={{ backgroundColor: sublist.color }}
                 />
-                <span className="text-sm font-semibold text-foreground truncate">{sublist.name}</span>
-                <span className="text-xs text-muted-foreground/60 flex-shrink-0">({taskCount})</span>
+                <span className="text-sm font-semibold text-foreground truncate">
+                    {sublist.name}
+                </span>
+                <span className="text-xs text-muted-foreground/60 flex-shrink-0">
+                    ({taskCount})
+                </span>
             </button>
 
             {breakdownText && (
@@ -318,7 +324,11 @@ export default function TaskList({
     }
 
     const [focusedTaskId, setFocusedTaskId] = useState(null);
-    const [createDialog, setCreateDialog] = useState({ open: false, parentId: null, sublistId: null });
+    const [createDialog, setCreateDialog] = useState({
+        open: false,
+        parentId: null,
+        sublistId: null,
+    });
     const { flags: collapsedGroups, toggleFlag: toggleGroup } = useUIState();
     const [activeStatusId, setActiveStatusId] = useState(null);
     const [sublistDialog, setSublistDialog] = useState({ open: false, sublist: null });
@@ -351,7 +361,9 @@ export default function TaskList({
     const countsByStatusId = useMemo(() => {
         const nextCountsByStatusId = {};
         for (const status of statuses) {
-            nextCountsByStatusId[status.id] = flatList.filter((task) => task.status_id === status.id).length;
+            nextCountsByStatusId[status.id] = flatList.filter(
+                (task) => task.status_id === status.id,
+            ).length;
         }
         return nextCountsByStatusId;
     }, [statuses, flatList]);
@@ -419,7 +431,9 @@ export default function TaskList({
                 allDepthCountsByStatusId: directAllDepth.countsByStatusId,
             },
             ...sublists.map((sublist) => {
-                const sublistTasks = bucketedRootTasks.filter((task) => task.sublist_id === sublist.id);
+                const sublistTasks = bucketedRootTasks.filter(
+                    (task) => task.sublist_id === sublist.id,
+                );
                 const sublistAllDepth = countAllDepth(sublistTasks);
                 return {
                     key: sublist.id,
@@ -530,7 +544,9 @@ export default function TaskList({
                 reordered
                     .map((sublist, newPosition) => ({ sublist, newPosition }))
                     .filter(({ sublist, newPosition }) => sublist.position !== newPosition)
-                    .map(({ sublist, newPosition }) => updateSublist(sublist.id, { position: newPosition })),
+                    .map(({ sublist, newPosition }) =>
+                        updateSublist(sublist.id, { position: newPosition }),
+                    ),
             );
             const failed = results.find((updateOutcome) => updateOutcome.error);
             if (failed) {
@@ -596,12 +612,23 @@ export default function TaskList({
 
         setDeletingSublist(true);
         const toastId = toast.loading('Deleting sublist...');
-        const { error } = await deleteSublist(deleteSublistTarget.id);
+
+        let result;
+        try {
+            result = await deleteSublist(deleteSublistTarget.id);
+        } catch {
+            setDeletingSublist(false);
+            setDeleteSublistTarget(null);
+            toast.error('Could not reach the server. Check your connection and try again.', {
+                id: toastId,
+            });
+            return;
+        }
         setDeletingSublist(false);
         setDeleteSublistTarget(null);
 
-        if (error) {
-            toast.error(error, { id: toastId });
+        if (result.error) {
+            toast.error(result.error, { id: toastId });
             return;
         }
 
@@ -638,7 +665,9 @@ export default function TaskList({
                 </div>
                 <TaskFormDialog
                     open={createDialog.open}
-                    onClose={() => setCreateDialog({ open: false, parentId: null, sublistId: null })}
+                    onClose={() =>
+                        setCreateDialog({ open: false, parentId: null, sublistId: null })
+                    }
                     parentId={createDialog.parentId}
                     listId={listId}
                 />
@@ -660,7 +689,10 @@ export default function TaskList({
                     initialLists={initialLists}
                 >
                     {doneStatus && (
-                        <VelocityMeter completedCount={completedCount} totalCount={flatList.length} />
+                        <VelocityMeter
+                            completedCount={completedCount}
+                            totalCount={flatList.length}
+                        />
                     )}
                 </ListHeader>
 
@@ -690,7 +722,10 @@ export default function TaskList({
                                         isCollapsed={isCollapsed}
                                         onToggle={() => toggleGroup(`sublist:${bucket.sublist.id}`)}
                                         onEdit={() =>
-                                            setSublistDialog({ open: true, sublist: bucket.sublist })
+                                            setSublistDialog({
+                                                open: true,
+                                                sublist: bucket.sublist,
+                                            })
                                         }
                                         onDelete={() => requestDeleteSublist(bucket.sublist)}
                                         onAddTask={() =>
@@ -731,11 +766,17 @@ export default function TaskList({
                                     <SublistHeader
                                         sublist={bucket.sublist}
                                         taskCount={bucket.allDepthCount}
-                                        breakdownText={describeBucketBreakdown(bucket.allDepthCountsByStatusId, statuses)}
+                                        breakdownText={describeBucketBreakdown(
+                                            bucket.allDepthCountsByStatusId,
+                                            statuses,
+                                        )}
                                         isCollapsed={isSublistCollapsed}
                                         onToggle={() => toggleGroup(`sublist:${bucket.sublist.id}`)}
                                         onEdit={() =>
-                                            setSublistDialog({ open: true, sublist: bucket.sublist })
+                                            setSublistDialog({
+                                                open: true,
+                                                sublist: bucket.sublist,
+                                            })
                                         }
                                         onDelete={() => requestDeleteSublist(bucket.sublist)}
                                         onAddTask={() =>
@@ -754,11 +795,17 @@ export default function TaskList({
                                                 key={status.id}
                                                 status={status}
                                                 tasks={bucket.tasksByStatusId.get(status.id) ?? []}
-                                                count={bucket.allDepthCountsByStatusId.get(status.id) ?? 0}
+                                                count={
+                                                    bucket.allDepthCountsByStatusId.get(
+                                                        status.id,
+                                                    ) ?? 0
+                                                }
                                                 isCollapsed={
                                                     collapsedGroups[`${bucket.key}:${status.id}`]
                                                 }
-                                                onToggle={() => toggleGroup(`${bucket.key}:${status.id}`)}
+                                                onToggle={() =>
+                                                    toggleGroup(`${bucket.key}:${status.id}`)
+                                                }
                                                 flatList={flatList}
                                                 listId={listId}
                                                 onFocusTask={setFocusedTaskId}

@@ -25,7 +25,11 @@ export const GET = withApiErrorHandling(async function GET() {
         return NextResponse.json({ error: 'Failed to fetch spaces' }, { status: 500 });
     }
 
-    const spacesWithPermission = await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null);
+    const spacesWithPermission = await attachMyPermissionLevel(
+        supabase,
+        spaces || [],
+        user?.id ?? null,
+    );
     return NextResponse.json(spacesWithPermission);
 });
 

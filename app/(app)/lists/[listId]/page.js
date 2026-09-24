@@ -13,24 +13,23 @@ export default async function ListPage({ params }) {
     const supabase = await createClient();
     const user = await getCurrentUser();
 
-    const [
-        { data: list },
-        { data: tasks },
-        { data: spaces },
-        { data: lists },
-        { data: sublists },
-    ] = await Promise.all([
-        supabase.from('lists').select('id, space_id').eq('id', listId).maybeSingle(),
-        supabase
-            .from('tasks')
-            .select('*, statuses(id, name, color, is_default, position)')
-            .eq('list_id', listId)
-            .order('depth', { ascending: true })
-            .order('position', { ascending: true }),
-        supabase.from('spaces').select('*').order('position', { ascending: true }),
-        supabase.from('lists').select('*').order('position', { ascending: true }),
-        supabase.from('sublists').select('*').eq('list_id', listId).order('position', { ascending: true }),
-    ]);
+    const [{ data: list }, { data: tasks }, { data: spaces }, { data: lists }, { data: sublists }] =
+        await Promise.all([
+            supabase.from('lists').select('id, space_id').eq('id', listId).maybeSingle(),
+            supabase
+                .from('tasks')
+                .select('*, statuses(id, name, color, is_default, position)')
+                .eq('list_id', listId)
+                .order('depth', { ascending: true })
+                .order('position', { ascending: true }),
+            supabase.from('spaces').select('*').order('position', { ascending: true }),
+            supabase.from('lists').select('*').order('position', { ascending: true }),
+            supabase
+                .from('sublists')
+                .select('*')
+                .eq('list_id', listId)
+                .order('position', { ascending: true }),
+        ]);
 
     if (!list) {
         return (
@@ -62,7 +61,11 @@ export default async function ListPage({ params }) {
     // Matches /api/lists' computation, so the client refetch never hydration-mismatches this field.
     const listsWithCounts = await attachTaskCounts(supabase, lists || []);
     // Matches /api/spaces' computation, so the client refetch never hydration-mismatches this field.
-    const spacesWithPermission = await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null);
+    const spacesWithPermission = await attachMyPermissionLevel(
+        supabase,
+        spaces || [],
+        user?.id ?? null,
+    );
 
     return (
         <div className="px-4 md:px-8 py-6">

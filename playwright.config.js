@@ -9,7 +9,12 @@ if (existsSync('.env.test')) process.loadEnvFile('.env.test');
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3001';
 
 // CJS (no "type": "module") can't require() a real .mjs file - install runs via pretest:e2e.
-const mailpitBinaryPath = join(process.cwd(), '.tools', 'mailpit', process.platform === 'win32' ? 'mailpit.exe' : 'mailpit');
+const mailpitBinaryPath = join(
+    process.cwd(),
+    '.tools',
+    'mailpit',
+    process.platform === 'win32' ? 'mailpit.exe' : 'mailpit',
+);
 
 export default defineConfig({
     testDir: './e2e',

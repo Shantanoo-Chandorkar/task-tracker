@@ -291,7 +291,12 @@ function SpaceSection({
  * @param {string} props.currentUserId - Signed-in user's ID, to tell owned spaces from shared ones
  * @param {object|null} [props.initialProfile] - SSR-fetched profile, so canJoinSpaces never hydration-mismatches
  */
-export default function SpaceListManager({ initialSpaces, initialLists, currentUserId, initialProfile }) {
+export default function SpaceListManager({
+    initialSpaces,
+    initialLists,
+    currentUserId,
+    initialProfile,
+}) {
     const queryClient = useQueryClient();
     const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
     const canJoinSpaces = profile?.is_guest === false;
@@ -302,7 +307,9 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
     const [joinDialog, setJoinDialog] = useState(() => {
         if (typeof window === 'undefined') return { open: false, prefillSpaceId: '' };
         const joinId = new URLSearchParams(window.location.search).get('join');
-        return joinId ? { open: true, prefillSpaceId: joinId } : { open: false, prefillSpaceId: '' };
+        return joinId
+            ? { open: true, prefillSpaceId: joinId }
+            : { open: false, prefillSpaceId: '' };
     });
     const [error, setError] = useState('');
     // { type: 'space'|'list'|'leave-space', id, name, counts }
@@ -442,7 +449,11 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
 
         setDeleting(true);
         const toastId = toast.loading(
-            type === 'space' ? 'Deleting space...' : type === 'list' ? 'Deleting list...' : 'Leaving space...',
+            type === 'space'
+                ? 'Deleting space...'
+                : type === 'list'
+                  ? 'Deleting list...'
+                  : 'Leaving space...',
         );
 
         let result;
@@ -467,7 +478,11 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
             else if (type === 'list') bustPageCache({ urls: [`/lists/${deleteTarget.id}`] });
             await refetchAll();
             toast.success(
-                type === 'space' ? 'Space deleted' : type === 'list' ? 'List deleted' : 'Left space',
+                type === 'space'
+                    ? 'Space deleted'
+                    : type === 'list'
+                      ? 'List deleted'
+                      : 'Left space',
                 { id: toastId },
             );
         }
@@ -617,7 +632,9 @@ export default function SpaceListManager({ initialSpaces, initialLists, currentU
                 }
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
                             disabled={deleting}

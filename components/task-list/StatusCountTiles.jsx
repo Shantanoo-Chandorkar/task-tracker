@@ -54,7 +54,9 @@ export default function StatusCountTiles({
                             className="h-2 w-2 rounded-full flex-shrink-0"
                             style={{ backgroundColor: status.color }}
                         />
-                        <span className={isActive ? '' : 'text-muted-foreground'}>{status.name}</span>
+                        <span className={isActive ? '' : 'text-muted-foreground'}>
+                            {status.name}
+                        </span>
                         <span className="font-mono font-semibold">
                             {countsByStatusId[status.id] ?? 0}
                         </span>

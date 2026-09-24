@@ -21,7 +21,13 @@ import HomeLinkSection from './HomeLinkSection';
  */
 export default function HomeView({ initialHome, firstList }) {
     const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
-    const { data: homeSummary, isPending, isError, refetch, isFetching } = useHomeQuery({ initialData: initialHome });
+    const {
+        data: homeSummary,
+        isPending,
+        isError,
+        refetch,
+        isFetching,
+    } = useHomeQuery({ initialData: initialHome });
 
     const newTaskTargetList = homeSummary?.recentLists[0] ?? firstList;
 
@@ -64,10 +70,17 @@ export default function HomeView({ initialHome, firstList }) {
                         Spaces
                     </Link>
                 </Button>
-                <Button type="button" variant="outline" className="h-11 justify-start gap-2" onClick={openSearch}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 justify-start gap-2"
+                    onClick={openSearch}
+                >
                     <Search className="h-4 w-4" />
                     Search
-                    <kbd className="ml-auto hidden text-xs text-muted-foreground sm:inline">Ctrl K</kbd>
+                    <kbd className="ml-auto hidden text-xs text-muted-foreground sm:inline">
+                        Ctrl K
+                    </kbd>
                 </Button>
             </div>
 
@@ -80,8 +93,15 @@ export default function HomeView({ initialHome, firstList }) {
             {isError && !homeSummary && (
                 <div className="rounded-md border border-border px-4 py-8 text-center">
                     <p className="text-sm text-foreground mb-1">Could not load your home screen.</p>
-                    <p className="text-sm text-muted-foreground mb-4">Check your connection and try again.</p>
-                    <Button type="button" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Check your connection and try again.
+                    </p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => refetch()}
+                        disabled={isFetching}
+                    >
                         Try again
                     </Button>
                 </div>

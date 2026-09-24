@@ -1,13 +1,14 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
-import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
-import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
-import { resolveSpacePermission, blockCreateForPermission, blockWriteForPermission } from '@/lib/permissions/space-permissions';
+import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
+import {
+    resolveSpacePermission,
+    blockCreateForPermission,
+    blockWriteForPermission,
+} from '@/lib/permissions/space-permissions';
 
 /**
  * Creates a new list under a space. Appends it after the last existing list
@@ -19,23 +20,20 @@ import { resolveSpacePermission, blockCreateForPermission, blockWriteForPermissi
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function createList(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const createList = withAuthenticatedAction(
+    '[lists] create',
+    'Unexpected error creating list',
+    async (user, supabase, fields) => {
+        const name = sanitizeString(fields.name, true);
+        if (!name) {
+            return { data: null, error: 'List name is required' };
+        }
+        const nameError = checkMaxLength(name, 200, 'List name');
+        if (nameError) return { data: null, error: nameError.error };
 
-    const name = sanitizeString(fields.name, true);
-    if (!name) {
-        return { data: null, error: 'List name is required' };
-    }
-    const nameError = checkMaxLength(name, 200, 'List name');
-    if (nameError) return { data: null, error: nameError.error };
-
-    if (!fields.space_id) {
-        return { data: null, error: 'A space is required' };
-    }
-
-    try {
-        const supabase = await createClient();
+        if (!fields.space_id) {
+            return { data: null, error: 'A space is required' };
+        }
 
         const permissionLevel = await resolveSpacePermission(supabase, fields.space_id, user.id);
         const permissionBlock = blockCreateForPermission(permissionLevel);
@@ -61,13 +59,9 @@ export async function createList(fields) {
             return { data: null, error: 'Failed to create list' };
         }
 
-        revalidateTag('lists', { expire: 0 });
         return { data: createdList, error: null };
-    } catch (thrown) {
-        console.error('[lists] create threw', { detail: thrown?.message });
-        return { data: null, error: 'Unexpected error creating list' };
-    }
-}
+    },
+);
 
 /**
  * Updates specific fields on a list (name, color, position).
@@ -76,21 +70,18 @@ export async function createList(fields) {
  * @param {object} fields - Partial list fields to update
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function updateList(id, fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const updateList = withAuthenticatedAction(
+    '[lists] update',
+    'Unexpected error updating list',
+    async (user, supabase, id, fields) => {
+        if (!id) return { data: null, error: 'List ID is required' };
 
-    if (!id) return { data: null, error: 'List ID is required' };
-
-    if ('name' in fields) {
-        fields.name = sanitizeString(fields.name, true);
-        if (!fields.name) return { data: null, error: 'List name is required' };
-        const nameError = checkMaxLength(fields.name, 200, 'List name');
-        if (nameError) return { data: null, error: nameError.error };
-    }
-
-    try {
-        const supabase = await createClient();
+        if ('name' in fields) {
+            fields.name = sanitizeString(fields.name, true);
+            if (!fields.name) return { data: null, error: 'List name is required' };
+            const nameError = checkMaxLength(fields.name, 200, 'List name');
+            if (nameError) return { data: null, error: nameError.error };
+        }
 
         const { data: existingList } = await supabase
             .from('lists')
@@ -99,15 +90,27 @@ export async function updateList(id, fields) {
             .maybeSingle();
         if (!existingList) return { data: null, error: 'List not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingList.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingList.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingList.created_by === user.id,
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
+        // Explicit allowlist, not { ...fields } - an unlisted field must never reach the update.
+        const { name, color, position } = fields;
+        const updates = {
+            ...(name !== undefined && { name }),
+            ...(color !== undefined && { color }),
+            ...(position !== undefined && { position }),
+        };
+
         const { data: updatedList, error } = await supabase
             .from('lists')
-            .update(fields)
+            .update(updates)
             .eq('id', id)
             .select()
             .maybeSingle();
@@ -116,13 +119,9 @@ export async function updateList(id, fields) {
             return { data: null, error: 'Failed to update list' };
         }
 
-        revalidateTag('lists', { expire: 0 });
         return { data: updatedList, error: null };
-    } catch (thrown) {
-        console.error('[lists] update threw', { id, detail: thrown?.message });
-        return { data: null, error: 'Unexpected error updating list' };
-    }
-}
+    },
+);
 
 /**
  * Deletes a list. Cascades to its tasks (ON DELETE CASCADE) - callers are
@@ -131,14 +130,11 @@ export async function updateList(id, fields) {
  * @param {string} id - List ID to delete
  * @returns {{ error: string|null }}
  */
-export async function deleteList(id) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!id) return { error: 'List ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const deleteList = withAuthenticatedAction(
+    '[lists] delete',
+    'Unexpected error deleting list',
+    async (user, supabase, id) => {
+        if (!id) return { error: 'List ID is required' };
 
         const { data: existingList } = await supabase
             .from('lists')
@@ -147,23 +143,28 @@ export async function deleteList(id) {
             .maybeSingle();
         if (!existingList) return { error: 'List not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingList.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingList.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingList.created_by === user.id,
         });
         if (permissionBlock) return permissionBlock;
 
-        const { data: deletedList, error } = await supabase.from('lists').delete().eq('id', id).select().maybeSingle();
+        const { data: deletedList, error } = await supabase
+            .from('lists')
+            .delete()
+            .eq('id', id)
+            .select()
+            .maybeSingle();
 
         if (error || !deletedList) {
             return { error: 'List not found' };
         }
 
-        revalidateTag('lists', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch (thrown) {
-        console.error('[lists] delete threw', { id, detail: thrown?.message });
-        return { error: 'Unexpected error deleting list' };
-    }
-}
+    },
+    { hasData: false },
+);

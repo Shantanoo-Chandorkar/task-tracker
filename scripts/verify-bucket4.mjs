@@ -70,14 +70,20 @@ await check('Owner can create a temp space', async () => {
 
 await check('Before any request, member sees ZERO rows for the space', async () => {
     const { data: visibleRows } = await memberClient.from('spaces').select('id').eq('id', spaceId);
-    return { pass: (visibleRows ?? []).length === 0, detail: `${visibleRows?.length ?? 0} row(s) visible` };
+    return {
+        pass: (visibleRows ?? []).length === 0,
+        detail: `${visibleRows?.length ?? 0} row(s) visible`,
+    };
 });
 
 await check("Owner can't self-join their own space (RLS WITH CHECK)", async () => {
     const { error } = await ownerClient
         .from('space_collaborators')
         .insert({ space_id: spaceId, user_id: ownerAuth.user.id, requester_email: ownerEmail });
-    return { pass: Boolean(error), detail: error ? `blocked: ${error.message}` : 'insert unexpectedly succeeded' };
+    return {
+        pass: Boolean(error),
+        detail: error ? `blocked: ${error.message}` : 'insert unexpectedly succeeded',
+    };
 });
 
 await check('Member can request to join', async () => {
@@ -97,7 +103,10 @@ await check("Member can't approve their own request (RLS owner-only UPDATE)", as
         .update({ status: 'accepted' })
         .eq('id', requestId)
         .select();
-    return { pass: (updatedRows ?? []).length === 0, detail: `${updatedRows?.length ?? 0} row(s) updated` };
+    return {
+        pass: (updatedRows ?? []).length === 0,
+        detail: `${updatedRows?.length ?? 0} row(s) updated`,
+    };
 });
 
 await check('Owner can approve the request', async () => {
@@ -107,11 +116,18 @@ await check('Owner can approve the request', async () => {
         .eq('id', requestId)
         .select();
     if (error) return { pass: false, detail: error.message };
-    return { pass: updatedRows.length === 1 && updatedRows[0].status === 'accepted', detail: JSON.stringify(updatedRows[0]) };
+    return {
+        pass: updatedRows.length === 1 && updatedRows[0].status === 'accepted',
+        detail: JSON.stringify(updatedRows[0]),
+    };
 });
 
 await check('After approval, member can see and write to the space', async () => {
-    const { data: visibleSpace } = await memberClient.from('spaces').select('id').eq('id', spaceId).maybeSingle();
+    const { data: visibleSpace } = await memberClient
+        .from('spaces')
+        .select('id')
+        .eq('id', spaceId)
+        .maybeSingle();
     if (!visibleSpace) return { pass: false, detail: 'space not visible to member' };
 
     const { data: createdList, error } = await memberClient
@@ -135,7 +151,10 @@ await check('Owner can remove the collaborator', async () => {
 
 await check('After removal, member sees ZERO rows for the space again', async () => {
     const { data: visibleRows } = await memberClient.from('spaces').select('id').eq('id', spaceId);
-    return { pass: (visibleRows ?? []).length === 0, detail: `${visibleRows?.length ?? 0} row(s) visible` };
+    return {
+        pass: (visibleRows ?? []).length === 0,
+        detail: `${visibleRows?.length ?? 0} row(s) visible`,
+    };
 });
 
 // Admin cleanup regardless of pass/fail above -- deletes cascade lists/collaborators.

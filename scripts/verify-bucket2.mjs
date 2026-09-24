@@ -112,7 +112,10 @@ for (const table of ['spaces', 'lists', 'sublists', 'tasks', 'statuses']) {
         // RLS denial can surface as an empty result OR a permission error, depending on the
         // exact policy shape -- both are the same correct outcome from the client's view.
         if (error) return { pass: true, detail: `denied: ${error.message}` };
-        return { pass: (visibleRows ?? []).length === 0, detail: `${visibleRows.length} row(s) visible` };
+        return {
+            pass: (visibleRows ?? []).length === 0,
+            detail: `${visibleRows.length} row(s) visible`,
+        };
     });
 }
 

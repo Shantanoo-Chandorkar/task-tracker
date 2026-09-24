@@ -14,7 +14,9 @@ export function useJoinRequestsQuery(spaceId, options = {}) {
     return useQuery({
         queryKey: ['space-collaborators', spaceId, 'pending'],
         queryFn: async () => {
-            const response = await fetch(`/api/space-collaborators?space_id=${spaceId}&status=pending`);
+            const response = await fetch(
+                `/api/space-collaborators?space_id=${spaceId}&status=pending`,
+            );
             if (!response.ok) throw new Error('Failed to fetch join requests');
             return response.json();
         },

@@ -105,7 +105,8 @@ export default function GlobalSearch() {
 
     // Covers the debounce gap too, not just the fetch, so results are never shown stale.
     const isLoading =
-        Boolean(trimmedQuery) && (trimmedQuery !== debouncedQuery || debouncedQuery !== completedQuery);
+        Boolean(trimmedQuery) &&
+        (trimmedQuery !== debouncedQuery || debouncedQuery !== completedQuery);
     const displayResults = trimmedQuery && !isLoading ? results : EMPTY_RESULTS;
     const hasResults =
         displayResults.tasks.length > 0 ||

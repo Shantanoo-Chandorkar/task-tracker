@@ -64,7 +64,9 @@ export default function ThemeToggle() {
         root.style.setProperty('--theme-toggle-radius', `${radius}px`);
 
         // .ready rejects if the transition is skipped (e.g. backgrounded tab); setTheme still ran, so this is harmless.
-        const transition = document.startViewTransition(() => flushSync(() => setTheme(nextIsDark)));
+        const transition = document.startViewTransition(() =>
+            flushSync(() => setTheme(nextIsDark)),
+        );
         transition.ready.catch(() => {});
     }
 

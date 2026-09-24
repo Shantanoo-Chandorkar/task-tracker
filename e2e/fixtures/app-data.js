@@ -52,7 +52,11 @@ export function spaceSection(page, spaceName) {
  */
 export async function createSpace(page, name = uniqueName('Space')) {
     await page.getByRole('button', { name: '+ Add space' }).click();
-    await submitDialog(page, { placeholder: 'Space name', value: name, submitName: 'Create space' });
+    await submitDialog(page, {
+        placeholder: 'Space name',
+        value: name,
+        submitName: 'Create space',
+    });
     return name;
 }
 
@@ -100,7 +104,11 @@ export async function createSublist(page, spaceName, listName, name = uniqueName
     await page.getByRole('menuitem', { name: 'New Sublist' }).click();
     await page.getByRole('combobox').click();
     await page.getByRole('option', { name: `${spaceName} / ${listName}` }).click();
-    await submitDialog(page, { placeholder: 'Sublist name', value: name, submitName: 'Create sublist' });
+    await submitDialog(page, {
+        placeholder: 'Sublist name',
+        value: name,
+        submitName: 'Create sublist',
+    });
     return name;
 }
 
@@ -113,7 +121,9 @@ export async function createSublist(page, spaceName, listName, name = uniqueName
  * @returns {import('@playwright/test').Locator}
  */
 export function statusRow(page, spaceName, statusName) {
-    return spaceSection(page, spaceName).locator('[class*="py-2.5"]').filter({ hasText: statusName });
+    return spaceSection(page, spaceName)
+        .locator('[class*="py-2.5"]')
+        .filter({ hasText: statusName });
 }
 
 /**
@@ -128,7 +138,11 @@ export function statusRow(page, spaceName, statusName) {
  */
 export async function createStatus(page, spaceName, name = uniqueName('Status')) {
     await spaceSection(page, spaceName).getByRole('button', { name: '+ Add status' }).click();
-    await submitDialog(page, { placeholder: 'Status name', value: name, submitName: 'Create status' });
+    await submitDialog(page, {
+        placeholder: 'Status name',
+        value: name,
+        submitName: 'Create status',
+    });
     return name;
 }
 
@@ -168,11 +182,15 @@ async function openNewTaskDialog(page) {
  * @param {boolean} [fields.recurring] - Checks "Recurring task" (default: weekly, no end).
  * @returns {Promise<string>} The task's title.
  */
-export async function createTask(page, { title = uniqueName('Task'), description, recurring = false } = {}) {
+export async function createTask(
+    page,
+    { title = uniqueName('Task'), description, recurring = false } = {},
+) {
     await openNewTaskDialog(page);
     const dialog = page.getByRole('dialog');
     await dialog.getByPlaceholder('Task title').fill(title);
-    if (description !== undefined) await dialog.locator('[contenteditable="true"]').fill(description);
+    if (description !== undefined)
+        await dialog.locator('[contenteditable="true"]').fill(description);
     if (recurring) await dialog.getByLabel('Recurring task').check();
     await dialog.getByRole('button', { name: 'Create task' }).click();
     await expect(dialog).toBeHidden();
@@ -205,7 +223,9 @@ export async function addSubtask(page, parentRow, title = uniqueName('Task')) {
  * @returns {import('@playwright/test').Locator}
  */
 export function sublistRow(page, sublistName) {
-    return page.locator('div.rounded-lg.bg-card', { has: page.getByText(sublistName, { exact: true }) });
+    return page.locator('div.rounded-lg.bg-card', {
+        has: page.getByText(sublistName, { exact: true }),
+    });
 }
 
 /**
@@ -272,7 +292,9 @@ export function collaboratorRow(spaceSectionLocator, email) {
  * @returns {Promise<void>}
  */
 export async function approveJoinRequestViaUi(page, spaceSectionLocator, requesterEmail) {
-    await collaboratorRow(spaceSectionLocator, requesterEmail).getByRole('button', { name: 'Approve request' }).click();
+    await collaboratorRow(spaceSectionLocator, requesterEmail)
+        .getByRole('button', { name: 'Approve request' })
+        .click();
     await expect(page.getByText('Request approved')).toBeVisible();
 }
 

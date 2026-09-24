@@ -1,13 +1,14 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
 import { getNextPosition } from '@/lib/position';
-import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
-import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
-import { resolveSpacePermission, blockCreateForPermission, blockWriteForPermission } from '@/lib/permissions/space-permissions';
+import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
+import {
+    resolveSpacePermission,
+    blockCreateForPermission,
+    blockWriteForPermission,
+} from '@/lib/permissions/space-permissions';
 
 /**
  * Creates a new status. Appends it after the last existing status in its space.
@@ -18,23 +19,20 @@ import { resolveSpacePermission, blockCreateForPermission, blockWriteForPermissi
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function createStatus(fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const createStatus = withAuthenticatedAction(
+    '[statuses] create',
+    'Unexpected error creating status',
+    async (user, supabase, fields) => {
+        const name = sanitizeString(fields.name, true);
+        if (!name) {
+            return { data: null, error: 'Status name is required' };
+        }
+        const nameError = checkMaxLength(name, 100, 'Status name');
+        if (nameError) return { data: null, error: nameError.error };
 
-    const name = sanitizeString(fields.name, true);
-    if (!name) {
-        return { data: null, error: 'Status name is required' };
-    }
-    const nameError = checkMaxLength(name, 100, 'Status name');
-    if (nameError) return { data: null, error: nameError.error };
-
-    if (!fields.space_id) {
-        return { data: null, error: 'A space is required' };
-    }
-
-    try {
-        const supabase = await createClient();
+        if (!fields.space_id) {
+            return { data: null, error: 'A space is required' };
+        }
 
         const permissionLevel = await resolveSpacePermission(supabase, fields.space_id, user.id);
         const permissionBlock = blockCreateForPermission(permissionLevel);
@@ -60,14 +58,9 @@ export async function createStatus(fields) {
             return { data: null, error: 'Failed to create status' };
         }
 
-        revalidateTag('statuses', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { data: createdStatus, error: null };
-    } catch (thrown) {
-        console.error('[statuses] create threw', { detail: thrown?.message });
-        return { data: null, error: 'Unexpected error creating status' };
-    }
-}
+    },
+);
 
 /**
  * Updates specific fields on a status (name, color, position).
@@ -78,30 +71,27 @@ export async function createStatus(fields) {
  * @param {object} fields - Partial status fields to update (name, color, position only)
  * @returns {{ data: object|null, error: string|null }}
  */
-export async function updateStatus(id, fields) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
+export const updateStatus = withAuthenticatedAction(
+    '[statuses] update',
+    'Unexpected error updating status',
+    async (user, supabase, id, fields) => {
+        if (!id) return { data: null, error: 'Status ID is required' };
 
-    if (!id) return { data: null, error: 'Status ID is required' };
+        const { color, position } = fields;
+        let { name } = fields;
 
-    const { color, position } = fields;
-    let { name } = fields;
+        if (name !== undefined) {
+            name = sanitizeString(name, true);
+            if (!name) return { data: null, error: 'Status name is required' };
+            const nameError = checkMaxLength(name, 100, 'Status name');
+            if (nameError) return { data: null, error: nameError.error };
+        }
 
-    if (name !== undefined) {
-        name = sanitizeString(name, true);
-        if (!name) return { data: null, error: 'Status name is required' };
-        const nameError = checkMaxLength(name, 100, 'Status name');
-        if (nameError) return { data: null, error: nameError.error };
-    }
-
-    const updates = {
-        ...(name !== undefined && { name }),
-        ...(color !== undefined && { color }),
-        ...(position !== undefined && { position }),
-    };
-
-    try {
-        const supabase = await createClient();
+        const updates = {
+            ...(name !== undefined && { name }),
+            ...(color !== undefined && { color }),
+            ...(position !== undefined && { position }),
+        };
 
         const { data: existingStatus } = await supabase
             .from('statuses')
@@ -110,7 +100,11 @@ export async function updateStatus(id, fields) {
             .maybeSingle();
         if (!existingStatus) return { data: null, error: 'Status not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingStatus.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingStatus.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingStatus.created_by === user.id,
         });
@@ -127,14 +121,9 @@ export async function updateStatus(id, fields) {
             return { data: null, error: 'Failed to update status' };
         }
 
-        revalidateTag('statuses', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { data: updatedStatus, error: null };
-    } catch (thrown) {
-        console.error('[statuses] update threw', { id, detail: thrown?.message });
-        return { data: null, error: 'Unexpected error updating status' };
-    }
-}
+    },
+);
 
 /**
  * Deletes a status. Refuses if it is the last remaining status or the default status.
@@ -142,14 +131,11 @@ export async function updateStatus(id, fields) {
  * @param {string} id - Status ID to delete
  * @returns {{ error: string|null }}
  */
-export async function deleteStatus(id) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
-
-    if (!id) return { error: 'Status ID is required' };
-
-    try {
-        const supabase = await createClient();
+export const deleteStatus = withAuthenticatedAction(
+    '[statuses] delete',
+    'Unexpected error deleting status',
+    async (user, supabase, id) => {
+        if (!id) return { error: 'Status ID is required' };
 
         const { data: target } = await supabase
             .from('statuses')
@@ -183,17 +169,18 @@ export async function deleteStatus(id) {
             return { error: 'Cannot delete a built-in status' };
         }
 
-        const { data: deletedStatus, error } = await supabase.from('statuses').delete().eq('id', id).select().maybeSingle();
+        const { data: deletedStatus, error } = await supabase
+            .from('statuses')
+            .delete()
+            .eq('id', id)
+            .select()
+            .maybeSingle();
 
         if (error || !deletedStatus) {
             return { error: 'Status not found' };
         }
 
-        revalidateTag('statuses', { expire: 0 });
-        revalidateTag('task-tree', { expire: 0 });
         return { error: null };
-    } catch (thrown) {
-        console.error('[statuses] delete threw', { id, detail: thrown?.message });
-        return { error: 'Unexpected error deleting status' };
-    }
-}
+    },
+    { hasData: false },
+);

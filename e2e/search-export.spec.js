@@ -1,9 +1,19 @@
 import { test, expect, loginAs } from './fixtures/test.js';
 import { adminClient, createTestUser, deleteTestUser } from './fixtures/test-users.js';
-import { uniqueName, createSpace, createList, createSublist, createTask, spaceSection } from './fixtures/app-data.js';
+import {
+    uniqueName,
+    createSpace,
+    createList,
+    createSublist,
+    createTask,
+    spaceSection,
+} from './fixtures/app-data.js';
 
 test.describe('search and export', () => {
-    test('search finds tasks, lists, and spaces, and navigates on select', async ({ page, testUser }) => {
+    test('search finds tasks, lists, and spaces, and navigates on select', async ({
+        page,
+        testUser,
+    }) => {
         await loginAs(page, testUser);
         await page.goto('/spaces');
         const marker = uniqueName('Findme');
@@ -21,8 +31,12 @@ test.describe('search and export', () => {
 
         const taskOption = searchDialog.getByRole('option').filter({ hasText: taskTitle });
         await expect(taskOption).toBeVisible();
-        await expect(searchDialog.getByRole('option', { name: listName, exact: true })).toBeVisible();
-        await expect(searchDialog.getByRole('option', { name: spaceName, exact: true })).toBeVisible();
+        await expect(
+            searchDialog.getByRole('option', { name: listName, exact: true }),
+        ).toBeVisible();
+        await expect(
+            searchDialog.getByRole('option', { name: spaceName, exact: true }),
+        ).toBeVisible();
 
         await taskOption.click();
         await page.waitForURL(new RegExp(`/lists/${listId}/tasks/`));
@@ -40,7 +54,9 @@ test.describe('search and export', () => {
             const otherPage = await otherContext.newPage();
             await loginAs(otherPage, otherUser);
 
-            const searchResponse = await otherPage.request.get(`/api/search?q=${encodeURIComponent(marker)}`);
+            const searchResponse = await otherPage.request.get(
+                `/api/search?q=${encodeURIComponent(marker)}`,
+            );
             expect(await searchResponse.json()).toEqual({ tasks: [], lists: [], spaces: [] });
 
             await otherContext.close();
@@ -59,8 +75,12 @@ test.describe('search and export', () => {
         const taskTitle = await createTask(page);
 
         await page.getByRole('button', { name: 'Export' }).click();
-        const csvHref = await page.getByRole('menuitem', { name: 'Export as CSV' }).getAttribute('href');
-        const jsonHref = await page.getByRole('menuitem', { name: 'Export as JSON' }).getAttribute('href');
+        const csvHref = await page
+            .getByRole('menuitem', { name: 'Export as CSV' })
+            .getAttribute('href');
+        const jsonHref = await page
+            .getByRole('menuitem', { name: 'Export as JSON' })
+            .getAttribute('href');
 
         const csvResponse = await page.request.get(csvHref);
         expect(csvResponse.headers()['content-type']).toContain('text/csv');
@@ -82,15 +102,27 @@ test.describe('search and export', () => {
         const sublistName = await createSublist(page, spaceName, listName);
         const taskTitle = await createTask(page);
 
-        const { data: sublist } = await adminClient().from('sublists').select('id').eq('name', sublistName).single();
-        const { data: space } = await adminClient().from('spaces').select('id').eq('name', spaceName).single();
+        const { data: sublist } = await adminClient()
+            .from('sublists')
+            .select('id')
+            .eq('name', sublistName)
+            .single();
+        const { data: space } = await adminClient()
+            .from('spaces')
+            .select('id')
+            .eq('name', spaceName)
+            .single();
 
-        const sublistExport = await page.request.get(`/api/export?type=sublist&id=${sublist.id}&format=json`);
+        const sublistExport = await page.request.get(
+            `/api/export?type=sublist&id=${sublist.id}&format=json`,
+        );
         expect(sublistExport.status()).toBe(200);
         const sublistBody = await sublistExport.json();
         expect(Array.isArray(sublistBody.tasks)).toBe(true);
 
-        const spaceExport = await page.request.get(`/api/export?type=space&id=${space.id}&format=json`);
+        const spaceExport = await page.request.get(
+            `/api/export?type=space&id=${space.id}&format=json`,
+        );
         expect(spaceExport.status()).toBe(200);
         const spaceBody = await spaceExport.json();
         expect(spaceBody.tasks.some((task) => task.title === taskTitle)).toBe(true);
@@ -101,7 +133,11 @@ test.describe('search and export', () => {
         await page.goto('/spaces');
         const spaceName = await createSpace(page);
         const listName = await createList(page, spaceName);
-        const { data: list } = await adminClient().from('lists').select('id').eq('name', listName).single();
+        const { data: list } = await adminClient()
+            .from('lists')
+            .select('id')
+            .eq('name', listName)
+            .single();
 
         const otherUser = await createTestUser();
         try {
@@ -109,7 +145,9 @@ test.describe('search and export', () => {
             const otherPage = await otherContext.newPage();
             await loginAs(otherPage, otherUser);
 
-            const response = await otherPage.request.get(`/api/export?type=list&id=${list.id}&format=csv`);
+            const response = await otherPage.request.get(
+                `/api/export?type=list&id=${list.id}&format=csv`,
+            );
             expect(response.status()).toBe(404);
             expect(await response.json()).toEqual({ error: 'Not found' });
 

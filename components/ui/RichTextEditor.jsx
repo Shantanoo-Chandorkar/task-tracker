@@ -45,7 +45,11 @@ function RichTextToolbar({ editor }) {
             .focus()
             .insertContentAt(
                 { from: selectionStart, to: selectionEnd },
-                { type: 'text', text: linkText, marks: [{ type: 'link', attrs: { href: linkUrl } }] },
+                {
+                    type: 'text',
+                    text: linkText,
+                    marks: [{ type: 'link', attrs: { href: linkUrl } }],
+                },
             )
             .run();
         setLinkDialogState(null);
@@ -53,7 +57,12 @@ function RichTextToolbar({ editor }) {
 
     function removeLink() {
         const { selectionStart, selectionEnd } = linkDialogState;
-        editor.chain().focus().setTextSelection({ from: selectionStart, to: selectionEnd }).unsetLink().run();
+        editor
+            .chain()
+            .focus()
+            .setTextSelection({ from: selectionStart, to: selectionEnd })
+            .unsetLink()
+            .run();
         setLinkDialogState(null);
     }
 

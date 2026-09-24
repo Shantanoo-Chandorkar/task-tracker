@@ -77,7 +77,10 @@ await check('profiles row exists for this account (migration 0005/0006)', async 
     if (profileRows.length !== 1) {
         return { pass: false, detail: `expected 1 row, got ${profileRows.length}` };
     }
-    return { pass: true, detail: `id ${profileRows[0].id}, created_at ${profileRows[0].created_at}` };
+    return {
+        pass: true,
+        detail: `id ${profileRows[0].id}, created_at ${profileRows[0].created_at}`,
+    };
 });
 
 await check(

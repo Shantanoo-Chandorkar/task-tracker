@@ -1,5 +1,10 @@
 import { test, expect, loginAs } from './fixtures/test.js';
-import { adminClient, createTestUser, deleteTestUser, signInClient } from './fixtures/test-users.js';
+import {
+    adminClient,
+    createTestUser,
+    deleteTestUser,
+    signInClient,
+} from './fixtures/test-users.js';
 import {
     createSpace,
     spaceSection,
@@ -19,7 +24,11 @@ import {
 async function createOwnedSpace(ownerPage) {
     await ownerPage.goto('/spaces');
     const spaceName = await createSpace(ownerPage);
-    const { data: space } = await adminClient().from('spaces').select('id').eq('name', spaceName).single();
+    const { data: space } = await adminClient()
+        .from('spaces')
+        .select('id')
+        .eq('name', spaceName)
+        .single();
     return { spaceName, spaceId: space.id };
 }
 
@@ -38,18 +47,29 @@ async function requestToJoinAsNewUser(browser, spaceId) {
     await requesterPage.goto('/spaces');
     await requestToJoinViaUi(requesterPage, spaceId);
     // Closing the context right after the click can abort the mutation mid-flight - wait for its success signal.
-    await expect(requesterPage.getByText('Request sent - the owner will be notified.')).toBeVisible();
+    await expect(
+        requesterPage.getByText('Request sent - the owner will be notified.'),
+    ).toBeVisible();
     return { requester, requesterPage, context };
 }
 
 test.describe('collaboration', () => {
-    test('requesting to join a space, then a duplicate request is blocked', async ({ page, browser, testUser }) => {
+    test('requesting to join a space, then a duplicate request is blocked', async ({
+        page,
+        browser,
+        testUser,
+    }) => {
         await loginAs(page, testUser);
         const { spaceId } = await createOwnedSpace(page);
 
-        const { requester, requesterPage, context } = await requestToJoinAsNewUser(browser, spaceId);
+        const { requester, requesterPage, context } = await requestToJoinAsNewUser(
+            browser,
+            spaceId,
+        );
         try {
-            await expect(requesterPage.getByText('Request sent - the owner will be notified.')).toBeVisible();
+            await expect(
+                requesterPage.getByText('Request sent - the owner will be notified.'),
+            ).toBeVisible();
 
             const { data: request } = await adminClient()
                 .from('space_collaborators')
@@ -61,7 +81,9 @@ test.describe('collaboration', () => {
 
             await requestToJoinViaUi(requesterPage, spaceId);
             await expect(
-                requesterPage.getByRole('dialog').getByText('You already requested or joined this space'),
+                requesterPage
+                    .getByRole('dialog')
+                    .getByText('You already requested or joined this space'),
             ).toBeVisible();
 
             await context.close();
@@ -83,9 +105,12 @@ test.describe('collaboration', () => {
             await approveJoinRequestViaUi(page, spaceSection(page, spaceName), requester.email);
 
             await expect(
-                collaboratorRow(spaceSection(page, spaceName), requester.email).getByRole('button', {
-                    name: 'Remove collaborator',
-                }),
+                collaboratorRow(spaceSection(page, spaceName), requester.email).getByRole(
+                    'button',
+                    {
+                        name: 'Remove collaborator',
+                    },
+                ),
             ).toBeVisible();
 
             const { data: collaborator } = await adminClient()
@@ -117,7 +142,9 @@ test.describe('collaboration', () => {
                 .click();
 
             const confirmDialog = page.getByRole('alertdialog');
-            await expect(confirmDialog.getByText(`Reject request from "${requester.email}"?`)).toBeVisible();
+            await expect(
+                confirmDialog.getByText(`Reject request from "${requester.email}"?`),
+            ).toBeVisible();
             await confirmDialog.getByRole('button', { name: 'Reject' }).click();
             await expect(page.getByText('Request rejected')).toBeVisible();
 
@@ -136,14 +163,19 @@ test.describe('collaboration', () => {
         await loginAs(page, testUser);
         const { spaceName, spaceId } = await createOwnedSpace(page);
 
-        const { requester, requesterPage, context } = await requestToJoinAsNewUser(browser, spaceId);
+        const { requester, requesterPage, context } = await requestToJoinAsNewUser(
+            browser,
+            spaceId,
+        );
         try {
             await page.reload();
             await openSharingPanel(spaceSection(page, spaceName));
             await approveJoinRequestViaUi(page, spaceSection(page, spaceName), requester.email);
 
             await gotoFreshAfterExternalChange(requesterPage, '/spaces');
-            await spaceSection(requesterPage, spaceName).getByRole('button', { name: 'Leave space' }).click();
+            await spaceSection(requesterPage, spaceName)
+                .getByRole('button', { name: 'Leave space' })
+                .click();
             const confirmDialog = requesterPage.getByRole('alertdialog');
             await expect(confirmDialog.getByText(`Leave "${spaceName}"?`)).toBeVisible();
             await confirmDialog.getByRole('button', { name: 'Leave' }).click();
@@ -178,7 +210,9 @@ test.describe('collaboration', () => {
                 .getByRole('button', { name: 'Remove collaborator' })
                 .click();
             const confirmDialog = page.getByRole('alertdialog');
-            await expect(confirmDialog.getByText(`Remove "${requester.email}" from this space?`)).toBeVisible();
+            await expect(
+                confirmDialog.getByText(`Remove "${requester.email}" from this space?`),
+            ).toBeVisible();
             await confirmDialog.getByRole('button', { name: 'Remove' }).click();
             await expect(page.getByText('Collaborator removed')).toBeVisible();
 

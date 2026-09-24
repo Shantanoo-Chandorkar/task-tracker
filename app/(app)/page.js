@@ -19,7 +19,12 @@ export default async function Page() {
 
     if ((lists || []).length > 0) {
         // A failed load leaves initialHome undefined, so the client fetches it and can show a retry
-        return <HomeView initialHome={homeLoadResult.data ?? undefined} firstList={{ id: lists[0].id, name: lists[0].name }} />;
+        return (
+            <HomeView
+                initialHome={homeLoadResult.data ?? undefined}
+                firstList={{ id: lists[0].id, name: lists[0].name }}
+            />
+        );
     }
 
     return (

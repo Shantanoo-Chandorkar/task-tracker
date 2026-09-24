@@ -116,7 +116,11 @@ export default function SignupForm() {
 
                     {error && <p className="text-xs text-destructive">{error}</p>}
 
-                    <Button type="submit" className="w-full gap-1.5" disabled={!isValid || submitting}>
+                    <Button
+                        type="submit"
+                        className="w-full gap-1.5"
+                        disabled={!isValid || submitting}
+                    >
                         {submitting && <Loader size="xs" />}
                         {submitting ? 'Creating account...' : 'Sign up'}
                     </Button>

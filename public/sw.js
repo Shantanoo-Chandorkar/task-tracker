@@ -49,7 +49,11 @@ self.addEventListener('message', (event) => {
                     const { pathname } = new URL(request.url);
                     // Home ('/') summarises every list, so any mutation makes its cached copy stale too
                     const isHomePage = pathname === '/';
-                    return isHomePage || urls.includes(pathname) || prefixes.some((prefix) => pathname.startsWith(prefix));
+                    return (
+                        isHomePage ||
+                        urls.includes(pathname) ||
+                        prefixes.some((prefix) => pathname.startsWith(prefix))
+                    );
                 });
                 await Promise.all(staleRequests.map((request) => cache.delete(request)));
             }),

@@ -1,5 +1,11 @@
 import { test, expect, loginAs } from './fixtures/test.js';
-import { uniqueName, createSpace, createList, createSublist, spaceSection } from './fixtures/app-data.js';
+import {
+    uniqueName,
+    createSpace,
+    createList,
+    createSublist,
+    spaceSection,
+} from './fixtures/app-data.js';
 
 test.describe('sublists', () => {
     let spaceName;
@@ -39,7 +45,9 @@ test.describe('sublists', () => {
         await page.getByRole('button', { name: 'Sublist actions' }).click();
         await page.getByRole('menuitem', { name: 'Delete' }).click();
         await expect(page.getByText('Delete “' + sublistName + '”?')).toBeVisible();
-        await expect(page.getByText('This deletes 0 tasks inside it. This cannot be undone.')).toBeVisible();
+        await expect(
+            page.getByText('This deletes 0 tasks inside it. This cannot be undone.'),
+        ).toBeVisible();
         await page.getByRole('button', { name: 'Delete' }).click();
 
         await expect(page.getByText('Sublist deleted')).toBeVisible();

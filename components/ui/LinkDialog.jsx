@@ -58,7 +58,12 @@ export default function LinkDialog({
             footer={
                 <>
                     {isEditing && (
-                        <Button type="button" variant="ghost" className="sm:mr-auto" onClick={onRemove}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="sm:mr-auto"
+                            onClick={onRemove}
+                        >
                             Remove link
                         </Button>
                     )}

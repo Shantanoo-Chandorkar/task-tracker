@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { sanitizeRedirectPath } from '@/lib/validation';
 
 /**
  * GET /auth/confirm?token_hash=...&type=recovery|signup&next=...
@@ -9,7 +10,7 @@ export async function GET(request) {
     const { searchParams, origin } = new URL(request.url);
     const tokenHash = searchParams.get('token_hash');
     const otpType = searchParams.get('type');
-    const next = searchParams.get('next') ?? '/';
+    const next = sanitizeRedirectPath(searchParams.get('next'));
 
     if (tokenHash && otpType) {
         const supabase = await createClient();

@@ -77,7 +77,11 @@ function SheetContent({ className, children, side = 'right', showCloseButton = t
 
 function SheetHeader({ className, ...props }) {
     return (
-        <div data-slot="sheet-header" className={cn('flex flex-col gap-1.5 p-4', className)} {...props} />
+        <div
+            data-slot="sheet-header"
+            className={cn('flex flex-col gap-1.5 p-4', className)}
+            {...props}
+        />
     );
 }
 

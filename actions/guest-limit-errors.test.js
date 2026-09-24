@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/session', () => ({ getCurrentUser: mocks.getCurrentUser }));
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createSessionClient }));
-vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }));
 
 const { createSpace } = await import('./space-actions');
 const { createList } = await import('./list-actions');
@@ -16,9 +15,11 @@ const { createStatus } = await import('./status-actions');
 const { createTask } = await import('./task-actions');
 const { GUEST_ERROR_CODES } = await import('@/lib/guest/guest-error-codes');
 
+const GUEST_USER_ID = 'guest-1';
+
 /**
- * Fake Supabase client: reads (used to work out the next position) return no rows, and the insert fails with
- * the given database error.
+ * Fake Supabase client - `spaces` reads resolve the caller as owner, since every create action
+ * checks permission before reaching the insert, which is rigged to fail with the given error.
  *
  * @param {{ message: string, code?: string }} insertError - Error the insert returns.
  * @returns {object} Client with a chainable `from`.
@@ -34,11 +35,26 @@ function makeClientWhoseInsertFails(insertError) {
         maybeSingle: async () => ({ data: null, error: null }),
         then: (resolve) => resolve({ data: [], error: null }),
     };
+    const spacesReadChain = {
+        select: () => spacesReadChain,
+        order: () => spacesReadChain,
+        limit: () => spacesReadChain,
+        eq: () => spacesReadChain,
+        is: () => spacesReadChain,
+        single: async () => ({ data: { owner_id: GUEST_USER_ID }, error: null }),
+        maybeSingle: async () => ({ data: { owner_id: GUEST_USER_ID }, error: null }),
+        then: (resolve) => resolve({ data: [{ owner_id: GUEST_USER_ID }], error: null }),
+    };
     const insertChain = {
         select: () => insertChain,
         single: async () => ({ data: null, error: insertError }),
     };
-    return { from: () => ({ ...readChain, insert: () => insertChain }) };
+    return {
+        from: (table) => ({
+            ...(table === 'spaces' ? spacesReadChain : readChain),
+            insert: () => insertChain,
+        }),
+    };
 }
 
 const createCases = [
@@ -52,7 +68,7 @@ const createCases = [
 beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    mocks.getCurrentUser.mockResolvedValue({ id: 'guest-1', is_anonymous: true });
+    mocks.getCurrentUser.mockResolvedValue({ id: GUEST_USER_ID, is_anonymous: true });
 });
 
 describe('a guest-limit error from the database', () => {
@@ -62,12 +78,15 @@ describe('a guest-limit error from the database', () => {
         );
     });
 
-    it.each(createCases)('%s returns the friendly limit code instead of a generic failure', async (name, callAction) => {
-        const actionResult = await callAction();
-        expect(actionResult.code).toBe(GUEST_ERROR_CODES.LIMIT_REACHED);
-        expect(actionResult.data).toBeNull();
-        expect(actionResult.error).toMatch(/Guest mode/);
-    });
+    it.each(createCases)(
+        '%s returns the friendly limit code instead of a generic failure',
+        async (name, callAction) => {
+            const actionResult = await callAction();
+            expect(actionResult.code).toBe(GUEST_ERROR_CODES.LIMIT_REACHED);
+            expect(actionResult.data).toBeNull();
+            expect(actionResult.error).toMatch(/Guest mode/);
+        },
+    );
 
     it.each(createCases)('%s does not leak the raw database message', async (name, callAction) => {
         const actionResult = await callAction();
@@ -80,13 +99,19 @@ describe('a guest-limit error from the database', () => {
 describe('any other database error keeps the old generic message', () => {
     beforeEach(() => {
         mocks.createSessionClient.mockResolvedValue(
-            makeClientWhoseInsertFails({ message: 'permission denied for table tasks', code: '42501' }),
+            makeClientWhoseInsertFails({
+                message: 'permission denied for table tasks',
+                code: '42501',
+            }),
         );
     });
 
-    it.each(createCases)('%s still says it failed, with no guest code', async (name, callAction) => {
-        const actionResult = await callAction();
-        expect(actionResult.error).toMatch(/Failed to create/);
-        expect(actionResult.code).toBeUndefined();
-    });
+    it.each(createCases)(
+        '%s still says it failed, with no guest code',
+        async (name, callAction) => {
+            const actionResult = await callAction();
+            expect(actionResult.error).toMatch(/Failed to create/);
+            expect(actionResult.code).toBeUndefined();
+        },
+    );
 });
