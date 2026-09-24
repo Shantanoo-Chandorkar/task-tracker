@@ -6,16 +6,8 @@ import { toast } from 'sonner';
 import { Copy, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import ModalShell from '@/components/ui/modal-shell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';
@@ -255,27 +247,23 @@ export default function SpaceSharingSection({ space }) {
                 </div>
             )}
 
-            <AlertDialog
+            <ModalShell
                 open={!!confirmTarget}
-                onOpenChange={(open) => !open && setConfirmTarget(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            {confirmTarget?.action === 'reject'
-                                ? `Reject request from "${confirmTarget?.label}"?`
-                                : `Remove "${confirmTarget?.label}" from this space?`}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {confirmTarget?.action === 'reject'
-                                ? "They'll need to send a new request to join."
-                                : "They'll lose access to this space's lists and tasks."}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setConfirmTarget(null)}>
-                            Cancel
-                        </AlertDialogCancel>
+                onClose={() => setConfirmTarget(null)}
+                variant="alert"
+                title={
+                    confirmTarget?.action === 'reject'
+                        ? `Reject request from "${confirmTarget?.label}"?`
+                        : `Remove "${confirmTarget?.label}" from this space?`
+                }
+                description={
+                    confirmTarget?.action === 'reject'
+                        ? "They'll need to send a new request to join."
+                        : "They'll lose access to this space's lists and tasks."
+                }
+                footer={
+                    <>
+                        <AlertDialogCancel onClick={() => setConfirmTarget(null)}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirm}
                             disabled={confirming}
@@ -284,9 +272,9 @@ export default function SpaceSharingSection({ space }) {
                             {confirming && <Loader size="xs" />}
                             {confirmTarget?.action === 'reject' ? 'Reject' : 'Remove'}
                         </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                    </>
+                }
+            />
         </div>
     );
 }

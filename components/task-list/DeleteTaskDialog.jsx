@@ -1,15 +1,7 @@
 'use client';
 
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -30,18 +22,14 @@ export default function DeleteTaskDialog({ open, onClose, task, flatList, onConf
 
     if (!hasChildren) {
         return (
-            <AlertDialog
+            <ModalShell
                 open={open}
-                onOpenChange={(isOpen) => {
-                    if (!isOpen) onClose();
-                }}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete &ldquo;{task.title}&rdquo;?</AlertDialogTitle>
-                        <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
+                onClose={onClose}
+                variant="alert"
+                title={<>Delete &ldquo;{task.title}&rdquo;?</>}
+                description="This cannot be undone."
+                footer={
+                    <>
                         <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => onConfirm('cascade')}
@@ -49,48 +37,39 @@ export default function DeleteTaskDialog({ open, onClose, task, flatList, onConf
                         >
                             Delete
                         </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                    </>
+                }
+            />
         );
     }
 
     return (
-        <AlertDialog
+        <ModalShell
             open={open}
-            onOpenChange={(isOpen) => {
-                if (!isOpen) onClose();
-            }}
-        >
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete &ldquo;{task.title}&rdquo;?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This task has {directChildren.length} subtask
-                        {directChildren.length !== 1 ? 's' : ''}. What should happen to{' '}
-                        {directChildren.length !== 1 ? 'them' : 'it'}?
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter className="flex-col sm:flex-col gap-2">
-                    <Button
-                        variant="outline"
-                        onClick={() => onConfirm('reparent')}
-                        className="w-full"
-                    >
+            onClose={onClose}
+            variant="alert"
+            title={<>Delete &ldquo;{task.title}&rdquo;?</>}
+            description={
+                <>
+                    This task has {directChildren.length} subtask
+                    {directChildren.length !== 1 ? 's' : ''}. What should happen to{' '}
+                    {directChildren.length !== 1 ? 'them' : 'it'}?
+                </>
+            }
+            footerClassName="flex-col sm:flex-col gap-2"
+            footer={
+                <>
+                    <Button variant="outline" onClick={() => onConfirm('reparent')} className="w-full">
                         Move subtasks to parent
                     </Button>
-                    <Button
-                        variant="destructive"
-                        onClick={() => onConfirm('cascade')}
-                        className="w-full"
-                    >
+                    <Button variant="destructive" onClick={() => onConfirm('cascade')} className="w-full">
                         Delete everything
                     </Button>
                     <AlertDialogCancel onClick={onClose} className="w-full mt-0">
                         Cancel
                     </AlertDialogCancel>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+                </>
+            }
+        />
     );
 }

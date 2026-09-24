@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { toast } from 'sonner';
-import ResponsiveModal from '@/components/ui/responsive-modal';
+import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
@@ -17,6 +17,7 @@ import { requestToJoinSpace } from '@/actions/collaboration-actions';
  * @param {string} [props.initialSpaceId] - Pre-filled space ID from a `?join=` link
  */
 export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) {
+    const formId = useId();
     const [spaceId, setSpaceId] = useState(initialSpaceId);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
@@ -58,8 +59,28 @@ export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) 
     }
 
     return (
-        <ResponsiveModal open={open} onClose={onClose} title="Join a space">
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+        <ModalShell
+            open={open}
+            onClose={onClose}
+            title="Join a space"
+            footer={
+                <>
+                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form={formId}
+                        disabled={!spaceId.trim() || submitting}
+                        className="gap-1.5"
+                    >
+                        {submitting && <Loader size="xs" />}
+                        {submitting ? 'Sending...' : 'Request to join'}
+                    </Button>
+                </>
+            }
+        >
+            <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
                 <Input
                     value={spaceId}
                     onChange={(event) => setSpaceId(event.target.value)}
@@ -68,17 +89,7 @@ export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) 
                     disabled={submitting}
                 />
                 {error && <p className="text-xs text-destructive">{error}</p>}
-
-                <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-                        Cancel
-                    </Button>
-                    <Button type="submit" disabled={!spaceId.trim() || submitting} className="gap-1.5">
-                        {submitting && <Loader size="xs" />}
-                        {submitting ? 'Sending...' : 'Request to join'}
-                    </Button>
-                </div>
             </form>
-        </ResponsiveModal>
+        </ModalShell>
     );
 }

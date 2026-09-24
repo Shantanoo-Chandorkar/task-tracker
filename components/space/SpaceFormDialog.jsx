@@ -1,7 +1,8 @@
 'use client';
 
+import { useId } from 'react';
 import { useColorNameForm } from '@/hooks/useColorNameForm';
-import ResponsiveModal from '@/components/ui/responsive-modal';
+import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
@@ -11,8 +12,7 @@ import { createSpace, updateSpace } from '@/actions/space-actions';
 const SPACE_NAME_MAX = 100;
 
 /**
- * Modal for creating or editing a Space, rendered through the shared
- * ResponsiveModal container - same container as Task/List creation.
+ * Modal for creating or editing a Space, rendered through the shared ModalShell container.
  *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open
@@ -20,6 +20,7 @@ const SPACE_NAME_MAX = 100;
  * @param {object|null} [props.space] - Space to edit, or null for create mode
  */
 export default function SpaceFormDialog({ open, onClose, space = null }) {
+    const formId = useId();
     const { isEditing, name, setName, color, setColor, submitting, error, handleSubmit } =
         useColorNameForm({
             open,
@@ -32,8 +33,28 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
         });
 
     return (
-        <ResponsiveModal open={open} onClose={onClose} title={isEditing ? 'Edit Space' : 'New Space'}>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+        <ModalShell
+            open={open}
+            onClose={onClose}
+            title={isEditing ? 'Edit Space' : 'New Space'}
+            footer={
+                <>
+                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form={formId}
+                        disabled={!name.trim() || submitting}
+                        className="gap-1.5"
+                    >
+                        {submitting && <Loader size="xs" />}
+                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create space'}
+                    </Button>
+                </>
+            }
+        >
+            <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
                 <CharLimitField
                     label="Space name"
                     currentLength={name.length}
@@ -59,17 +80,7 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
                         />
                     </div>
                 </CharLimitField>
-
-                <div className="flex justify-end gap-2 pt-2">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-                        Cancel
-                    </Button>
-                    <Button type="submit" disabled={!name.trim() || submitting} className="gap-1.5">
-                        {submitting && <Loader size="xs" />}
-                        {submitting ? 'Saving...' : isEditing ? 'Save changes' : 'Create space'}
-                    </Button>
-                </div>
             </form>
-        </ResponsiveModal>
+        </ModalShell>
     );
 }

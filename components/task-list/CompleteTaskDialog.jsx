@@ -1,15 +1,7 @@
 'use client';
 
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import ModalShell from '@/components/ui/modal-shell';
 
 /**
  * Confirms cascading a task's complete/incomplete status to its descendants before applying it.
@@ -28,24 +20,22 @@ export default function CompleteTaskDialog({ open, onClose, task, isComplete, de
     const verb = isComplete ? 'complete' : 'incomplete';
 
     return (
-        <AlertDialog
+        <ModalShell
             open={open}
-            onOpenChange={(isOpen) => {
-                if (!isOpen) onClose();
-            }}
-        >
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Mark &ldquo;{task.title}&rdquo; {verb}?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This will also mark {descendantCount} subtask{descendantCount !== 1 ? 's' : ''} as {verb}.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
+            onClose={onClose}
+            variant="alert"
+            title={
+                <>
+                    Mark &ldquo;{task.title}&rdquo; {verb}?
+                </>
+            }
+            description={`This will also mark ${descendantCount} subtask${descendantCount !== 1 ? 's' : ''} as ${verb}.`}
+            footer={
+                <>
                     <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={onConfirm}>Mark {verb}</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+                </>
+            }
+        />
     );
 }
