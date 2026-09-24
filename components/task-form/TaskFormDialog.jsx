@@ -125,23 +125,32 @@ export default function TaskFormDialog({
             recurrence_rule: isRecurring ? recurrenceRule : null,
         };
 
-        const { error } = isEditing ? await updateTask(task.id, fields) : await createTask(fields);
+        try {
+            const { error } = isEditing
+                ? await updateTask(task.id, fields)
+                : await createTask(fields);
 
-        setSubmitting(false);
+            if (error) {
+                setFormError(error);
+                toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
+                return;
+            }
 
-        if (error) {
-            setFormError(error);
-            toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
-            return;
+            toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
+            onClose();
+            // Not awaited - the dialog closes immediately instead of blocking on this refetch.
+            queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
+            // A new task changes the list's total count - the sidebar's ['lists'] query needs telling.
+            if (!isEditing) queryClient.invalidateQueries({ queryKey: ['lists'] });
+            bustPageCache({ urls: [`/lists/${listId ?? task?.list_id}`] });
+        } catch {
+            // A rejected server action means the request never completed (offline, server down)
+            const message = 'Could not save. Check your connection and try again.';
+            setFormError(message);
+            toast.error(message);
+        } finally {
+            setSubmitting(false);
         }
-
-        toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
-        onClose();
-        // Not awaited - the dialog closes immediately instead of blocking on this refetch.
-        queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
-        // A new task changes the list's total count - the sidebar's ['lists'] query needs telling.
-        if (!isEditing) queryClient.invalidateQueries({ queryKey: ['lists'] });
-        bustPageCache({ urls: [`/lists/${listId ?? task?.list_id}`] });
     }
 
     return (
