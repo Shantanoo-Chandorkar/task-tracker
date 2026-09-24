@@ -196,3 +196,111 @@ export async function addSubtask(page, parentRow, title = uniqueName('Task')) {
     await expect(dialog).toBeHidden();
     return title;
 }
+
+/**
+ * Locates a single sublist's own header row by its exact visible name.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} sublistName
+ * @returns {import('@playwright/test').Locator}
+ */
+export function sublistRow(page, sublistName) {
+    return page.locator('div.rounded-lg.bg-card', { has: page.getByText(sublistName, { exact: true }) });
+}
+
+/**
+ * Moves a sortable row one step down via dnd-kit's keyboard sensor, deterministically -
+ * a raw mouse dragTo() is timing-sensitive against dnd-kit sortables.
+ *
+ * @param {import('@playwright/test').Locator} row - A space/list/sublist/task row locator.
+ * @returns {Promise<void>}
+ */
+export async function dragHandleDown(row) {
+    const handle = row.getByRole('button', { name: 'Drag to reorder' });
+    const page = row.page();
+    // Space/Arrow/Space back-to-back outruns React's own state update and drops on itself.
+    await handle.focus();
+    await handle.press('Space');
+    await page.waitForTimeout(150);
+    await handle.press('ArrowDown');
+    await page.waitForTimeout(150);
+    await handle.press('Space');
+}
+
+/**
+ * Requests to join a space by ID via the real "Join a space" dialog.
+ *
+ * @param {import('@playwright/test').Page} page - Already on /spaces.
+ * @param {string} spaceId
+ * @returns {Promise<void>}
+ */
+export async function requestToJoinViaUi(page, spaceId) {
+    await page.getByRole('button', { name: 'Join a space' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByPlaceholder('Paste the space ID').fill(spaceId);
+    await dialog.getByRole('button', { name: 'Request to join' }).click();
+}
+
+/**
+ * Expands an owned space's "Share this space" panel. Caller must be the only opener - the
+ * toggle isn't idempotent, see docs/e2e-test-quality.md #3.
+ *
+ * @param {import('@playwright/test').Locator} spaceSectionLocator
+ * @returns {Promise<void>}
+ */
+export async function openSharingPanel(spaceSectionLocator) {
+    await spaceSectionLocator.getByRole('button', { name: 'Share this space' }).click();
+}
+
+/**
+ * Locates a join-request or collaborator row within an owner's sharing panel by requester email.
+ *
+ * @param {import('@playwright/test').Locator} spaceSectionLocator
+ * @param {string} email
+ * @returns {import('@playwright/test').Locator}
+ */
+export function collaboratorRow(spaceSectionLocator, email) {
+    return spaceSectionLocator.locator('div.px-3.py-2', { hasText: email });
+}
+
+/**
+ * Approves a pending join request via the owner's sharing panel, waiting for confirmation.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').Locator} spaceSectionLocator
+ * @param {string} requesterEmail
+ * @returns {Promise<void>}
+ */
+export async function approveJoinRequestViaUi(page, spaceSectionLocator, requesterEmail) {
+    await collaboratorRow(spaceSectionLocator, requesterEmail).getByRole('button', { name: 'Approve request' }).click();
+    await expect(page.getByText('Request approved')).toBeVisible();
+}
+
+/**
+ * Navigates to a page this same browser context already visited, bypassing the service
+ * worker's stale-while-revalidate cache after a change made by a DIFFERENT context - see
+ * docs/e2e-test-quality.md.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} path
+ * @returns {Promise<void>}
+ */
+export async function gotoFreshAfterExternalChange(page, path) {
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    await page.reload();
+}
+
+/**
+ * Starts a real anonymous guest session via the login page's "Try as guest" button.
+ *
+ * No captcha handling needed - .env.test blanks TURNSTILE_* vars, so the widget never renders.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<void>}
+ */
+export async function startGuestSession(page) {
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Try as guest' }).click();
+    await page.waitForURL('/');
+}

@@ -38,6 +38,24 @@ export async function createTestUser(overrides = {}) {
 }
 
 /**
+ * Anon-key Supabase client signed in as a specific user - the only way to exercise real RLS as
+ * that user outside the app's own session cookies (adminClient bypasses RLS entirely).
+ *
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<import('@supabase/supabase-js').SupabaseClient>}
+ */
+export async function signInClient(email, password) {
+    const client = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    );
+    const { error: signInError } = await client.auth.signInWithPassword({ email, password });
+    if (signInError) throw signInError;
+    return client;
+}
+
+/**
  * Deletes a test user.
  *
  * Spaces cascade-delete via owner_id's ON DELETE CASCADE chain (migration 0007) - nothing else to clean up.
