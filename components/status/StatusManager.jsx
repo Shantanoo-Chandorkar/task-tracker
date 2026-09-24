@@ -25,10 +25,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
-import {
-    AlertDialogAction,
-    AlertDialogCancel,
-} from '@/components/ui/alert-dialog';
+import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
 import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
@@ -162,7 +159,9 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                 reordered
                     .map((status, newPosition) => ({ status, newPosition }))
                     .filter(({ status, newPosition }) => status.position !== newPosition)
-                    .map(({ status, newPosition }) => updateStatus(status.id, { position: newPosition })),
+                    .map(({ status, newPosition }) =>
+                        updateStatus(status.id, { position: newPosition }),
+                    ),
             );
         } catch {
             await queryClient.invalidateQueries({ queryKey: ['statuses'] });
@@ -248,7 +247,9 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                                 <StatusRow
                                     key={status.id}
                                     status={status}
-                                    onEditRequest={(status) => setStatusDialog({ open: true, status })}
+                                    onEditRequest={(status) =>
+                                        setStatusDialog({ open: true, status })
+                                    }
                                     onDeleteRequest={setDeleteTarget}
                                     isOnly={statuses.length === 1}
                                 />
@@ -282,7 +283,9 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                 description="Tasks using this status will lose it. This cannot be undone."
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
                             disabled={deleting}

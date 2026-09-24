@@ -29,7 +29,11 @@ const FOOTER_CLASSES =
 
 function ModalFooter({ children, roundedBottom, className }) {
     if (!children) return null;
-    return <div className={cn(FOOTER_CLASSES, roundedBottom && 'rounded-b-xl', className)}>{children}</div>;
+    return (
+        <div className={cn(FOOTER_CLASSES, roundedBottom && 'rounded-b-xl', className)}>
+            {children}
+        </div>
+    );
 }
 
 // Every modal requires an explicit Cancel/close click - an outside click must never dismiss it.
@@ -79,7 +83,9 @@ export default function ModalShell({
                 <AlertDialogContent onPointerDownOutside={blockOutsideDismiss}>
                     <AlertDialogHeader>
                         <AlertDialogTitle>{title}</AlertDialogTitle>
-                        {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
+                        {description && (
+                            <AlertDialogDescription>{description}</AlertDialogDescription>
+                        )}
                     </AlertDialogHeader>
                     {children}
                     <ModalFooter roundedBottom className={footerClassName}>
@@ -96,7 +102,11 @@ export default function ModalShell({
             <Sheet open={open} onOpenChange={handleOpenChange}>
                 <SheetContent
                     side={isPureSheet ? side : 'bottom'}
-                    className={isPureSheet ? contentClassName : cn('max-h-[90vh] overflow-y-auto', contentClassName)}
+                    className={
+                        isPureSheet
+                            ? contentClassName
+                            : cn('max-h-[90vh] overflow-y-auto', contentClassName)
+                    }
                     onOpenAutoFocus={(event) => event.preventDefault()}
                     onCloseAutoFocus={onCloseAutoFocus}
                     onPointerDownOutside={blockOutsideDismiss}

@@ -32,7 +32,10 @@ test.describe('tasks', () => {
     });
 
     test('creating a task with a title and description shows it in the list', async ({ page }) => {
-        const title = await createTask(page, { title: uniqueName('Task'), description: 'Some details' });
+        const title = await createTask(page, {
+            title: uniqueName('Task'),
+            description: 'Some details',
+        });
         await expect(taskRow(page, title)).toBeVisible();
     });
 
@@ -69,7 +72,9 @@ test.describe('tasks', () => {
         );
     });
 
-    test('changing a task status via the inline picker updates it with no error', async ({ page }) => {
+    test('changing a task status via the inline picker updates it with no error', async ({
+        page,
+    }) => {
         const title = await createTask(page);
         const row = taskRow(page, title);
 
@@ -80,7 +85,9 @@ test.describe('tasks', () => {
         await expect(page.getByText('Failed to update task status')).toHaveCount(0);
     });
 
-    test('a task with a real status shows it in the server-rendered HTML, not "No status"', async ({ page }) => {
+    test('a task with a real status shows it in the server-rendered HTML, not "No status"', async ({
+        page,
+    }) => {
         const title = await createTask(page);
         const row = taskRow(page, title);
 
@@ -94,7 +101,9 @@ test.describe('tasks', () => {
         expect(html).not.toContain('No status');
     });
 
-    test('completing a task with an incomplete subtask cascades after confirmation', async ({ page }) => {
+    test('completing a task with an incomplete subtask cascades after confirmation', async ({
+        page,
+    }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));
 
@@ -110,7 +119,9 @@ test.describe('tasks', () => {
         await expect(taskRow(page, childTitle).getByText('Done', { exact: true })).toBeVisible();
     });
 
-    test('reopening a completed task with a completed subtask cascades after confirmation', async ({ page }) => {
+    test('reopening a completed task with a completed subtask cascades after confirmation', async ({
+        page,
+    }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));
 
@@ -133,7 +144,9 @@ test.describe('tasks', () => {
         await expect(taskRow(page, childTitle).getByText('To Do', { exact: true })).toBeVisible();
     });
 
-    test('moving a subtask via "Move to..." relocates it, and promotion returns it to root', async ({ page }) => {
+    test('moving a subtask via "Move to..." relocates it, and promotion returns it to root', async ({
+        page,
+    }) => {
         const originalParentTitle = await createTask(page);
         const moveTargetTitle = await createTask(page);
         const subtask = await addSubtask(page, taskRow(page, originalParentTitle));
@@ -145,7 +158,9 @@ test.describe('tasks', () => {
         await expect(page.getByText('Task moved')).toBeVisible();
 
         // moveTargetTitle had no children before the move, so its row still defaults to collapsed.
-        await taskRow(page, moveTargetTitle).getByRole('button', { name: 'Expand subtasks' }).click();
+        await taskRow(page, moveTargetTitle)
+            .getByRole('button', { name: 'Expand subtasks' })
+            .click();
 
         await taskRow(page, subtask).getByRole('button', { name: 'More actions' }).click();
         await expect(page.getByRole('menuitem', { name: 'Promote to sibling' })).toBeVisible();
@@ -173,13 +188,15 @@ test.describe('tasks', () => {
         await expect(page.getByRole('link', { name: childTitle, exact: true })).toHaveCount(2);
     });
 
-    test('a subtask checkbox is enabled in the task detail page\'s server-rendered HTML on first paint', async ({
+    test("a subtask checkbox is enabled in the task detail page's server-rendered HTML on first paint", async ({
         page,
     }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));
 
-        await taskRow(page, parentTitle).getByRole('link', { name: parentTitle, exact: true }).click();
+        await taskRow(page, parentTitle)
+            .getByRole('link', { name: parentTitle, exact: true })
+            .click();
         await page.waitForURL(/\/tasks\//);
 
         // Bypasses the client/hydration entirely - proves the checkbox is enabled in the raw SSR HTML.
@@ -205,13 +222,17 @@ test.describe('tasks', () => {
         await expect(page.getByRole('link', { name: title, exact: true })).toHaveCount(0);
     });
 
-    test('deleting a task with children can move the children to its own parent', async ({ page }) => {
+    test('deleting a task with children can move the children to its own parent', async ({
+        page,
+    }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));
 
         await taskRow(page, parentTitle).getByRole('button', { name: 'More actions' }).click();
         await page.getByRole('menuitem', { name: 'Delete' }).click();
-        await expect(page.getByText('This task has 1 subtask. What should happen to it?')).toBeVisible();
+        await expect(
+            page.getByText('This task has 1 subtask. What should happen to it?'),
+        ).toBeVisible();
         await page.getByRole('button', { name: 'Move subtasks to parent' }).click();
 
         await expect(page.getByText('Task deleted')).toBeVisible();

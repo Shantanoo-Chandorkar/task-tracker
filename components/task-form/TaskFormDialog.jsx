@@ -108,7 +108,9 @@ export default function TaskFormDialog({
             status_id: statusId || null,
             due_date: dueDate || null,
             parent_id: isEditing ? task.parent_id : (parentId ?? null),
-            ...(isEditing ? {} : { list_id: listId, sublist_id: isRootCreate ? sublistId || null : null }),
+            ...(isEditing
+                ? {}
+                : { list_id: listId, sublist_id: isRootCreate ? sublistId || null : null }),
             is_recurring: isRecurring,
             recurrence_rule: isRecurring ? recurrenceRule : null,
         };

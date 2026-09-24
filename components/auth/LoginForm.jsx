@@ -63,8 +63,12 @@ export default function LoginForm({ hasGuestSessionEnded = false }) {
             <p className="mt-1 text-sm text-muted-foreground">Welcome back to Task Tracker.</p>
 
             {hasGuestSessionEnded && (
-                <p role="status" className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-sm text-foreground">
-                    Your guest session ended. Sign up to keep your work, or start a new guest session below.
+                <p
+                    role="status"
+                    className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-sm text-foreground"
+                >
+                    Your guest session ended. Sign up to keep your work, or start a new guest
+                    session below.
                 </p>
             )}
 

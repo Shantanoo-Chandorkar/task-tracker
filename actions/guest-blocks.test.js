@@ -26,9 +26,15 @@ vi.mock('@/lib/email/notifications/send-collaborator-left-email', () => ({
 vi.mock('@/lib/email/notifications/send-collaborator-removed-email', () => ({
     sendCollaboratorRemovedEmail: mocks.sendCollaboratorRemovedEmail,
 }));
-vi.mock('@/lib/email/notifications/send-password-reset-email', () => ({ sendPasswordResetEmail: vi.fn() }));
-vi.mock('@/lib/email/notifications/send-signup-confirmation-email', () => ({ sendSignupConfirmationEmail: vi.fn() }));
-vi.mock('@/lib/email/notifications/send-existing-account-email', () => ({ sendExistingAccountEmail: vi.fn() }));
+vi.mock('@/lib/email/notifications/send-password-reset-email', () => ({
+    sendPasswordResetEmail: vi.fn(),
+}));
+vi.mock('@/lib/email/notifications/send-signup-confirmation-email', () => ({
+    sendSignupConfirmationEmail: vi.fn(),
+}));
+vi.mock('@/lib/email/notifications/send-existing-account-email', () => ({
+    sendExistingAccountEmail: vi.fn(),
+}));
 
 const {
     requestToJoinSpace,
@@ -81,21 +87,27 @@ beforeEach(() => {
 describe('guest is refused before anything is read, written or sent', () => {
     beforeEach(() => mocks.getCurrentUser.mockResolvedValue(GUEST_USER));
 
-    it.each(guestBlockedCases)('%s returns GUEST_ACTION_NOT_ALLOWED', async (actionName, callAction) => {
-        const actionResult = await callAction();
-        expect(actionResult.code).toBe(GUEST_ERROR_CODES.ACTION_NOT_ALLOWED);
-        expect(actionResult.error).toBeTruthy();
-    });
+    it.each(guestBlockedCases)(
+        '%s returns GUEST_ACTION_NOT_ALLOWED',
+        async (actionName, callAction) => {
+            const actionResult = await callAction();
+            expect(actionResult.code).toBe(GUEST_ERROR_CODES.ACTION_NOT_ALLOWED);
+            expect(actionResult.error).toBeTruthy();
+        },
+    );
 
-    it.each(guestBlockedCases)('%s touches no database and sends no email', async (actionName, callAction) => {
-        await callAction();
-        expect(mocks.createSessionClient).not.toHaveBeenCalled();
-        expect(mocks.createAdminClient).not.toHaveBeenCalled();
-        expect(mocks.sendJoinRequestEmail).not.toHaveBeenCalled();
-        expect(mocks.sendJoinDecisionEmail).not.toHaveBeenCalled();
-        expect(mocks.sendCollaboratorLeftEmail).not.toHaveBeenCalled();
-        expect(mocks.sendCollaboratorRemovedEmail).not.toHaveBeenCalled();
-    });
+    it.each(guestBlockedCases)(
+        '%s touches no database and sends no email',
+        async (actionName, callAction) => {
+            await callAction();
+            expect(mocks.createSessionClient).not.toHaveBeenCalled();
+            expect(mocks.createAdminClient).not.toHaveBeenCalled();
+            expect(mocks.sendJoinRequestEmail).not.toHaveBeenCalled();
+            expect(mocks.sendJoinDecisionEmail).not.toHaveBeenCalled();
+            expect(mocks.sendCollaboratorLeftEmail).not.toHaveBeenCalled();
+            expect(mocks.sendCollaboratorRemovedEmail).not.toHaveBeenCalled();
+        },
+    );
 
     it('keeps the data field null on the actions that normally return one', async () => {
         expect((await requestToJoinSpace({ spaceId: VALID_SPACE_ID })).data).toBeNull();

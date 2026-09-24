@@ -27,7 +27,13 @@ import RichTextRenderer from '@/components/ui/RichTextRenderer';
  * @param {object[]} [props.initialStatuses] - Seeds the query cache so SubtaskTree's checkboxes don't hydrate-mismatch
  * @param {object[]} [props.initialLists] - SSR-fetched single-list array, so spaceId resolves synchronously on first paint
  */
-export default function TaskDetail({ listId, taskId, initialTasks, initialStatuses, initialLists }) {
+export default function TaskDetail({
+    listId,
+    taskId,
+    initialTasks,
+    initialStatuses,
+    initialLists,
+}) {
     const router = useRouter();
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
 

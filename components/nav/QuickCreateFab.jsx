@@ -92,7 +92,10 @@ export default function QuickCreateFab({ className }) {
             )}
             <SpaceFormDialog open={spaceDialogOpen} onClose={() => setSpaceDialogOpen(false)} />
             <ListFormDialog open={listDialogOpen} onClose={() => setListDialogOpen(false)} />
-            <SublistFormDialog open={sublistDialogOpen} onClose={() => setSublistDialogOpen(false)} />
+            <SublistFormDialog
+                open={sublistDialogOpen}
+                onClose={() => setSublistDialogOpen(false)}
+            />
         </>
     );
 }

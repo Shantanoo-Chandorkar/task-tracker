@@ -14,10 +14,16 @@ function killProcessOnPort(port) {
                 netstatOutput
                     .split('\n')
                     .map((line) => line.trim().split(/\s+/))
-                    .filter((columns) => columns[0] === 'TCP' && columns[1]?.endsWith(`:${port}`) && columns[3] === 'LISTENING')
+                    .filter(
+                        (columns) =>
+                            columns[0] === 'TCP' &&
+                            columns[1]?.endsWith(`:${port}`) &&
+                            columns[3] === 'LISTENING',
+                    )
                     .map((columns) => columns[4]),
             );
-            for (const pid of pids) execFileSync('taskkill', ['/F', '/T', '/PID', pid], { stdio: 'ignore' });
+            for (const pid of pids)
+                execFileSync('taskkill', ['/F', '/T', '/PID', pid], { stdio: 'ignore' });
         } else {
             const pids = execFileSync('lsof', ['-ti', `:${port}`], { encoding: 'utf8' }).trim();
             if (pids) execFileSync('kill', ['-9', ...pids.split('\n')]);

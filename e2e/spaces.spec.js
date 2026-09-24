@@ -26,12 +26,16 @@ test.describe('spaces', () => {
         await expect(page.getByText(spaceName)).toHaveCount(0);
     });
 
-    test('deleting a space shows the cascade count and removes it and its lists', async ({ page }) => {
+    test('deleting a space shows the cascade count and removes it and its lists', async ({
+        page,
+    }) => {
         const spaceName = await createSpace(page);
         const listName = await createList(page, spaceName);
 
         await spaceSection(page, spaceName).getByRole('button', { name: 'Delete space' }).click();
-        await expect(page.getByText('This deletes 1 list and 0 tasks. This cannot be undone.')).toBeVisible();
+        await expect(
+            page.getByText('This deletes 1 list and 0 tasks. This cannot be undone.'),
+        ).toBeVisible();
         await page.getByRole('button', { name: 'Delete' }).click();
 
         await expect(page.getByText('Space deleted')).toBeVisible();
@@ -41,7 +45,9 @@ test.describe('spaces', () => {
 
     // name-too-long test dropped: maxLength truncates fill(), unreachable via UI - see docs/e2e-test-quality.md.
 
-    test('requesting to join a space with an invalid ID shows an inline error', async ({ page }) => {
+    test('requesting to join a space with an invalid ID shows an inline error', async ({
+        page,
+    }) => {
         await page.getByRole('button', { name: 'Join a space' }).click();
         const dialog = page.getByRole('dialog');
         await dialog.getByPlaceholder('Paste the space ID').fill('not-a-uuid');

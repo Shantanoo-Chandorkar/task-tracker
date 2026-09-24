@@ -1,5 +1,11 @@
 import { test, expect, loginAs } from './fixtures/test.js';
-import { uniqueName, createSpace, createStatus, spaceSection, statusRow } from './fixtures/app-data.js';
+import {
+    uniqueName,
+    createSpace,
+    createStatus,
+    spaceSection,
+    statusRow,
+} from './fixtures/app-data.js';
 
 test.describe('statuses', () => {
     let spaceName;
@@ -20,7 +26,9 @@ test.describe('statuses', () => {
         const statusName = await createStatus(page, spaceName);
         const newName = uniqueName('Renamed status');
 
-        await statusRow(page, spaceName, statusName).getByRole('button', { name: 'Edit status' }).click();
+        await statusRow(page, spaceName, statusName)
+            .getByRole('button', { name: 'Edit status' })
+            .click();
         await page.getByRole('dialog').getByPlaceholder('Status name').fill(newName);
         await page.getByRole('dialog').getByRole('button', { name: 'Save changes' }).click();
         await expect(page.getByRole('dialog')).toBeHidden();

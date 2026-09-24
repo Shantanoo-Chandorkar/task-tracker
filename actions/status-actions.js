@@ -7,7 +7,11 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
-import { resolveSpacePermission, blockCreateForPermission, blockWriteForPermission } from '@/lib/permissions/space-permissions';
+import {
+    resolveSpacePermission,
+    blockCreateForPermission,
+    blockWriteForPermission,
+} from '@/lib/permissions/space-permissions';
 
 /**
  * Creates a new status. Appends it after the last existing status in its space.
@@ -110,7 +114,11 @@ export async function updateStatus(id, fields) {
             .maybeSingle();
         if (!existingStatus) return { data: null, error: 'Status not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingStatus.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingStatus.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingStatus.created_by === user.id,
         });
@@ -183,7 +191,12 @@ export async function deleteStatus(id) {
             return { error: 'Cannot delete a built-in status' };
         }
 
-        const { data: deletedStatus, error } = await supabase.from('statuses').delete().eq('id', id).select().maybeSingle();
+        const { data: deletedStatus, error } = await supabase
+            .from('statuses')
+            .delete()
+            .eq('id', id)
+            .select()
+            .maybeSingle();
 
         if (error || !deletedStatus) {
             return { error: 'Status not found' };

@@ -11,7 +11,14 @@
  * @param {string} [props.error] - Server/action error shown below the input.
  * @param {import('react').ReactNode} props.children - The input or control being wrapped.
  */
-export default function CharLimitField({ label, currentLength, maxLength, htmlFor, error, children }) {
+export default function CharLimitField({
+    label,
+    currentLength,
+    maxLength,
+    htmlFor,
+    error,
+    children,
+}) {
     const isExceeded = currentLength >= maxLength;
 
     return (
@@ -20,13 +27,17 @@ export default function CharLimitField({ label, currentLength, maxLength, htmlFo
                 <label htmlFor={htmlFor} className="text-sm font-medium text-foreground">
                     {label}
                 </label>
-                <span className={`text-xs ${isExceeded ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                <span
+                    className={`text-xs ${isExceeded ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+                >
                     {currentLength}/{maxLength}
                 </span>
             </div>
             {children}
             {error && <p className="text-xs text-destructive">{error}</p>}
-            {isExceeded && !error && <p className="text-xs text-destructive">Character limit exceeded</p>}
+            {isExceeded && !error && (
+                <p className="text-xs text-destructive">Character limit exceeded</p>
+            )}
         </div>
     );
 }

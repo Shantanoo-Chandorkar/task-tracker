@@ -7,7 +7,12 @@ import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
 import { findDescendantIds, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
 import { getNextPosition } from '@/lib/position';
-import { canMarkTaskDone, getDefaultStatusId, getDoneStatusId, getTaskListTree } from '@/lib/task-completion';
+import {
+    canMarkTaskDone,
+    getDefaultStatusId,
+    getDoneStatusId,
+    getTaskListTree,
+} from '@/lib/task-completion';
 import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED, TASK_INVALID_PRIORITY } from '@/lib/error-codes';
@@ -114,7 +119,11 @@ export async function createTask(fields) {
         if (position === undefined || position === null) {
             const filters = fields.parent_id
                 ? { parent_id: fields.parent_id }
-                : { list_id: fields.list_id, parent_id: null, sublist_id: fields.sublist_id ?? null };
+                : {
+                      list_id: fields.list_id,
+                      parent_id: null,
+                      sublist_id: fields.sublist_id ?? null,
+                  };
             position = await getNextPosition(supabase, 'tasks', filters, 1);
         }
 
@@ -145,7 +154,11 @@ export async function createTask(fields) {
             .single();
 
         if (error) {
-            console.error('[tasks] create failed', { listId: fields.list_id, code: error.code, detail: error.message });
+            console.error('[tasks] create failed', {
+                listId: fields.list_id,
+                code: error.code,
+                detail: error.message,
+            });
             const guestLimitResult = toGuestLimitResult(error);
             if (guestLimitResult) return { data: null, ...guestLimitResult };
             return { data: null, error: 'Failed to create task' };
@@ -182,7 +195,11 @@ export async function updateTask(taskId, fields) {
             .maybeSingle();
         if (!existingTask) return { data: null, error: 'Task not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingTask.lists?.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingTask.lists?.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingTask.created_by === user.id,
         });
@@ -198,7 +215,11 @@ export async function updateTask(taskId, fields) {
         }
 
         if ('is_prioritised' in updates && typeof updates.is_prioritised !== 'boolean') {
-            return { data: null, error: 'Priority must be true or false', code: TASK_INVALID_PRIORITY };
+            return {
+                data: null,
+                error: 'Priority must be true or false',
+                code: TASK_INVALID_PRIORITY,
+            };
         }
 
         if ('description' in updates) {
@@ -220,7 +241,10 @@ export async function updateTask(taskId, fields) {
             if (targetStatus?.code === 'done') {
                 const canComplete = await canMarkTaskDone(supabase, taskId, updates.status_id);
                 if (!canComplete) {
-                    return { data: null, error: 'Complete all subtasks before marking this task done' };
+                    return {
+                        data: null,
+                        error: 'Complete all subtasks before marking this task done',
+                    };
                 }
             }
         }
@@ -298,7 +322,9 @@ export async function completeTaskAndDescendants(taskId) {
 
         // Gated on root-task ownership only - RLS still blocks any descendant the caller doesn't own.
         const permissionLevel = await resolveSpacePermission(supabase, task.space_id, user.id);
-        const permissionBlock = blockWriteForPermission(permissionLevel, { isOwnRow: task.created_by === user.id });
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: task.created_by === user.id,
+        });
         if (permissionBlock) return permissionBlock;
 
         const doneStatusId = await getDoneStatusId(supabase, task.space_id);
@@ -314,7 +340,11 @@ export async function completeTaskAndDescendants(taskId) {
             .select('id');
 
         if (error) {
-            console.error('[tasks] complete-cascade failed', { taskId, code: error.code, detail: error.message });
+            console.error('[tasks] complete-cascade failed', {
+                taskId,
+                code: error.code,
+                detail: error.message,
+            });
             return { error: 'Failed to mark tasks complete' };
         }
 
@@ -352,7 +382,9 @@ export async function uncompleteTaskAndDescendants(taskId) {
 
         // Gated on root-task ownership only - RLS still blocks any descendant the caller doesn't own.
         const permissionLevel = await resolveSpacePermission(supabase, task.space_id, user.id);
-        const permissionBlock = blockWriteForPermission(permissionLevel, { isOwnRow: task.created_by === user.id });
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: task.created_by === user.id,
+        });
         if (permissionBlock) return permissionBlock;
 
         const defaultStatusId = await getDefaultStatusId(supabase, task.space_id);
@@ -368,7 +400,11 @@ export async function uncompleteTaskAndDescendants(taskId) {
             .select('id');
 
         if (error) {
-            console.error('[tasks] uncomplete-cascade failed', { taskId, code: error.code, detail: error.message });
+            console.error('[tasks] uncomplete-cascade failed', {
+                taskId,
+                code: error.code,
+                detail: error.message,
+            });
             return { error: 'Failed to mark tasks incomplete' };
         }
 
@@ -376,7 +412,11 @@ export async function uncompleteTaskAndDescendants(taskId) {
 
         const uncompletedCount = updatedRows?.length ?? 0;
         if (uncompletedCount < idsToUncomplete.length) {
-            return { error: null, completedCount: uncompletedCount, totalCount: idsToUncomplete.length };
+            return {
+                error: null,
+                completedCount: uncompletedCount,
+                totalCount: idsToUncomplete.length,
+            };
         }
         return { error: null };
     } catch (thrown) {
@@ -407,13 +447,22 @@ export async function deleteTask(id) {
             .maybeSingle();
         if (!existingTask) return { error: 'Task not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingTask.lists?.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingTask.lists?.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingTask.created_by === user.id,
         });
         if (permissionBlock) return permissionBlock;
 
-        const { data: deletedTask, error } = await supabase.from('tasks').delete().eq('id', id).select().maybeSingle();
+        const { data: deletedTask, error } = await supabase
+            .from('tasks')
+            .delete()
+            .eq('id', id)
+            .select()
+            .maybeSingle();
 
         if (error || !deletedTask) {
             return { error: 'Task not found' };
@@ -454,8 +503,14 @@ export async function deleteTaskAndReparentChildren(taskId) {
 
         if (taskError || !task) return { error: 'Task not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, task.lists?.space_id, user.id);
-        const permissionBlock = blockWriteForPermission(permissionLevel, { isOwnRow: task.created_by === user.id });
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            task.lists?.space_id,
+            user.id,
+        );
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: task.created_by === user.id,
+        });
         if (permissionBlock) return permissionBlock;
 
         const { data: directChildren = [] } = await supabase
@@ -570,7 +625,11 @@ export async function duplicateTask(taskId) {
         if (taskError || !task) return { error: 'Task not found' };
 
         // Duplicating creates new rows, so this is a create-permission check, not row ownership.
-        const permissionLevel = await resolveSpacePermission(supabase, task.lists?.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            task.lists?.space_id,
+            user.id,
+        );
         const permissionBlock = blockCreateForPermission(permissionLevel);
         if (permissionBlock) return permissionBlock;
 
@@ -684,7 +743,7 @@ async function insertSnapshotNode(
         description: node.description ?? null,
         status_id: node.status_id ?? null,
         parent_id: parentId ?? null,
-        sublist_id: parentId ? null : (isRoot ? (sublistId ?? null) : null),
+        sublist_id: parentId ? null : isRoot ? (sublistId ?? null) : null,
         list_id: listId,
         position,
         depth,

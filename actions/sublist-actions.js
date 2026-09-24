@@ -104,7 +104,11 @@ export async function updateSublist(sublistId, fields) {
             .maybeSingle();
         if (!existingSublist) return { data: null, error: 'Sublist not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingSublist.lists?.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingSublist.lists?.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingSublist.created_by === user.id,
         });
@@ -151,7 +155,11 @@ export async function deleteSublist(sublistId) {
             .maybeSingle();
         if (!existingSublist) return { error: 'Sublist not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingSublist.lists?.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingSublist.lists?.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingSublist.created_by === user.id,
         });

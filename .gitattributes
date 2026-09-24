@@ -1,0 +1,9 @@
+# Normalizes line endings to LF regardless of the checkout platform's autocrlf setting,
+# matching Prettier's default endOfLine, so `format:check` stays green after any git
+# operation (checkout, stash, merge) on a Windows machine with core.autocrlf=true.
+* text=auto eol=lf
+
+# Binary assets: never touched by line-ending normalization.
+*.png binary
+*.ico binary
+*.exe binary

@@ -29,7 +29,9 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
     const { data: lists = [] } = useListsQuery({ initialData: initialLists });
     const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
 
-    const displayName = profile?.is_guest ? 'Guest' : profile?.display_name || profile?.email || 'User';
+    const displayName = profile?.is_guest
+        ? 'Guest'
+        : profile?.display_name || profile?.email || 'User';
     const initials = displayName
         .split(' ')
         .filter(Boolean)

@@ -5,7 +5,9 @@ import { createClient } from '@supabase/supabase-js';
 
 const [fromOwnerId, toOwnerId] = process.argv.slice(2);
 if (!fromOwnerId || !toOwnerId) {
-    console.error('Usage: node --env-file=.env.local scripts/reassign-space-owner.mjs <fromOwnerId> <toOwnerId>');
+    console.error(
+        'Usage: node --env-file=.env.local scripts/reassign-space-owner.mjs <fromOwnerId> <toOwnerId>',
+    );
     process.exit(1);
 }
 

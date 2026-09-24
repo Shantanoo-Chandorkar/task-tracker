@@ -7,7 +7,11 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
-import { resolveSpacePermission, blockCreateForPermission, blockWriteForPermission } from '@/lib/permissions/space-permissions';
+import {
+    resolveSpacePermission,
+    blockCreateForPermission,
+    blockWriteForPermission,
+} from '@/lib/permissions/space-permissions';
 
 /**
  * Creates a new list under a space. Appends it after the last existing list
@@ -99,7 +103,11 @@ export async function updateList(id, fields) {
             .maybeSingle();
         if (!existingList) return { data: null, error: 'List not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingList.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingList.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingList.created_by === user.id,
         });
@@ -147,13 +155,22 @@ export async function deleteList(id) {
             .maybeSingle();
         if (!existingList) return { error: 'List not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, existingList.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            existingList.space_id,
+            user.id,
+        );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingList.created_by === user.id,
         });
         if (permissionBlock) return permissionBlock;
 
-        const { data: deletedList, error } = await supabase.from('lists').delete().eq('id', id).select().maybeSingle();
+        const { data: deletedList, error } = await supabase
+            .from('lists')
+            .delete()
+            .eq('id', id)
+            .select()
+            .maybeSingle();
 
         if (error || !deletedList) {
             return { error: 'List not found' };

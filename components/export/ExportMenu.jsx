@@ -31,12 +31,20 @@ export default function ExportMenu({ scope, variant = 'icon' }) {
     const items = (
         <>
             <DropdownMenuItem asChild>
-                <a href={`/api/export?type=${scope.type}&id=${scope.id}&format=csv`} download onClick={handleExportClick}>
+                <a
+                    href={`/api/export?type=${scope.type}&id=${scope.id}&format=csv`}
+                    download
+                    onClick={handleExportClick}
+                >
                     Export as CSV
                 </a>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-                <a href={`/api/export?type=${scope.type}&id=${scope.id}&format=json`} download onClick={handleExportClick}>
+                <a
+                    href={`/api/export?type=${scope.type}&id=${scope.id}&format=json`}
+                    download
+                    onClick={handleExportClick}
+                >
                     Export as JSON
                 </a>
             </DropdownMenuItem>

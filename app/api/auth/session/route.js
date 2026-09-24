@@ -22,7 +22,11 @@ export async function GET() {
             // Clears the cookies, so the browser is logged out and not just told so
             await supabase.auth.signOut();
             return NextResponse.json(
-                { authenticated: false, error: 'Your guest session has ended', code: GUEST_ERROR_CODES.SESSION_EXPIRED },
+                {
+                    authenticated: false,
+                    error: 'Your guest session has ended',
+                    code: GUEST_ERROR_CODES.SESSION_EXPIRED,
+                },
                 { status: 401, headers: NO_STORE_HEADERS },
             );
         }
@@ -34,7 +38,11 @@ export async function GET() {
         // A dropped connection to Supabase says nothing about the session, so it must not look like a logout
         if (userLookupError?.name === 'AuthRetryableFetchError' || userLookupError?.status >= 500) {
             return NextResponse.json(
-                { authenticated: null, error: 'Could not check your session', code: AUTH_ERROR_CODES.SESSION_CHECK_UNAVAILABLE },
+                {
+                    authenticated: null,
+                    error: 'Could not check your session',
+                    code: AUTH_ERROR_CODES.SESSION_CHECK_UNAVAILABLE,
+                },
                 { status: 503, headers: NO_STORE_HEADERS },
             );
         }
@@ -45,7 +53,11 @@ export async function GET() {
         );
     } catch {
         return NextResponse.json(
-            { authenticated: null, error: 'Could not check your session', code: AUTH_ERROR_CODES.SESSION_CHECK_UNAVAILABLE },
+            {
+                authenticated: null,
+                error: 'Could not check your session',
+                code: AUTH_ERROR_CODES.SESSION_CHECK_UNAVAILABLE,
+            },
             { status: 503, headers: NO_STORE_HEADERS },
         );
     }

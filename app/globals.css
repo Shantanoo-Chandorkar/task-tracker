@@ -57,75 +57,75 @@
    addition, reserved for count numerals only, never for actions. */
 :root {
     color-scheme: light;
-    --background: #FDFBF7;
-    --foreground: #1C1917;
-    --card: #F2EEE8;
-    --card-foreground: #1C1917;
-    --popover: #F2EEE8;
-    --popover-foreground: #1C1917;
-    --primary: #C2410C;
+    --background: #fdfbf7;
+    --foreground: #1c1917;
+    --card: #f2eee8;
+    --card-foreground: #1c1917;
+    --popover: #f2eee8;
+    --popover-foreground: #1c1917;
+    --primary: #c2410c;
     --primary-foreground: #ffffff;
-    --secondary: #F2EEE8;
-    --secondary-foreground: #1C1917;
-    --muted: #F2EEE8;
+    --secondary: #f2eee8;
+    --secondary-foreground: #1c1917;
+    --muted: #f2eee8;
     --muted-foreground: #737373;
-    --accent: #F2EEE8;
-    --accent-foreground: #1C1917;
+    --accent: #f2eee8;
+    --accent-foreground: #1c1917;
     --destructive: oklch(0.577 0.245 27.325);
     --border: #e7e5e4;
     --input: #e7e5e4;
-    --ring: #C2410C;
-    --metric: #7E22CE;
+    --ring: #c2410c;
+    --metric: #7e22ce;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0.625rem;
-    --sidebar: #F2EEE8;
-    --sidebar-foreground: #1C1917;
-    --sidebar-primary: #C2410C;
+    --sidebar: #f2eee8;
+    --sidebar-foreground: #1c1917;
+    --sidebar-primary: #c2410c;
     --sidebar-primary-foreground: #ffffff;
     --sidebar-accent: #e7e5e4;
-    --sidebar-accent-foreground: #1C1917;
+    --sidebar-accent-foreground: #1c1917;
     --sidebar-border: #e7e5e4;
-    --sidebar-ring: #C2410C;
+    --sidebar-ring: #c2410c;
 }
 
 .dark {
     color-scheme: dark;
     --background: #141210;
-    --foreground: #FFFAF5;
+    --foreground: #fffaf5;
     --card: #292521;
-    --card-foreground: #FFFAF5;
+    --card-foreground: #fffaf5;
     --popover: #292521;
-    --popover-foreground: #FFFAF5;
-    --primary: #FDBA74;
+    --popover-foreground: #fffaf5;
+    --primary: #fdba74;
     --primary-foreground: #1a1200;
     --secondary: #292521;
-    --secondary-foreground: #FFFAF5;
+    --secondary-foreground: #fffaf5;
     --muted: #292521;
     --muted-foreground: #a3a3a3;
     --accent: #292521;
-    --accent-foreground: #FFFAF5;
+    --accent-foreground: #fffaf5;
     --destructive: oklch(0.704 0.191 22.216);
     --border: #2a2a2a;
     --input: #2a2a2a;
-    --ring: #FDBA74;
-    --metric: #D8B4FE;
+    --ring: #fdba74;
+    --metric: #d8b4fe;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --sidebar: #292521;
-    --sidebar-foreground: #FFFAF5;
-    --sidebar-primary: #FDBA74;
+    --sidebar-foreground: #fffaf5;
+    --sidebar-primary: #fdba74;
     --sidebar-primary-foreground: #1a1200;
     --sidebar-accent: #2e2e2e;
-    --sidebar-accent-foreground: #FFFAF5;
+    --sidebar-accent-foreground: #fffaf5;
     --sidebar-border: #2a2a2a;
-    --sidebar-ring: #FDBA74;
+    --sidebar-ring: #fdba74;
 }
 
 /* Theme toggle reveal - a circle grows from the toggle button's click point to cover the
@@ -151,7 +151,8 @@
     @keyframes theme-reveal {
         to {
             clip-path: circle(
-                var(--theme-toggle-radius, 150%) at var(--theme-toggle-x, 0px) var(--theme-toggle-y, 0px)
+                var(--theme-toggle-radius, 150%) at var(--theme-toggle-x, 0px)
+                    var(--theme-toggle-y, 0px)
             );
         }
     }

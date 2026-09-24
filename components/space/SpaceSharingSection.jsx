@@ -8,7 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';
 import { useCollaboratorsQuery } from '@/hooks/useCollaboratorsQuery';
@@ -39,8 +45,12 @@ async function copyToClipboard(text, label) {
  */
 export default function SpaceSharingSection({ space }) {
     const queryClient = useQueryClient();
-    const { data: pendingRequests = [], isLoading: isLoadingRequests } = useJoinRequestsQuery(space.id);
-    const { data: collaborators = [], isLoading: isLoadingCollaborators } = useCollaboratorsQuery(space.id);
+    const { data: pendingRequests = [], isLoading: isLoadingRequests } = useJoinRequestsQuery(
+        space.id,
+    );
+    const { data: collaborators = [], isLoading: isLoadingCollaborators } = useCollaboratorsQuery(
+        space.id,
+    );
     // { action: 'reject'|'remove', targetId, label } while a confirm dialog is open, else null.
     const [confirmTarget, setConfirmTarget] = useState(null);
     const [confirming, setConfirming] = useState(false);
@@ -103,7 +113,10 @@ export default function SpaceSharingSection({ space }) {
         const toastId = toast.loading('Updating permission...');
         let result;
         try {
-            result = await updateCollaboratorPermission({ collaboratorId, permissionLevel: newPermissionLevel });
+            result = await updateCollaboratorPermission({
+                collaboratorId,
+                permissionLevel: newPermissionLevel,
+            });
         } catch {
             toast.error('Could not reach the server. Try again.', { id: toastId });
             return;
@@ -137,7 +150,10 @@ export default function SpaceSharingSection({ space }) {
                     size="sm"
                     className="mt-2 gap-1.5"
                     onClick={() =>
-                        copyToClipboard(`${window.location.origin}/spaces?join=${space.id}`, 'Join link')
+                        copyToClipboard(
+                            `${window.location.origin}/spaces?join=${space.id}`,
+                            'Join link',
+                        )
                     }
                 >
                     <Copy className="h-3.5 w-3.5" />
@@ -154,7 +170,9 @@ export default function SpaceSharingSection({ space }) {
 
             {!isLoadingRequests && pendingRequests.length > 0 && (
                 <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Pending requests</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                        Pending requests
+                    </p>
                     <div className="rounded-lg bg-muted/50 divide-y divide-border">
                         {pendingRequests.map((request) => (
                             <div
@@ -196,19 +214,26 @@ export default function SpaceSharingSection({ space }) {
 
             {!isLoadingCollaborators && collaborators.length > 0 && (
                 <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Collaborators</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                        Collaborators
+                    </p>
                     <div className="rounded-lg bg-muted/50 divide-y divide-border">
                         {collaborators.map((collaborator) => (
                             <div
                                 key={collaborator.id}
                                 className="flex items-center justify-between gap-2 px-3 py-2"
                             >
-                                <span className="text-sm truncate">{collaborator.requester_email}</span>
+                                <span className="text-sm truncate">
+                                    {collaborator.requester_email}
+                                </span>
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                     <Select
                                         value={collaborator.permission_level}
                                         onValueChange={(newPermissionLevel) =>
-                                            handlePermissionChange(collaborator.id, newPermissionLevel)
+                                            handlePermissionChange(
+                                                collaborator.id,
+                                                newPermissionLevel,
+                                            )
                                         }
                                     >
                                         <SelectTrigger
@@ -218,11 +243,13 @@ export default function SpaceSharingSection({ space }) {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {Object.entries(PERMISSION_LEVEL_LABELS).map(([level, label]) => (
-                                                <SelectItem key={level} value={level}>
-                                                    {label}
-                                                </SelectItem>
-                                            ))}
+                                            {Object.entries(PERMISSION_LEVEL_LABELS).map(
+                                                ([level, label]) => (
+                                                    <SelectItem key={level} value={level}>
+                                                        {label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
                                         </SelectContent>
                                     </Select>
                                     <Button
@@ -263,7 +290,9 @@ export default function SpaceSharingSection({ space }) {
                 }
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setConfirmTarget(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => setConfirmTarget(null)}>
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirm}
                             disabled={confirming}

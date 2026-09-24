@@ -17,11 +17,7 @@ import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
-import {
-    deleteTask,
-    deleteTaskAndReparentChildren,
-    duplicateTask,
-} from '@/actions/task-actions';
+import { deleteTask, deleteTaskAndReparentChildren, duplicateTask } from '@/actions/task-actions';
 import { findAncestors, findDescendantIds, flattenTreeDepthFirst } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
@@ -63,12 +59,20 @@ export default function TaskRowActions({
 
     // UX hints only - RLS and the app-layer pre-checks are the real backstop if a control is missed.
     const canCreate = myPermission !== 'read_only';
-    const canEditRow = canCreate && (myPermission !== 'restricted' || task.created_by === currentUserId);
+    const canEditRow =
+        canCreate && (myPermission !== 'restricted' || task.created_by === currentUserId);
 
     const { data: sublists = [] } = useSublistsQuery(listId);
 
-    const { doneStatus, defaultStatus, isDone, setComplete, confirmState, closeConfirm, confirmCascade } =
-        useTaskCompletion(listId);
+    const {
+        doneStatus,
+        defaultStatus,
+        isDone,
+        setComplete,
+        confirmState,
+        closeConfirm,
+        confirmCascade,
+    } = useTaskCompletion(listId);
     const taskIsDone = isDone(task);
     const { togglePriority } = useTaskPriority(listId);
 
@@ -99,12 +103,18 @@ export default function TaskRowActions({
 
     const targetGroups = [
         { id: null, name: 'Main List', targets: [], color: 'var(--primary)' },
-        ...sublists.map((sublist) => ({ id: sublist.id, name: sublist.name, targets: [], color: sublist.color }))
+        ...sublists.map((sublist) => ({
+            id: sublist.id,
+            name: sublist.name,
+            targets: [],
+            color: sublist.color,
+        })),
     ];
 
     validTargets.forEach((target) => {
         const sublistId = getSublistIdForTarget(target.id);
-        const group = targetGroups.find((targetGroup) => targetGroup.id === sublistId) || targetGroups[0];
+        const group =
+            targetGroups.find((targetGroup) => targetGroup.id === sublistId) || targetGroups[0];
         group.targets.push(target);
     });
 
@@ -121,7 +131,12 @@ export default function TaskRowActions({
 
     const moveDestinations = sortedGroups.flatMap((group) => {
         const groupDestinations = [
-            { id: `label-${group.id || 'main'}`, label: group.name, isLabel: true, color: group.color },
+            {
+                id: `label-${group.id || 'main'}`,
+                label: group.name,
+                isLabel: true,
+                color: group.color,
+            },
         ];
 
         if (group.canMoveToRoot) {
@@ -158,7 +173,9 @@ export default function TaskRowActions({
                     : await deleteTask(task.id));
         } catch {
             setPending(false);
-            toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+            toast.error('Could not reach the server. Check your connection and try again.', {
+                id: toastId,
+            });
             return;
         }
         setPending(false);
@@ -197,7 +214,9 @@ export default function TaskRowActions({
             });
         } catch {
             setPending(false);
-            toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+            toast.error('Could not reach the server. Check your connection and try again.', {
+                id: toastId,
+            });
             return;
         }
         const moveResponseBody = await response.json().catch(() => null);
@@ -221,10 +240,7 @@ export default function TaskRowActions({
     }
 
     function handleMoveTo(targetId) {
-        return performMove(
-            { newParentId: targetId, afterSiblingId: null, listId },
-            'Task moved',
-        );
+        return performMove({ newParentId: targetId, afterSiblingId: null, listId }, 'Task moved');
     }
 
     function handleMoveToSublist(targetSublistId) {
@@ -249,7 +265,9 @@ export default function TaskRowActions({
             ({ error } = await duplicateTask(task.id));
         } catch {
             setPending(false);
-            toast.error('Could not reach the server. Check your connection and try again.', { id: toastId });
+            toast.error('Could not reach the server. Check your connection and try again.', {
+                id: toastId,
+            });
             return;
         }
         setPending(false);
@@ -298,7 +316,9 @@ export default function TaskRowActions({
                         <DropdownMenuItem
                             onClick={handleToggleComplete}
                             disabled={!doneStatus || !defaultStatus || !canEditRow}
-                            className={!doneStatus || !defaultStatus || !canEditRow ? 'opacity-40' : ''}
+                            className={
+                                !doneStatus || !defaultStatus || !canEditRow ? 'opacity-40' : ''
+                            }
                         >
                             {taskIsDone ? 'Mark as incomplete' : 'Mark as complete'}
                         </DropdownMenuItem>
@@ -352,7 +372,9 @@ export default function TaskRowActions({
                             onClick={() => setDeleteOpen(true)}
                             disabled={!canEditRow}
                             className={
-                                canEditRow ? 'text-destructive focus:text-destructive' : 'opacity-40'
+                                canEditRow
+                                    ? 'text-destructive focus:text-destructive'
+                                    : 'opacity-40'
                             }
                         >
                             Delete

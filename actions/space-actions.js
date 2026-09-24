@@ -69,7 +69,7 @@ export async function updateSpace(id, fields) {
     if (!user) return { data: null, error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
     if (!id) return { data: null, error: 'Space ID is required' };
-    
+
     if ('name' in fields) {
         fields.name = sanitizeString(fields.name, true);
         if (!fields.name) return { data: null, error: 'Space name is required' };

@@ -15,7 +15,11 @@ export const GET = withApiErrorHandling(async function GET(request, { params }) 
     const { id: sublistId } = await params;
     const supabase = await createClient();
 
-    const { data: sublist, error } = await supabase.from('sublists').select('*').eq('id', sublistId).single();
+    const { data: sublist, error } = await supabase
+        .from('sublists')
+        .select('*')
+        .eq('id', sublistId)
+        .single();
 
     if (error) {
         return NextResponse.json({ error: 'Sublist not found' }, { status: 404 });

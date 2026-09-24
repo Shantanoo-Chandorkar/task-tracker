@@ -7,7 +7,9 @@ vi.mock('@/lib/supabase/server', () => ({
     createClient: async () => ({
         from: () => ({
             select: () => ({
-                eq: () => ({ single: async () => ({ data: { display_name: 'Stored Name' }, error: null }) }),
+                eq: () => ({
+                    single: async () => ({ data: { display_name: 'Stored Name' }, error: null }),
+                }),
             }),
         }),
     }),

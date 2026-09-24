@@ -16,22 +16,33 @@ const GUEST_SEEDED_LIST_NAME = 'Product Launch';
 test.describe('guest mode', () => {
     // Guest sessions are capped at GUEST_SESSIONS_PER_IP_PER_HOUR (5) - run once, not per-viewport.
     test.beforeEach(({}, testInfo) => {
-        test.skip(testInfo.project.name !== 'desktop-chrome', 'Guest mode runs once, not per-viewport - see comment above.');
+        test.skip(
+            testInfo.project.name !== 'desktop-chrome',
+            'Guest mode runs once, not per-viewport - see comment above.',
+        );
     });
 
     // Clears quota a previous run in the same hour left behind, before this run's tests start.
     test.beforeAll(async () => {
-        await adminClient().from('auth_rate_limits').delete().eq('email', 'guest').eq('action_type', 'guest_create');
+        await adminClient()
+            .from('auth_rate_limits')
+            .delete()
+            .eq('email', 'guest')
+            .eq('action_type', 'guest_create');
     });
 
     test('an expired-guest redirect shows the session-ended notice', async ({ page }) => {
         await page.goto('/login?reason=guest-expired');
         await expect(
-            page.getByText('Your guest session ended. Sign up to keep your work, or start a new guest session below.'),
+            page.getByText(
+                'Your guest session ended. Sign up to keep your work, or start a new guest session below.',
+            ),
         ).toBeVisible();
     });
 
-    test('the guest banner shows a live countdown, and the space limit blocks a 2nd space', async ({ page }) => {
+    test('the guest banner shows a live countdown, and the space limit blocks a 2nd space', async ({
+        page,
+    }) => {
         await startGuestSession(page);
 
         const banner = page.getByRole('region', { name: 'Guest mode' });
@@ -43,22 +54,32 @@ test.describe('guest mode', () => {
         const dialog = page.getByRole('dialog');
         await dialog.getByPlaceholder('Space name').fill(uniqueName('Space'));
         await dialog.getByRole('button', { name: 'Create space' }).click();
-        await expect(dialog.getByText('Guest mode is limited to 1 space. Sign up to create more.')).toBeVisible();
+        await expect(
+            dialog.getByText('Guest mode is limited to 1 space. Sign up to create more.'),
+        ).toBeVisible();
     });
 
-    test('list, sublist, and status limits block once the seeded space hits its cap', async ({ page }) => {
+    test('list, sublist, and status limits block once the seeded space hits its cap', async ({
+        page,
+    }) => {
         await startGuestSession(page);
         await page.goto('/spaces');
 
         await createList(page, GUEST_SPACE_NAME);
-        await spaceSection(page, GUEST_SPACE_NAME).getByRole('button', { name: '+ Add list' }).click();
+        await spaceSection(page, GUEST_SPACE_NAME)
+            .getByRole('button', { name: '+ Add list' })
+            .click();
         const listDialog = page.getByRole('dialog');
         await listDialog.getByPlaceholder('List name').fill(uniqueName('List'));
         await listDialog.getByRole('button', { name: 'Create list' }).click();
-        await expect(listDialog.getByText('Guest mode is limited to 3 lists. Sign up to create more.')).toBeVisible();
+        await expect(
+            listDialog.getByText('Guest mode is limited to 3 lists. Sign up to create more.'),
+        ).toBeVisible();
         await listDialog.getByRole('button', { name: 'Cancel' }).click();
 
-        await spaceSection(page, GUEST_SPACE_NAME).getByRole('link', { name: GUEST_SEEDED_LIST_NAME }).click();
+        await spaceSection(page, GUEST_SPACE_NAME)
+            .getByRole('link', { name: GUEST_SEEDED_LIST_NAME })
+            .click();
         await page.waitForURL(/\/lists\//);
 
         for (let sublistCount = 0; sublistCount < 4; sublistCount++) {
@@ -67,7 +88,9 @@ test.describe('guest mode', () => {
         await page.getByRole('button', { name: 'Create new...' }).click();
         await page.getByRole('menuitem', { name: 'New Sublist' }).click();
         await page.getByRole('combobox').click();
-        await page.getByRole('option', { name: `${GUEST_SPACE_NAME} / ${GUEST_SEEDED_LIST_NAME}` }).click();
+        await page
+            .getByRole('option', { name: `${GUEST_SPACE_NAME} / ${GUEST_SEEDED_LIST_NAME}` })
+            .click();
         const sublistDialog = page.getByRole('dialog');
         await sublistDialog.getByPlaceholder('Sublist name').fill(uniqueName('Sublist'));
         await sublistDialog.getByRole('button', { name: 'Create sublist' }).click();
@@ -77,11 +100,15 @@ test.describe('guest mode', () => {
         await sublistDialog.getByRole('button', { name: 'Cancel' }).click();
 
         await page.goto('/spaces');
-        await spaceSection(page, GUEST_SPACE_NAME).getByRole('button', { name: 'Statuses' }).click();
+        await spaceSection(page, GUEST_SPACE_NAME)
+            .getByRole('button', { name: 'Statuses' })
+            .click();
         for (let statusCount = 0; statusCount < 5; statusCount++) {
             await createStatus(page, GUEST_SPACE_NAME);
         }
-        await spaceSection(page, GUEST_SPACE_NAME).getByRole('button', { name: '+ Add status' }).click();
+        await spaceSection(page, GUEST_SPACE_NAME)
+            .getByRole('button', { name: '+ Add status' })
+            .click();
         const statusDialog = page.getByRole('dialog');
         await statusDialog.getByPlaceholder('Status name').fill(uniqueName('Status'));
         await statusDialog.getByRole('button', { name: 'Create status' }).click();
@@ -102,13 +129,21 @@ test.describe('guest mode', () => {
         await page.goto('/reset-password');
         await page.getByLabel('New password', { exact: true }).fill('a-valid-password-123');
         await page.getByRole('button', { name: 'Update password' }).click();
-        await expect(page.getByText('This feature is not available in guest mode. Sign up to use it.')).toBeVisible();
+        await expect(
+            page.getByText('This feature is not available in guest mode. Sign up to use it.'),
+        ).toBeVisible();
     });
 
-    test("a guest's data isn't reachable by another account", async ({ page, browser, testUser }) => {
+    test("a guest's data isn't reachable by another account", async ({
+        page,
+        browser,
+        testUser,
+    }) => {
         await startGuestSession(page);
         await page.goto('/spaces');
-        await spaceSection(page, GUEST_SPACE_NAME).getByRole('link', { name: GUEST_SEEDED_LIST_NAME }).click();
+        await spaceSection(page, GUEST_SPACE_NAME)
+            .getByRole('link', { name: GUEST_SEEDED_LIST_NAME })
+            .click();
         await page.waitForURL(/\/lists\//);
         const listId = page.url().match(/\/lists\/([^/]+)/)[1];
 
@@ -129,7 +164,10 @@ test.describe('guest mode', () => {
         const deleteResponse = await otherPage.request.delete(`/api/tasks/${task.id}`);
         expect(deleteResponse.status()).toBe(400);
 
-        const { data: rowsStillPresent } = await adminClient().from('tasks').select('id').eq('id', task.id);
+        const { data: rowsStillPresent } = await adminClient()
+            .from('tasks')
+            .select('id')
+            .eq('id', task.id);
         expect(rowsStillPresent).toHaveLength(1);
 
         await otherContext.close();

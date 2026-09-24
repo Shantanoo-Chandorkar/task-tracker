@@ -62,12 +62,15 @@ describe('a guest-limit error from the database', () => {
         );
     });
 
-    it.each(createCases)('%s returns the friendly limit code instead of a generic failure', async (name, callAction) => {
-        const actionResult = await callAction();
-        expect(actionResult.code).toBe(GUEST_ERROR_CODES.LIMIT_REACHED);
-        expect(actionResult.data).toBeNull();
-        expect(actionResult.error).toMatch(/Guest mode/);
-    });
+    it.each(createCases)(
+        '%s returns the friendly limit code instead of a generic failure',
+        async (name, callAction) => {
+            const actionResult = await callAction();
+            expect(actionResult.code).toBe(GUEST_ERROR_CODES.LIMIT_REACHED);
+            expect(actionResult.data).toBeNull();
+            expect(actionResult.error).toMatch(/Guest mode/);
+        },
+    );
 
     it.each(createCases)('%s does not leak the raw database message', async (name, callAction) => {
         const actionResult = await callAction();
@@ -80,13 +83,19 @@ describe('a guest-limit error from the database', () => {
 describe('any other database error keeps the old generic message', () => {
     beforeEach(() => {
         mocks.createSessionClient.mockResolvedValue(
-            makeClientWhoseInsertFails({ message: 'permission denied for table tasks', code: '42501' }),
+            makeClientWhoseInsertFails({
+                message: 'permission denied for table tasks',
+                code: '42501',
+            }),
         );
     });
 
-    it.each(createCases)('%s still says it failed, with no guest code', async (name, callAction) => {
-        const actionResult = await callAction();
-        expect(actionResult.error).toMatch(/Failed to create/);
-        expect(actionResult.code).toBeUndefined();
-    });
+    it.each(createCases)(
+        '%s still says it failed, with no guest code',
+        async (name, callAction) => {
+            const actionResult = await callAction();
+            expect(actionResult.error).toMatch(/Failed to create/);
+            expect(actionResult.code).toBeUndefined();
+        },
+    );
 });

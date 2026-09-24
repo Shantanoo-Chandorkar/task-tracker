@@ -21,7 +21,9 @@ export async function waitForEmailTo(toEmail, { timeoutMs = 20_000, pollInterval
         const { messages } = await searchResponse.json();
 
         if (messages?.length > 0) {
-            const messageResponse = await fetch(`${MAILPIT_API_URL}/api/v1/message/${messages[0].ID}`);
+            const messageResponse = await fetch(
+                `${MAILPIT_API_URL}/api/v1/message/${messages[0].ID}`,
+            );
             return messageResponse.json();
         }
 

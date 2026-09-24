@@ -37,13 +37,18 @@ test.describe('auth', () => {
         expect(new URL(page.url()).pathname).toBe('/');
     });
 
-    test('wrong password shows a generic error and stays on the login page', async ({ page, testUser }) => {
+    test('wrong password shows a generic error and stays on the login page', async ({
+        page,
+        testUser,
+    }) => {
         await attemptLogin(page, testUser.email, WRONG_PASSWORD);
         await expect(page.getByText(INVALID_CREDENTIALS_ERROR)).toBeVisible();
         expect(new URL(page.url()).pathname).toBe('/login');
     });
 
-    test('a non-existent email shows the same generic error, no enumeration leak', async ({ page }) => {
+    test('a non-existent email shows the same generic error, no enumeration leak', async ({
+        page,
+    }) => {
         await attemptLogin(page, `e2e-no-such-user-${Date.now()}@example.com`, WRONG_PASSWORD);
         await expect(page.getByText(INVALID_CREDENTIALS_ERROR)).toBeVisible();
     });
@@ -69,7 +74,10 @@ test.describe('auth', () => {
         await page.waitForURL('/login');
     });
 
-    test('visiting login while already logged in redirects to the tasks page', async ({ page, testUser }) => {
+    test('visiting login while already logged in redirects to the tasks page', async ({
+        page,
+        testUser,
+    }) => {
         await loginAs(page, testUser);
         await page.goto('/login');
         await page.waitForURL('/');
@@ -85,7 +93,9 @@ test.describe('auth', () => {
                 await page.getByLabel('Email', { exact: true }).fill(testUser.email);
                 await page.getByLabel('Password', { exact: true }).fill(WRONG_PASSWORD);
                 await page.getByRole('button', { name: 'Log in' }).click();
-                await expect(page.getByText(attempt < 5 ? INVALID_CREDENTIALS_ERROR : LOCKOUT_ERROR)).toBeVisible();
+                await expect(
+                    page.getByText(attempt < 5 ? INVALID_CREDENTIALS_ERROR : LOCKOUT_ERROR),
+                ).toBeVisible();
             }
         } finally {
             await clearRateLimit(testUser.email);

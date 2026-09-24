@@ -8,7 +8,9 @@ import { createClient } from '@supabase/supabase-js';
 
 const [email, password] = process.argv.slice(2);
 if (!email || !password) {
-    console.error('Usage: node --env-file=.env.local scripts/verify-bucket3.mjs <email> <password>');
+    console.error(
+        'Usage: node --env-file=.env.local scripts/verify-bucket3.mjs <email> <password>',
+    );
     process.exit(1);
 }
 
@@ -47,26 +49,29 @@ await check('Admin client can write to auth_rate_limits (bypasses RLS)', async (
     return { pass: !error, detail: error ? error.message : 'inserted' };
 });
 
-await check('Lockout triggers once failed_count reaches 5 (matches rate-limit.js logic)', async () => {
-    const lockedUntil = new Date(Date.now() + 30 * 60_000).toISOString();
-    const { error } = await adminClient
-        .from('auth_rate_limits')
-        .update({ failed_count: 5, locked_until: lockedUntil })
-        .eq('email', TEST_EMAIL)
-        .eq('ip_address', TEST_IP)
-        .eq('action_type', 'signin');
-    if (error) return { pass: false, detail: error.message };
+await check(
+    'Lockout triggers once failed_count reaches 5 (matches rate-limit.js logic)',
+    async () => {
+        const lockedUntil = new Date(Date.now() + 30 * 60_000).toISOString();
+        const { error } = await adminClient
+            .from('auth_rate_limits')
+            .update({ failed_count: 5, locked_until: lockedUntil })
+            .eq('email', TEST_EMAIL)
+            .eq('ip_address', TEST_IP)
+            .eq('action_type', 'signin');
+        if (error) return { pass: false, detail: error.message };
 
-    const { data: lockoutRow } = await adminClient
-        .from('auth_rate_limits')
-        .select('locked_until')
-        .eq('email', TEST_EMAIL)
-        .eq('ip_address', TEST_IP)
-        .eq('action_type', 'signin')
-        .maybeSingle();
-    const isLocked = new Date(lockoutRow.locked_until).getTime() > Date.now();
-    return { pass: isLocked, detail: `locked_until=${lockoutRow.locked_until}` };
-});
+        const { data: lockoutRow } = await adminClient
+            .from('auth_rate_limits')
+            .select('locked_until')
+            .eq('email', TEST_EMAIL)
+            .eq('ip_address', TEST_IP)
+            .eq('action_type', 'signin')
+            .maybeSingle();
+        const isLocked = new Date(lockoutRow.locked_until).getTime() > Date.now();
+        return { pass: isLocked, detail: `locked_until=${lockoutRow.locked_until}` };
+    },
+);
 
 await check('Reset (delete) clears the lockout row', async () => {
     const { error } = await adminClient
@@ -90,7 +95,10 @@ const anonClient = createClient(supabaseUrl, publishableKey);
 await check('Anonymous client sees ZERO rows on auth_rate_limits', async () => {
     const { data: visibleRows, error } = await anonClient.from('auth_rate_limits').select('email');
     if (error) return { pass: true, detail: `denied: ${error.message}` };
-    return { pass: (visibleRows ?? []).length === 0, detail: `${visibleRows.length} row(s) visible` };
+    return {
+        pass: (visibleRows ?? []).length === 0,
+        detail: `${visibleRows.length} row(s) visible`,
+    };
 });
 
 const authClient = createClient(supabaseUrl, publishableKey);
@@ -100,7 +108,10 @@ await check('Authenticated (real) user still sees ZERO rows on auth_rate_limits'
 
     const { data: visibleRows, error } = await authClient.from('auth_rate_limits').select('email');
     if (error) return { pass: true, detail: `denied: ${error.message}` };
-    return { pass: (visibleRows ?? []).length === 0, detail: `${visibleRows.length} row(s) visible` };
+    return {
+        pass: (visibleRows ?? []).length === 0,
+        detail: `${visibleRows.length} row(s) visible`,
+    };
 });
 await authClient.auth.signOut();
 

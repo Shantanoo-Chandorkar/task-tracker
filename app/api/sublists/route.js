@@ -20,7 +20,11 @@ export const GET = withApiErrorHandling(async function GET(request) {
     }
 
     const [{ data: sublists, error }, { data: tasks }] = await Promise.all([
-        supabase.from('sublists').select('*').eq('list_id', listId).order('position', { ascending: true }),
+        supabase
+            .from('sublists')
+            .select('*')
+            .eq('list_id', listId)
+            .order('position', { ascending: true }),
         supabase.from('tasks').select('sublist_id').eq('list_id', listId),
     ]);
 
@@ -31,7 +35,10 @@ export const GET = withApiErrorHandling(async function GET(request) {
     const taskCountBySublistId = new Map();
     for (const task of tasks || []) {
         if (!task.sublist_id) continue;
-        taskCountBySublistId.set(task.sublist_id, (taskCountBySublistId.get(task.sublist_id) ?? 0) + 1);
+        taskCountBySublistId.set(
+            task.sublist_id,
+            (taskCountBySublistId.get(task.sublist_id) ?? 0) + 1,
+        );
     }
 
     const sublistsWithCounts = (sublists || []).map((sublist) => ({

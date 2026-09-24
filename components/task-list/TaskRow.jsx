@@ -5,7 +5,15 @@ import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Check, ChevronDown, ChevronRight, Circle, GripVertical, RefreshCw, Star } from 'lucide-react';
+import {
+    Check,
+    ChevronDown,
+    ChevronRight,
+    Circle,
+    GripVertical,
+    RefreshCw,
+    Star,
+} from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import StatusPicker from '@/components/status/StatusPicker';
 import TaskRowActions from './TaskRowActions';
@@ -68,8 +76,15 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
         [task.is_recurring, task.recurrence_rule],
     );
 
-    const { doneStatus, defaultStatus, isDone, setComplete, confirmState, closeConfirm, confirmCascade } =
-        useTaskCompletion(listId);
+    const {
+        doneStatus,
+        defaultStatus,
+        isDone,
+        setComplete,
+        confirmState,
+        closeConfirm,
+        confirmCascade,
+    } = useTaskCompletion(listId);
     const taskIsDone = isDone(task);
     const { togglePriority } = useTaskPriority(listId);
     const canToggleComplete = Boolean(doneStatus && defaultStatus);
@@ -243,7 +258,9 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
                     >
                         {task.children.map((child, childIndex) => (
                             <Fragment key={child.id}>
-                                {isStartOfUnprioritisedTier(task.children, childIndex) && <PriorityTierDivider />}
+                                {isStartOfUnprioritisedTier(task.children, childIndex) && (
+                                    <PriorityTierDivider />
+                                )}
                                 <TaskRow
                                     task={child}
                                     depth={depth + 1}

@@ -49,15 +49,23 @@ async function discardGuest(guestUserId, supabase) {
 export async function startGuestSession(captchaToken) {
     try {
         if (await getCurrentUser()) {
-            return { error: 'You are already signed in.', code: GUEST_ERROR_CODES.ALREADY_SIGNED_IN };
+            return {
+                error: 'You are already signed in.',
+                code: GUEST_ERROR_CODES.ALREADY_SIGNED_IN,
+            };
         }
 
         // The site key being set is what says the security check is switched on
         const isCaptchaConfigured = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
         const cleanCaptchaToken =
-            typeof captchaToken === 'string' && captchaToken.length <= CAPTCHA_TOKEN_MAX_LENGTH ? captchaToken : null;
+            typeof captchaToken === 'string' && captchaToken.length <= CAPTCHA_TOKEN_MAX_LENGTH
+                ? captchaToken
+                : null;
         if (isCaptchaConfigured && !cleanCaptchaToken) {
-            return { error: 'Complete the security check and try again.', code: GUEST_ERROR_CODES.CAPTCHA_FAILED };
+            return {
+                error: 'Complete the security check and try again.',
+                code: GUEST_ERROR_CODES.CAPTCHA_FAILED,
+            };
         }
 
         const clientIp = getClientIp(await headers());
@@ -70,13 +78,19 @@ export async function startGuestSession(captchaToken) {
         }
         if (slot.status === 'unavailable') {
             logGuestFailure(GUEST_ERROR_CODES.START_FAILED, 'rate limit unavailable');
-            return { error: 'Could not start a guest session. Please try again.', code: GUEST_ERROR_CODES.START_FAILED };
+            return {
+                error: 'Could not start a guest session. Please try again.',
+                code: GUEST_ERROR_CODES.START_FAILED,
+            };
         }
 
         // Checked after the IP limit, so a bot sending fake tokens uses up its own quota, not calls to Cloudflare
         if (isCaptchaConfigured && !(await verifyTurnstileToken(cleanCaptchaToken, clientIp))) {
             logGuestFailure(GUEST_ERROR_CODES.CAPTCHA_FAILED, 'turnstile verification failed');
-            return { error: 'The security check failed. Please try again.', code: GUEST_ERROR_CODES.CAPTCHA_FAILED };
+            return {
+                error: 'The security check failed. Please try again.',
+                code: GUEST_ERROR_CODES.CAPTCHA_FAILED,
+            };
         }
 
         const supabase = await createClient();
@@ -84,7 +98,10 @@ export async function startGuestSession(captchaToken) {
 
         if (signInError || !signInData?.user) {
             logGuestFailure(GUEST_ERROR_CODES.START_FAILED, signInError?.message);
-            return { error: 'Could not start a guest session. Please try again.', code: GUEST_ERROR_CODES.START_FAILED };
+            return {
+                error: 'Could not start a guest session. Please try again.',
+                code: GUEST_ERROR_CODES.START_FAILED,
+            };
         }
 
         try {
@@ -92,12 +109,18 @@ export async function startGuestSession(captchaToken) {
         } catch (seedError) {
             logGuestFailure(GUEST_ERROR_CODES.START_FAILED, seedError?.message);
             await discardGuest(signInData.user.id, supabase);
-            return { error: 'Could not start a guest session. Please try again.', code: GUEST_ERROR_CODES.START_FAILED };
+            return {
+                error: 'Could not start a guest session. Please try again.',
+                code: GUEST_ERROR_CODES.START_FAILED,
+            };
         }
 
         return { error: null, code: null };
     } catch (thrown) {
         logGuestFailure(GUEST_ERROR_CODES.START_FAILED, thrown?.message);
-        return { error: 'Could not start a guest session. Please try again.', code: GUEST_ERROR_CODES.START_FAILED };
+        return {
+            error: 'Could not start a guest session. Please try again.',
+            code: GUEST_ERROR_CODES.START_FAILED,
+        };
     }
 }

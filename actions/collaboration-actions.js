@@ -4,7 +4,12 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
 import { blockGuestAction } from '@/lib/guest/guest-guards';
-import { NOT_AUTHENTICATED, SPACE_NOT_FOUND, ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
+import {
+    NOT_AUTHENTICATED,
+    SPACE_NOT_FOUND,
+    ALREADY_MEMBER,
+    REQUEST_NOT_FOUND,
+} from '@/lib/error-codes';
 import { COLLABORATOR_PERMISSION_LEVELS } from '@/lib/permissions/space-permissions';
 import { sendJoinRequestEmail } from '@/lib/email/notifications/send-join-request-email';
 import { sendJoinDecisionEmail } from '@/lib/email/notifications/send-join-decision-email';
@@ -56,15 +61,18 @@ export async function requestToJoinSpace(fields) {
             .single();
 
         if (error?.code === '23505') {
-            return { data: null, error: 'You already requested or joined this space', code: ALREADY_MEMBER };
+            return {
+                data: null,
+                error: 'You already requested or joined this space',
+                code: ALREADY_MEMBER,
+            };
         }
         if (error) {
             return { data: null, error: 'Failed to send join request', code: null };
         }
 
-        const { data: ownerAuthUser, error: ownerLookupError } = await adminSupabase.auth.admin.getUserById(
-            targetSpace.owner_id,
-        );
+        const { data: ownerAuthUser, error: ownerLookupError } =
+            await adminSupabase.auth.admin.getUserById(targetSpace.owner_id);
         if (ownerAuthUser?.user?.email) {
             await sendJoinRequestEmail(ownerAuthUser.user.email, targetSpace.name, user.email);
         } else {
@@ -308,12 +316,19 @@ export async function leaveSpace(fields) {
                 const { data: ownerAuthUser, error: ownerLookupError } =
                     await adminSupabase.auth.admin.getUserById(space.owner_id);
                 if (ownerAuthUser?.user?.email) {
-                    await sendCollaboratorLeftEmail(ownerAuthUser.user.email, space.name, user.email);
+                    await sendCollaboratorLeftEmail(
+                        ownerAuthUser.user.email,
+                        space.name,
+                        user.email,
+                    );
                 } else {
-                    console.error('[collaboration] could not resolve owner email for leave notice', {
-                        spaceId: removedRow.space_id,
-                        detail: ownerLookupError?.message,
-                    });
+                    console.error(
+                        '[collaboration] could not resolve owner email for leave notice',
+                        {
+                            spaceId: removedRow.space_id,
+                            detail: ownerLookupError?.message,
+                        },
+                    );
                 }
             } else {
                 console.error('[collaboration] could not resolve space for leave notice', {

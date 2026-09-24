@@ -37,7 +37,10 @@ export default function StatusPicker({ task, flatList }) {
     async function handleChange(newStatusId) {
         const isCompleteTransition = doneStatus && newStatusId === doneStatus.id;
         const isIncompleteTransition =
-            doneStatus && defaultStatus && newStatusId === defaultStatus.id && task.status_id === doneStatus.id;
+            doneStatus &&
+            defaultStatus &&
+            newStatusId === defaultStatus.id &&
+            task.status_id === doneStatus.id;
 
         if (isCompleteTransition || isIncompleteTransition) {
             setPending(true);

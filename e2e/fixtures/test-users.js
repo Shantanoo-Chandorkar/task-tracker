@@ -27,11 +27,13 @@ export async function createTestUser(overrides = {}) {
     const email = `e2e-${RUN_ID}-${randomUUID().slice(0, 8)}@example.com`;
     const password = overrides.password ?? `Test-${randomUUID()}`;
 
-    const { data: createdUser, error: createUserError } = await adminClient().auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-    });
+    const { data: createdUser, error: createUserError } = await adminClient().auth.admin.createUser(
+        {
+            email,
+            password,
+            email_confirm: true,
+        },
+    );
     if (createUserError) throw createUserError;
 
     return { id: createdUser.user.id, email, password };

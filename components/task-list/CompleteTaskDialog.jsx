@@ -14,7 +14,14 @@ import ModalShell from '@/components/ui/modal-shell';
  * @param {number} props.descendantCount - Number of descendants that will also change status
  * @param {Function} props.onConfirm - Called when the user confirms the cascade
  */
-export default function CompleteTaskDialog({ open, onClose, task, isComplete, descendantCount, onConfirm }) {
+export default function CompleteTaskDialog({
+    open,
+    onClose,
+    task,
+    isComplete,
+    descendantCount,
+    onConfirm,
+}) {
     if (!task) return null;
 
     const verb = isComplete ? 'complete' : 'incomplete';

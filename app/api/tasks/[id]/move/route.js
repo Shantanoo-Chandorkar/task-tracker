@@ -6,7 +6,10 @@ import { findAncestors, findDescendantIds } from '@/lib/tree';
 import { getNestingMode, FINITE_MAX_DEPTH } from '@/lib/config';
 import { requireAuthResponse } from '@/lib/api-response';
 import { getCurrentUser } from '@/lib/auth/session';
-import { resolveSpacePermission, blockWriteForPermission } from '@/lib/permissions/space-permissions';
+import {
+    resolveSpacePermission,
+    blockWriteForPermission,
+} from '@/lib/permissions/space-permissions';
 
 /**
  * POST /api/tasks/[id]/move
@@ -41,18 +44,24 @@ export async function POST(request, { params }) {
         }
 
         const user = await getCurrentUser();
-        const permissionLevel = await resolveSpacePermission(supabase, task.lists?.space_id, user.id);
-        const permissionBlock = blockWriteForPermission(permissionLevel, { isOwnRow: task.created_by === user.id });
+        const permissionLevel = await resolveSpacePermission(
+            supabase,
+            task.lists?.space_id,
+            user.id,
+        );
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: task.created_by === user.id,
+        });
         if (permissionBlock) {
-            return NextResponse.json({ error: permissionBlock.error, code: permissionBlock.code }, { status: 400 });
+            return NextResponse.json(
+                { error: permissionBlock.error, code: permissionBlock.code },
+                { status: 400 },
+            );
         }
 
         // Defense in depth - a self/descendant reparent creates a cycle that hangs every tree walker.
         if (newParentId === taskId) {
-            return NextResponse.json(
-                { error: 'A task cannot be its own parent' },
-                { status: 400 },
-            );
+            return NextResponse.json({ error: 'A task cannot be its own parent' }, { status: 400 });
         }
         if (newParentId) {
             const { data: allTasksInList } = await supabase

@@ -59,10 +59,18 @@ export default function DeleteTaskDialog({ open, onClose, task, flatList, onConf
             footerClassName="flex-col sm:flex-col gap-2"
             footer={
                 <>
-                    <Button variant="outline" onClick={() => onConfirm('reparent')} className="w-full">
+                    <Button
+                        variant="outline"
+                        onClick={() => onConfirm('reparent')}
+                        className="w-full"
+                    >
                         Move subtasks to parent
                     </Button>
-                    <Button variant="destructive" onClick={() => onConfirm('cascade')} className="w-full">
+                    <Button
+                        variant="destructive"
+                        onClick={() => onConfirm('cascade')}
+                        className="w-full"
+                    >
                         Delete everything
                     </Button>
                     <AlertDialogCancel onClick={onClose} className="w-full mt-0">
