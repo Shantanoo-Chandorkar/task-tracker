@@ -88,7 +88,6 @@ function TaskRow({ task, depth, flatList, listId }) {
         <div
             ref={setNodeRef}
             style={style}
-            {...attributes}
             className={isDragging ? 'opacity-50 relative z-10' : ''}
         >
             {/* Task row - flat, hairline-separated: no per-row card background or radius */}
@@ -100,9 +99,9 @@ function TaskRow({ task, depth, flatList, listId }) {
                 {/* Drag handle - always visible (mobile has no hover to reveal it on) */}
                 <button
                     {...listeners}
+                    {...attributes}
                     className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground p-3 -m-3 flex-shrink-0 focus:outline-none"
                     aria-label="Drag to reorder"
-                    tabIndex={-1}
                 >
                     <GripVertical className="h-3.5 w-3.5" />
                 </button>

@@ -113,6 +113,7 @@ export default function SpaceSharingSection({ space }) {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 flex-shrink-0"
+                        aria-label="Copy space ID"
                         onClick={() => copyToClipboard(space.id, 'Space ID')}
                     >
                         <Copy className="h-3 w-3" />
@@ -153,6 +154,7 @@ export default function SpaceSharingSection({ space }) {
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+                                        aria-label="Approve request"
                                         onClick={() => handleApprove(request.id)}
                                     >
                                         <Check className="h-4 w-4" />
@@ -161,6 +163,7 @@ export default function SpaceSharingSection({ space }) {
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7 text-destructive hover:text-destructive"
+                                        aria-label="Reject request"
                                         onClick={() =>
                                             setConfirmTarget({
                                                 action: 'reject',
@@ -192,6 +195,7 @@ export default function SpaceSharingSection({ space }) {
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    aria-label="Remove collaborator"
                                     onClick={() =>
                                         setConfirmTarget({
                                             action: 'remove',
