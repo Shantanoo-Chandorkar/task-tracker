@@ -203,6 +203,7 @@ export async function updateTask(taskId, fields) {
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
+        // Explicit allowlist, not { ...fields } - an unlisted field must never reach the update.
         const {
             title,
             description,

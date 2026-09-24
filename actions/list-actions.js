@@ -111,6 +111,7 @@ export async function updateList(id, fields) {
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
+        // Explicit allowlist, not { ...fields } - an unlisted field must never reach the update.
         const { name, color, position } = fields;
         const updates = {
             ...(name !== undefined && { name }),

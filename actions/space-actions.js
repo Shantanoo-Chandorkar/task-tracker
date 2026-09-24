@@ -75,6 +75,7 @@ export async function updateSpace(id, fields) {
         if (nameError) return { data: null, error: nameError.error };
     }
 
+    // Explicit allowlist, not { ...fields } - an unlisted field must never reach the update.
     const { name, color, position } = fields;
     const updates = {
         ...(name !== undefined && { name }),
