@@ -7,9 +7,10 @@ import { useListsQuery } from '@/hooks/useListsQuery';
  * status-showing component can resolve its space without re-deriving the same lookup.
  *
  * @param {string|null|undefined} listId - The list whose space is being looked up
+ * @param {object} [options] - Extra react-query options (e.g. initialData) forwarded to useListsQuery
  * @returns {string|null} The list's space_id, or null while lists are still loading / listId is unset
  */
-export function useSpaceIdForList(listId) {
-    const { data: lists = [] } = useListsQuery();
+export function useSpaceIdForList(listId, options = {}) {
+    const { data: lists = [] } = useListsQuery(options);
     return lists.find((list) => list.id === listId)?.space_id ?? null;
 }

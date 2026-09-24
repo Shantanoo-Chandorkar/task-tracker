@@ -80,6 +80,20 @@ test.describe('tasks', () => {
         await expect(page.getByText('Failed to update task status')).toHaveCount(0);
     });
 
+    test('a task with a real status shows it in the server-rendered HTML, not "No status"', async ({ page }) => {
+        const title = await createTask(page);
+        const row = taskRow(page, title);
+
+        await row.getByRole('combobox').click();
+        await page.getByRole('option', { name: 'In Progress', exact: true }).click();
+        await expect(row.getByText('In Progress', { exact: true })).toBeVisible();
+
+        // Bypasses the client/hydration entirely - proves the status is in the raw SSR HTML itself.
+        const html = await (await page.request.get(page.url())).text();
+        expect(html).toContain('In Progress');
+        expect(html).not.toContain('No status');
+    });
+
     test('completing a task with an incomplete subtask cascades after confirmation', async ({ page }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));
@@ -148,6 +162,25 @@ test.describe('tasks', () => {
         await duplicateRow.getByRole('button', { name: 'Expand subtasks' }).click();
 
         await expect(page.getByRole('link', { name: childTitle, exact: true })).toHaveCount(2);
+    });
+
+    test('a subtask checkbox is enabled in the task detail page\'s server-rendered HTML on first paint', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        const childTitle = await addSubtask(page, taskRow(page, parentTitle));
+
+        await taskRow(page, parentTitle).getByRole('link', { name: parentTitle, exact: true }).click();
+        await page.waitForURL(/\/tasks\//);
+
+        // Bypasses the client/hydration entirely - proves the checkbox is enabled in the raw SSR HTML.
+        const html = await (await page.request.get(page.url())).text();
+        const escapedTitle = childTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const checkboxTag = html.match(
+            new RegExp(`<input[^>]*aria-label="Mark &quot;${escapedTitle}&quot; complete"[^>]*>`),
+        );
+        expect(checkboxTag).not.toBeNull();
+        expect(checkboxTag[0]).not.toContain('disabled');
     });
 
     test('deleting a task with no children removes it', async ({ page }) => {
