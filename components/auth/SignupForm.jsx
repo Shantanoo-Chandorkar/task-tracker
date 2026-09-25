@@ -15,8 +15,12 @@ const MIN_PASSWORD_LENGTH = 12;
 /**
  * Email/password signup form. Email confirmation is required, so a successful signup never
  * gets an active session -- it shows a "check your email" state instead of signing in.
+ *
+ * @param {object} props
+ * @param {string} [props.redirectTo] - Where the signup-confirmation email's link should land
+ *   (e.g. back on an invite-accept page). Already sanitized server-side by the page.
  */
-export default function SignupForm() {
+export default function SignupForm({ redirectTo = '/' }) {
     const [displayName, setDisplayName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -34,7 +38,12 @@ export default function SignupForm() {
 
         let signUpResult;
         try {
-            signUpResult = await signUpAction({ email, password, displayName });
+            signUpResult = await signUpAction({
+                email,
+                password,
+                displayName,
+                redirectPath: redirectTo,
+            });
         } catch {
             // Server Actions reject on a transport failure (offline, server down) - without
             // this catch, submitting would stay true forever with no feedback to the client.
@@ -130,7 +139,11 @@ export default function SignupForm() {
             <p className="mt-4 text-center text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <Link
-                    href="/login"
+                    href={
+                        redirectTo === '/'
+                            ? '/login'
+                            : `/login?next=${encodeURIComponent(redirectTo)}`
+                    }
                     className="font-medium text-foreground underline underline-offset-4"
                 >
                     Log in

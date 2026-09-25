@@ -15,7 +15,7 @@ import {
 import { sendPasswordResetEmail } from '@/lib/email/notifications/send-password-reset-email';
 import { sendSignupConfirmationEmail } from '@/lib/email/notifications/send-signup-confirmation-email';
 import { sendExistingAccountEmail } from '@/lib/email/notifications/send-existing-account-email';
-import { sanitizeString, checkMaxLength } from '@/lib/validation';
+import { sanitizeString, checkMaxLength, sanitizeRedirectPath } from '@/lib/validation';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Length over composition rules (NIST 800-63B, OWASP) -- no forced uppercase/symbol/number.
@@ -41,12 +41,16 @@ function logAuthFailure(code, email, detail) {
  * @param {string} fields.email - Address to register.
  * @param {string} fields.password - Chosen password.
  * @param {string} fields.displayName - Name shown in the app, max 50 characters.
+ * @param {string} [fields.redirectPath] - Where the signup-confirmation link should land after
+ *   verification (e.g. back on an invite-accept page). Re-sanitized here, server-side --
+ *   never trust a client-passed value even one built from an already-sanitized prop.
  * @returns {Promise<{ error: string|null, code: string|null }>} Null error means "check your email", never a session.
  */
 export async function signUpAction(fields) {
     const email = fields.email?.trim().toLowerCase() ?? '';
     const password = fields.password ?? '';
     const displayName = sanitizeString(fields.displayName ?? '');
+    const redirectPath = sanitizeRedirectPath(fields.redirectPath);
 
     if (!EMAIL_PATTERN.test(email)) {
         return { error: 'Enter a valid email address', code: AUTH_ERROR_CODES.EMAIL_INVALID };
@@ -108,7 +112,7 @@ export async function signUpAction(fields) {
             return { error: 'Failed to create account', code: AUTH_ERROR_CODES.SIGNUP_FAILED };
         }
 
-        const confirmLink = `${process.env.SITE_URL}/auth/confirm?token_hash=${generatedLink.properties.hashed_token}&type=signup&next=/`;
+        const confirmLink = `${process.env.SITE_URL}/auth/confirm?token_hash=${generatedLink.properties.hashed_token}&type=signup&next=${encodeURIComponent(redirectPath)}`;
         await sendSignupConfirmationEmail(email, confirmLink);
 
         return { error: null, code: null };
