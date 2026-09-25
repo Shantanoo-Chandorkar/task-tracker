@@ -31,6 +31,7 @@ export default function MobileNavDrawer({ initialSpaces, initialLists, initialPr
                 onClose={() => setIsOpen(false)}
                 variant="sheet"
                 side="left"
+                dismissOnOutsideClick
                 title="Task Tracker"
                 contentClassName="flex w-[80%] flex-col bg-sidebar p-3"
                 headerClassName="p-0 pb-4"

@@ -172,6 +172,32 @@ test.describe('tasks', () => {
         await page.keyboard.press('Escape');
     });
 
+    test('clicking outside the task form dialog does not close it', async ({ page }) => {
+        await page.getByRole('button', { name: 'New Task' }).click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog).toBeVisible();
+
+        await page.locator('[data-slot="dialog-overlay"], [data-slot="sheet-overlay"]').click({
+            position: { x: 5, y: 5 },
+        });
+        await expect(dialog).toBeVisible();
+    });
+
+    test('clicking outside the "Move to..." sheet closes it', async ({ page }) => {
+        const parentTitle = await createTask(page);
+        await createTask(page);
+        const subtask = await addSubtask(page, taskRow(page, parentTitle));
+
+        await taskRow(page, subtask).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+        await expect(moveSheet).toBeVisible();
+
+        // The sheet's own content sits over the bottom ~70vh - the overlay is only reachable near the top.
+        await page.locator('[data-slot="sheet-overlay"]').click({ position: { x: 20, y: 20 } });
+        await expect(moveSheet).toBeHidden();
+    });
+
     test('duplicating a task copies it and its subtree', async ({ page }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));

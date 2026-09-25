@@ -69,6 +69,24 @@ test.describe('auth', () => {
         await expect(page.getByText('Logged out')).toBeVisible();
     });
 
+    test('clicking outside the mobile nav drawer closes it', async ({ page, testUser }) => {
+        await loginAs(page, testUser);
+        // Only rendered below the `lg` breakpoint - nothing to test on desktop-chrome.
+        const openNav = page.getByRole('button', { name: 'Open navigation' });
+        test.skip((await openNav.count()) === 0, 'Nav drawer only exists below the lg breakpoint');
+
+        await openNav.click();
+        const drawer = page.getByRole('dialog', { name: 'Task Tracker' });
+        await expect(drawer).toBeVisible();
+
+        // The drawer covers the left 80% of the screen - the overlay is only reachable to its right.
+        const viewportWidth = page.viewportSize().width;
+        await page
+            .locator('[data-slot="sheet-overlay"]')
+            .click({ position: { x: viewportWidth - 10, y: 100 } });
+        await expect(drawer).toBeHidden();
+    });
+
     test('visiting a protected route while logged out redirects to login', async ({ page }) => {
         await page.goto('/');
         await page.waitForURL('/login');

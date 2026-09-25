@@ -11,7 +11,7 @@ export default async function TaskDetailPage({ params }) {
     const [{ data: tasks }, { data: list }] = await Promise.all([
         supabase
             .from('tasks')
-            .select('*, statuses(id, name, color, is_default, position)')
+            .select('*, statuses(id, name, color, is_default, position), task_tags(tags(id, name))')
             .eq('list_id', listId)
             .order('depth', { ascending: true })
             .order('position', { ascending: true }),
@@ -30,6 +30,7 @@ export default async function TaskDetailPage({ params }) {
         ...task,
         status_name: task.statuses?.name ?? null,
         status_color: task.statuses?.color ?? null,
+        tags: (task.task_tags || []).map((taskTagRow) => taskTagRow.tags),
     }));
 
     return (

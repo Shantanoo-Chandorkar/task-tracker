@@ -57,6 +57,7 @@ function blockOutsideDismiss(event) {
  * @param {import('react').ReactNode} [props.footer] - Action buttons, rendered in the shared footer bar
  * @param {string} [props.footerClassName] - Extra classes for the footer bar (e.g. a stacked button layout)
  * @param {Function} [props.onCloseAutoFocus] - Override Radix's default post-close focus return (variant 'form')
+ * @param {boolean} [props.dismissOnOutsideClick] - Sheet only; default stays blocked like every other modal
  * @param {import('react').ReactNode} props.children - Modal body content
  */
 export default function ModalShell({
@@ -72,6 +73,7 @@ export default function ModalShell({
     footer,
     footerClassName,
     onCloseAutoFocus,
+    dismissOnOutsideClick = false,
     children,
 }) {
     const isDesktop = useIsDesktop();
@@ -109,7 +111,7 @@ export default function ModalShell({
                     }
                     onOpenAutoFocus={(event) => event.preventDefault()}
                     onCloseAutoFocus={onCloseAutoFocus}
-                    onPointerDownOutside={blockOutsideDismiss}
+                    onPointerDownOutside={dismissOnOutsideClick ? undefined : blockOutsideDismiss}
                 >
                     <SheetHeader className={headerClassName}>
                         <SheetTitle className={titleClassName}>{title}</SheetTitle>

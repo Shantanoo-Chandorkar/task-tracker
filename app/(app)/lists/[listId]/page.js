@@ -18,7 +18,9 @@ export default async function ListPage({ params }) {
             supabase.from('lists').select('id, space_id').eq('id', listId).maybeSingle(),
             supabase
                 .from('tasks')
-                .select('*, statuses(id, name, color, is_default, position)')
+                .select(
+                    '*, statuses(id, name, color, is_default, position), task_tags(tags(id, name))',
+                )
                 .eq('list_id', listId)
                 .order('depth', { ascending: true })
                 .order('position', { ascending: true }),
@@ -45,11 +47,12 @@ export default async function ListPage({ params }) {
         );
     }
 
-    // Flatten the statuses join so callers don't need to know its structure.
+    // Flatten the statuses join and the task_tags join so callers don't need to know either's structure.
     const normalizedTasks = (tasks || []).map((task) => ({
         ...task,
         status_name: task.statuses?.name ?? null,
         status_color: task.statuses?.color ?? null,
+        tags: (task.task_tags || []).map((taskTagRow) => taskTagRow.tags),
     }));
 
     const { data: statuses } = await supabase

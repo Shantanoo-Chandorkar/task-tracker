@@ -11,6 +11,7 @@ import { humanReadableLabel } from '@/lib/recurrence';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import StatusBadge from '@/components/status/StatusBadge';
+import TaskTagPicker from './TaskTagPicker';
 import TaskRowActions from '@/components/task-list/TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import SubtaskTree from './SubtaskTree';
@@ -141,6 +142,8 @@ export default function TaskDetail({
                         </p>
                     </div>
                 )}
+
+                <TaskTagPicker task={task} spaceId={spaceId} />
             </div>
 
             <div className="w-full min-w-0">

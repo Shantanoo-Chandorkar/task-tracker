@@ -173,6 +173,10 @@ test.describe('collaboration', () => {
             await approveJoinRequestViaUi(page, spaceSection(page, spaceName), requester.email);
 
             await gotoFreshAfterExternalChange(requesterPage, '/spaces');
+            // A new approval defaults to 'restricted' - confirms the access-level pill reflects it.
+            await expect(
+                spaceSection(requesterPage, spaceName).getByText('Restricted'),
+            ).toBeVisible();
             await spaceSection(requesterPage, spaceName)
                 .getByRole('button', { name: 'Leave space' })
                 .click();
