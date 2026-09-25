@@ -9,7 +9,7 @@ import { Loader } from '@/components/ui/loader';
 import CharLimitField from '@/components/ui/CharLimitField';
 import { createStatus, updateStatus } from '@/actions/status-actions';
 
-const STATUS_NAME_MAX = 100;
+const STATUS_NAME_MAX = 50;
 
 /**
  * Modal for creating or editing a Status, rendered through the shared ModalShell container.

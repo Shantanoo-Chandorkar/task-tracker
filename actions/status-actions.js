@@ -27,7 +27,7 @@ export const createStatus = withAuthenticatedAction(
         if (!name) {
             return { data: null, error: 'Status name is required' };
         }
-        const nameError = checkMaxLength(name, 100, 'Status name');
+        const nameError = checkMaxLength(name, 50, 'Status name');
         if (nameError) return { data: null, error: nameError.error };
 
         if (!fields.space_id) {
@@ -83,7 +83,7 @@ export const updateStatus = withAuthenticatedAction(
         if (name !== undefined) {
             name = sanitizeString(name, true);
             if (!name) return { data: null, error: 'Status name is required' };
-            const nameError = checkMaxLength(name, 100, 'Status name');
+            const nameError = checkMaxLength(name, 50, 'Status name');
             if (nameError) return { data: null, error: nameError.error };
         }
 
