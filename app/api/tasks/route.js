@@ -21,7 +21,7 @@ export const GET = withApiErrorHandling(async function GET(request) {
 
     const { data: tasks, error } = await supabase
         .from('tasks')
-        .select('*, statuses(id, name, color, is_default, position)')
+        .select('*, statuses(id, name, color, is_default, position), task_tags(tags(id, name))')
         .eq('list_id', listId)
         .order('depth', { ascending: true })
         .order('position', { ascending: true });
@@ -30,12 +30,12 @@ export const GET = withApiErrorHandling(async function GET(request) {
         return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
     }
 
-    // Flatten the nested statuses object to top-level status_name / status_color fields
-    // so callers don't need to know about the join structure
+    // Flattens the statuses and task_tags joins so callers don't need to know either's structure.
     const normalized = (tasks || []).map((task) => ({
         ...task,
         status_name: task.statuses?.name ?? null,
         status_color: task.statuses?.color ?? null,
+        tags: (task.task_tags || []).map((taskTagRow) => taskTagRow.tags),
     }));
 
     return NextResponse.json(normalized);
