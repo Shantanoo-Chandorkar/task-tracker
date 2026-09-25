@@ -25,6 +25,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/ui/loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
@@ -32,6 +33,7 @@ import { updateSpace, deleteSpace } from '@/actions/space-actions';
 import { updateList, deleteList } from '@/actions/list-actions';
 import { leaveSpace } from '@/actions/collaboration-actions';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
+import { PERMISSION_LEVEL_LABELS } from '@/lib/permissions/space-permissions';
 import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
 import JoinSpaceDialog from './JoinSpaceDialog';
@@ -174,8 +176,18 @@ function SpaceSection({
                 <span className="flex-1 text-sm font-semibold text-foreground">
                     {space.name}
                     {!isOwner && (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                            Shared with you
+                        <span className="ml-2 inline-flex items-center gap-1.5 align-middle">
+                            <span className="text-xs font-normal text-muted-foreground">
+                                Shared with you
+                            </span>
+                            {PERMISSION_LEVEL_LABELS[space.my_permission_level] && (
+                                <Badge
+                                    variant="outline"
+                                    className="border-metric/25 bg-metric/15 text-metric"
+                                >
+                                    {PERMISSION_LEVEL_LABELS[space.my_permission_level]}
+                                </Badge>
+                            )}
                         </span>
                     )}
                 </span>

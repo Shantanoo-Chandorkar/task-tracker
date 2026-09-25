@@ -27,8 +27,8 @@ import {
     updateCollaboratorPermission,
 } from '@/actions/collaboration-actions';
 import { sendSpaceInvite, revokeSpaceInvite } from '@/actions/invite-actions';
+import { PERMISSION_LEVEL_LABELS } from '@/lib/permissions/space-permissions';
 
-const PERMISSION_LEVEL_LABELS = { full: 'Full', restricted: 'Restricted', read_only: 'Read-only' };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function copyToClipboard(text, label) {
