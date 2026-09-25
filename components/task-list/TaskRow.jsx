@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import StatusPicker from '@/components/status/StatusPicker';
+import TaskRowTags from './TaskRowTags';
 import TaskRowActions from './TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import CompleteTaskDialog from './CompleteTaskDialog';
@@ -205,7 +206,8 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
                     )}
                 </span>
 
-                {/* Inline status picker */}
+                {/* Read-only tag summary, and the inline status picker */}
+                <TaskRowTags tags={task.tags} />
                 <div className="flex-shrink-0">
                     <StatusPicker task={task} flatList={flatList} />
                 </div>
