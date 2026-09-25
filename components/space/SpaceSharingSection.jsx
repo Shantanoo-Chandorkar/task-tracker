@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Copy, Check, X } from 'lucide-react';
+import { Copy, Check, X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
@@ -18,14 +19,17 @@ import {
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';
 import { useCollaboratorsQuery } from '@/hooks/useCollaboratorsQuery';
+import { usePendingInvitesQuery } from '@/hooks/usePendingInvitesQuery';
 import {
     approveJoinRequest,
     rejectJoinRequest,
     removeCollaborator,
     updateCollaboratorPermission,
 } from '@/actions/collaboration-actions';
+import { sendSpaceInvite, revokeSpaceInvite } from '@/actions/invite-actions';
 
 const PERMISSION_LEVEL_LABELS = { full: 'Full', restricted: 'Restricted', read_only: 'Read-only' };
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function copyToClipboard(text, label) {
     try {
@@ -34,6 +38,19 @@ async function copyToClipboard(text, label) {
     } catch {
         toast.error(`Could not copy ${label.toLowerCase()}`);
     }
+}
+
+/**
+ * Renders how long until an invite expires, or that it already has -- a display-only label; the
+ * server is the actual source of truth for whether an expired invite can still be redeemed.
+ *
+ * @param {string} expiresAt - ISO timestamp.
+ * @returns {string} e.g. "Expires in 3 days" or "Expired".
+ */
+function formatInviteExpiry(expiresAt) {
+    const daysLeft = Math.ceil((Date.parse(expiresAt) - Date.now()) / DAY_MS);
+    if (daysLeft <= 0) return 'Expired';
+    return `Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
 }
 
 /**
@@ -51,26 +68,63 @@ export default function SpaceSharingSection({ space }) {
     const { data: collaborators = [], isLoading: isLoadingCollaborators } = useCollaboratorsQuery(
         space.id,
     );
-    // { action: 'reject'|'remove', targetId, label } while a confirm dialog is open, else null.
+    const { data: pendingInvites = [], isLoading: isLoadingInvites } = usePendingInvitesQuery(
+        space.id,
+    );
+    // { action: 'reject'|'remove'|'revoke-invite', targetId, label } while a confirm dialog is open, else null.
     const [confirmTarget, setConfirmTarget] = useState(null);
     const [confirming, setConfirming] = useState(false);
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [sendingInvite, setSendingInvite] = useState(false);
+    const [inviteError, setInviteError] = useState('');
 
     async function refetch() {
         await queryClient.invalidateQueries({ queryKey: ['space-collaborators', space.id] });
+        await queryClient.invalidateQueries({ queryKey: ['space-invites', space.id] });
         bustPageCache({ urls: ['/spaces'] });
+    }
+
+    async function handleSendInvite(event) {
+        event.preventDefault();
+        if (!inviteEmail.trim() || sendingInvite) return;
+
+        setSendingInvite(true);
+        setInviteError('');
+
+        let sendInviteResult;
+        try {
+            sendInviteResult = await sendSpaceInvite({
+                spaceId: space.id,
+                email: inviteEmail.trim(),
+            });
+        } catch {
+            setSendingInvite(false);
+            setInviteError('Could not reach the server. Try again.');
+            return;
+        }
+        setSendingInvite(false);
+
+        if (sendInviteResult.error) {
+            setInviteError(sendInviteResult.error);
+            return;
+        }
+
+        setInviteEmail('');
+        toast.success('Invite sent');
+        await refetch();
     }
 
     async function handleApprove(requestId) {
         const toastId = toast.loading('Approving...');
-        let result;
+        let approveResult;
         try {
-            result = await approveJoinRequest({ requestId });
+            approveResult = await approveJoinRequest({ requestId });
         } catch {
             toast.error('Could not reach the server. Try again.', { id: toastId });
             return;
         }
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
+        if (approveResult.error) {
+            toast.error(approveResult.error, { id: toastId });
             return;
         }
         toast.success('Request approved', { id: toastId });
@@ -82,14 +136,22 @@ export default function SpaceSharingSection({ space }) {
         const { action, targetId } = confirmTarget;
 
         setConfirming(true);
-        const toastId = toast.loading(action === 'reject' ? 'Rejecting...' : 'Removing...');
+        const loadingLabelByAction = {
+            reject: 'Rejecting...',
+            remove: 'Removing...',
+            'revoke-invite': 'Revoking...',
+        };
+        const toastId = toast.loading(loadingLabelByAction[action]);
 
-        let result;
+        let actionResult;
         try {
-            result =
-                action === 'reject'
-                    ? await rejectJoinRequest({ requestId: targetId })
-                    : await removeCollaborator({ collaboratorId: targetId });
+            if (action === 'reject') {
+                actionResult = await rejectJoinRequest({ requestId: targetId });
+            } else if (action === 'remove') {
+                actionResult = await removeCollaborator({ collaboratorId: targetId });
+            } else {
+                actionResult = await revokeSpaceInvite({ inviteId: targetId });
+            }
         } catch {
             setConfirming(false);
             setConfirmTarget(null);
@@ -99,21 +161,24 @@ export default function SpaceSharingSection({ space }) {
         setConfirming(false);
         setConfirmTarget(null);
 
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
+        if (actionResult.error) {
+            toast.error(actionResult.error, { id: toastId });
             return;
         }
-        toast.success(action === 'reject' ? 'Request rejected' : 'Collaborator removed', {
-            id: toastId,
-        });
+        const successLabelByAction = {
+            reject: 'Request rejected',
+            remove: 'Collaborator removed',
+            'revoke-invite': 'Invite revoked',
+        };
+        toast.success(successLabelByAction[action], { id: toastId });
         await refetch();
     }
 
     async function handlePermissionChange(collaboratorId, newPermissionLevel) {
         const toastId = toast.loading('Updating permission...');
-        let result;
+        let permissionResult;
         try {
-            result = await updateCollaboratorPermission({
+            permissionResult = await updateCollaboratorPermission({
                 collaboratorId,
                 permissionLevel: newPermissionLevel,
             });
@@ -121,8 +186,8 @@ export default function SpaceSharingSection({ space }) {
             toast.error('Could not reach the server. Try again.', { id: toastId });
             return;
         }
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
+        if (permissionResult.error) {
+            toast.error(permissionResult.error, { id: toastId });
             return;
         }
         toast.success('Permission updated', { id: toastId });
@@ -159,12 +224,79 @@ export default function SpaceSharingSection({ space }) {
                     <Copy className="h-3.5 w-3.5" />
                     Copy join link
                 </Button>
+
+                <form onSubmit={handleSendInvite} className="mt-3 flex items-start gap-1.5">
+                    <div className="flex-1">
+                        <Input
+                            type="email"
+                            placeholder="Invite by email"
+                            className="h-8 text-sm"
+                            value={inviteEmail}
+                            onChange={(event) => {
+                                setInviteEmail(event.target.value);
+                                if (inviteError) setInviteError('');
+                            }}
+                            disabled={sendingInvite}
+                            aria-label="Invite by email"
+                        />
+                        {inviteError && (
+                            <p className="mt-1 text-xs text-destructive">{inviteError}</p>
+                        )}
+                    </div>
+                    <Button
+                        type="submit"
+                        size="sm"
+                        className="h-8 gap-1.5"
+                        disabled={!inviteEmail.trim() || sendingInvite}
+                    >
+                        {sendingInvite ? <Loader size="xs" /> : <Send className="h-3.5 w-3.5" />}
+                        Send
+                    </Button>
+                </form>
             </div>
 
-            {(isLoadingRequests || isLoadingCollaborators) && (
+            {(isLoadingRequests || isLoadingCollaborators || isLoadingInvites) && (
                 <div className="flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-4 text-xs text-muted-foreground">
                     <Loader size="xs" />
-                    Loading requests and collaborators...
+                    Loading invites, requests and collaborators...
+                </div>
+            )}
+
+            {!isLoadingInvites && pendingInvites.length > 0 && (
+                <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                        Pending invites
+                    </p>
+                    <div className="rounded-lg bg-muted/50 divide-y divide-border">
+                        {pendingInvites.map((invite) => (
+                            <div
+                                key={invite.id}
+                                className="flex items-center justify-between gap-2 px-3 py-2"
+                            >
+                                <div className="min-w-0">
+                                    <p className="text-sm truncate">{invite.invited_email}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {formatInviteExpiry(invite.expires_at)}
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
+                                    aria-label="Revoke invite"
+                                    onClick={() =>
+                                        setConfirmTarget({
+                                            action: 'revoke-invite',
+                                            targetId: invite.id,
+                                            label: invite.invited_email,
+                                        })
+                                    }
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
@@ -279,14 +411,18 @@ export default function SpaceSharingSection({ space }) {
                 onClose={() => setConfirmTarget(null)}
                 variant="alert"
                 title={
-                    confirmTarget?.action === 'reject'
-                        ? `Reject request from "${confirmTarget?.label}"?`
-                        : `Remove "${confirmTarget?.label}" from this space?`
+                    {
+                        reject: `Reject request from "${confirmTarget?.label}"?`,
+                        remove: `Remove "${confirmTarget?.label}" from this space?`,
+                        'revoke-invite': `Revoke the invite sent to "${confirmTarget?.label}"?`,
+                    }[confirmTarget?.action]
                 }
                 description={
-                    confirmTarget?.action === 'reject'
-                        ? "They'll need to send a new request to join."
-                        : "They'll lose access to this space's lists and tasks."
+                    {
+                        reject: "They'll need to send a new request to join.",
+                        remove: "They'll lose access to this space's lists and tasks.",
+                        'revoke-invite': 'The link in their email will stop working.',
+                    }[confirmTarget?.action]
                 }
                 footer={
                     <>
@@ -299,7 +435,11 @@ export default function SpaceSharingSection({ space }) {
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             {confirming && <Loader size="xs" />}
-                            {confirmTarget?.action === 'reject' ? 'Reject' : 'Remove'}
+                            {
+                                { reject: 'Reject', remove: 'Remove', 'revoke-invite': 'Revoke' }[
+                                    confirmTarget?.action
+                                ]
+                            }
                         </AlertDialogAction>
                     </>
                 }

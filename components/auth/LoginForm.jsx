@@ -19,8 +19,10 @@ import { clearAllCaches } from '@/lib/cache';
  *
  * @param {object} props
  * @param {boolean} [props.hasGuestSessionEnded] - Shows a notice that the guest session ran out.
+ * @param {string} [props.redirectTo] - Where to send the user after a successful login. Already
+ *   sanitized server-side by the page (see `sanitizeRedirectPath`).
  */
-export default function LoginForm({ hasGuestSessionEnded = false }) {
+export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '/' }) {
     const router = useRouter();
     const queryClient = useQueryClient();
 
@@ -53,7 +55,7 @@ export default function LoginForm({ hasGuestSessionEnded = false }) {
         }
 
         await clearAllCaches(queryClient);
-        router.push('/');
+        router.push(redirectTo);
         router.refresh();
     }
 
@@ -124,7 +126,11 @@ export default function LoginForm({ hasGuestSessionEnded = false }) {
             <p className="mt-4 text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{' '}
                 <Link
-                    href="/signup"
+                    href={
+                        redirectTo === '/'
+                            ? '/signup'
+                            : `/signup?next=${encodeURIComponent(redirectTo)}`
+                    }
                     className="font-medium text-foreground underline underline-offset-4"
                 >
                     Sign up
