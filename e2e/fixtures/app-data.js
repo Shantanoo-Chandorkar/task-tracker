@@ -284,6 +284,31 @@ export function collaboratorRow(spaceSectionLocator, email) {
 }
 
 /**
+ * Sends a direct email invite via the owner's sharing panel, waiting for confirmation.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').Locator} spaceSectionLocator
+ * @param {string} email
+ * @returns {Promise<void>}
+ */
+export async function sendInviteViaUi(page, spaceSectionLocator, email) {
+    await spaceSectionLocator.getByLabel('Invite by email').fill(email);
+    await spaceSectionLocator.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByText('Invite sent')).toBeVisible();
+}
+
+/**
+ * Locates a pending invite's own row within an owner's sharing panel by invited email.
+ *
+ * @param {import('@playwright/test').Locator} spaceSectionLocator
+ * @param {string} email
+ * @returns {import('@playwright/test').Locator}
+ */
+export function pendingInviteRow(spaceSectionLocator, email) {
+    return spaceSectionLocator.locator('div.px-3.py-2', { hasText: email });
+}
+
+/**
  * Approves a pending join request via the owner's sharing panel, waiting for confirmation.
  *
  * @param {import('@playwright/test').Page} page
