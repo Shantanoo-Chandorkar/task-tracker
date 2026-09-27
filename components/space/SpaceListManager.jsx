@@ -185,7 +185,7 @@ function SpaceSection({
                                     variant="outline"
                                     className="border-metric/25 bg-metric/15 text-metric"
                                 >
-                                    {PERMISSION_LEVEL_LABELS[space.my_permission_level]}
+                                    {PERMISSION_LEVEL_LABELS[space.my_permission_level]} access
                                 </Badge>
                             )}
                         </span>
