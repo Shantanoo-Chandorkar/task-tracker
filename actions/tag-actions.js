@@ -14,6 +14,7 @@ import {
     TAG_NOT_FOUND,
     TAG_SPACE_ID_REQUIRED,
     TAG_DELETE_FAILED,
+    TAG_ALREADY_ON_TASK,
 } from '@/lib/error-codes';
 
 const UNIQUE_VIOLATION = '23505';
@@ -54,7 +55,7 @@ async function findOrCreateTag(supabase, spaceId, name, userId) {
  * @param {object} fields
  * @param {string} fields.taskId - Task to tag
  * @param {string} fields.name - Tag name, matched case-insensitively against existing tags
- * @returns {{ data: { id: string, name: string }|null, error: string|null }}
+ * @returns {{ data: { id: string, name: string }|null, error: string|null, code: string|undefined }}
  */
 export const addTagToTask = withAuthenticatedAction(
     '[tags] add to task',
@@ -99,7 +100,14 @@ export const addTagToTask = withAuthenticatedAction(
             .from('task_tags')
             .insert({ task_id: fields.taskId, tag_id: tagId });
 
-        if (attachError && attachError.code !== UNIQUE_VIOLATION) {
+        if (attachError) {
+            if (attachError.code === UNIQUE_VIOLATION) {
+                return {
+                    data: null,
+                    error: 'This tag is already on this task',
+                    code: TAG_ALREADY_ON_TASK,
+                };
+            }
             return { data: null, error: 'Failed to tag task' };
         }
 

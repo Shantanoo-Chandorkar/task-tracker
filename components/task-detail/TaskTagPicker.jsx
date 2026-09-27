@@ -19,6 +19,7 @@ import TagComboboxField from '@/components/tag/TagComboboxField';
 export default function TaskTagPicker({ task, spaceId }) {
     const queryClient = useQueryClient();
     const [pending, setPending] = useState(false);
+    const [removingKey, setRemovingKey] = useState(null);
     const { data: spaceTags = [] } = useTagsQuery(spaceId);
 
     const tags = (task.tags ?? []).map((tag) => ({ key: tag.id, name: tag.name }));
@@ -47,6 +48,7 @@ export default function TaskTagPicker({ task, spaceId }) {
     }
 
     async function handleRemove(tagId) {
+        setRemovingKey(tagId);
         try {
             const result = await removeTagFromTask({ taskId: task.id, tagId });
             if (result.error) {
@@ -56,6 +58,8 @@ export default function TaskTagPicker({ task, spaceId }) {
             await refreshTags();
         } catch {
             toast.error('Could not reach the server. Try again.');
+        } finally {
+            setRemovingKey(null);
         }
     }
 
@@ -66,6 +70,7 @@ export default function TaskTagPicker({ task, spaceId }) {
             onAdd={handleAdd}
             onRemove={handleRemove}
             addPending={pending}
+            removingKey={removingKey}
         />
     );
 }

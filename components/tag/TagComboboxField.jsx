@@ -12,6 +12,7 @@ import {
     CommandList,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
+import { Loader } from '@/components/ui/loader';
 
 const TAG_NAME_MAX = 50;
 
@@ -25,8 +26,16 @@ const TAG_NAME_MAX = 50;
  * @param {Function} props.onAdd - Called with a tag name to attach (existing or new)
  * @param {Function} props.onRemove - Called with the attached tag's key to detach
  * @param {boolean} [props.addPending] - Disables the trigger while an add is in flight
+ * @param {string|null} [props.removingKey] - Key of the tag currently being removed, if any
  */
-export default function TagComboboxField({ tags, suggestions, onAdd, onRemove, addPending }) {
+export default function TagComboboxField({
+    tags,
+    suggestions,
+    onAdd,
+    onRemove,
+    addPending,
+    removingKey,
+}) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
 
@@ -55,10 +64,11 @@ export default function TagComboboxField({ tags, suggestions, onAdd, onRemove, a
                     <button
                         type="button"
                         onClick={() => onRemove(tag.key)}
+                        disabled={tag.key === removingKey}
                         aria-label={`Remove tag ${tag.name}`}
                         className="rounded-full p-0.5 hover:bg-foreground/10"
                     >
-                        <X className="h-3 w-3" />
+                        {tag.key === removingKey ? <Loader size="xs" /> : <X className="h-3 w-3" />}
                     </button>
                 </Badge>
             ))}
@@ -70,7 +80,7 @@ export default function TagComboboxField({ tags, suggestions, onAdd, onRemove, a
                         disabled={addPending}
                         className="flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40"
                     >
-                        <Plus className="h-3 w-3" />
+                        {addPending ? <Loader size="xs" /> : <Plus className="h-3 w-3" />}
                         Tag
                     </button>
                 </PopoverTrigger>
