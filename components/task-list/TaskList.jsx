@@ -36,6 +36,7 @@ import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
+import { useSpaceById } from '@/hooks/useSpaceById';
 import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
@@ -98,6 +99,7 @@ function siblingScopedCollisionDetection(args) {
  * @param {boolean} props.canWrite - Whether the caller may create tasks (false for read-only collaborators)
  * @param {string|null} props.currentUserId - Caller's user id, for row-level ownership checks
  * @param {'owner'|'full'|'restricted'|'read_only'|null} props.myPermission - Caller's tier for this space
+ * @param {number|null} [props.maxSubtasksPerParent] - Space's direct-subtask cap, or null for no limit
  */
 function StatusGroup({
     status,
@@ -112,6 +114,7 @@ function StatusGroup({
     canWrite,
     currentUserId,
     myPermission,
+    maxSubtasksPerParent,
 }) {
     if (tasks.length === 0) return null;
 
@@ -159,6 +162,7 @@ function StatusGroup({
                                         listId={listId}
                                         currentUserId={currentUserId}
                                         myPermission={myPermission}
+                                        maxSubtasksPerParent={maxSubtasksPerParent}
                                     />
                                 </div>
                             </Fragment>
@@ -353,6 +357,8 @@ export default function TaskList({
     // A UX hint only - RLS and the app-layer pre-checks are the real backstop if a control is missed.
     const myPermission = usePermissionForSpace(spaceId, { initialData: initialSpaces });
     const canWrite = myPermission !== 'read_only';
+    const maxSubtasksPerParent =
+        useSpaceById(spaceId, { initialData: initialSpaces })?.max_subtasks_per_parent ?? null;
 
     const tree = useMemo(() => flatToTree(flatList), [flatList]);
     const rootTasks = tree; // flatToTree already returns only root nodes
@@ -820,6 +826,7 @@ export default function TaskList({
                                                 canWrite={canWrite}
                                                 currentUserId={currentUserId}
                                                 myPermission={myPermission}
+                                                maxSubtasksPerParent={maxSubtasksPerParent}
                                             />
                                         ))}
                                         <StatusGroup
@@ -841,6 +848,7 @@ export default function TaskList({
                                             canWrite={canWrite}
                                             currentUserId={currentUserId}
                                             myPermission={myPermission}
+                                            maxSubtasksPerParent={maxSubtasksPerParent}
                                         />
                                     </>
                                 )}

@@ -19,11 +19,13 @@ import {
     NOT_AUTHENTICATED,
     TASK_INVALID_PRIORITY,
     TASK_DUE_DATE_REQUIRED,
+    TASK_SUBTASK_CAP_REACHED,
 } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength, sanitizeRichText } from '@/lib/validation';
 import {
     resolveSpacePermission,
     getSpaceIdForList,
+    getSpaceIdForTask,
     blockCreateForPermission,
     blockWriteForPermission,
 } from '@/lib/permissions/space-permissions';
@@ -39,6 +41,37 @@ function snapshotMaxRelativeDepth(node) {
     const children = node.children || [];
     if (children.length === 0) return 0;
     return 1 + Math.max(...children.map(snapshotMaxRelativeDepth));
+}
+
+/**
+ * Rejects adding a new direct subtask under parentId if its space has a cap and it's already reached.
+ *
+ * @param {object} supabase - Request-scoped Supabase client
+ * @param {string} parentId - Task that would receive a new direct child
+ * @returns {Promise<{ error: string, code: string }|null>} A refusal, or null to proceed
+ */
+async function blockIfSubtaskCapReached(supabase, parentId) {
+    const spaceId = await getSpaceIdForTask(supabase, parentId);
+    const { data: space } = await supabase
+        .from('spaces')
+        .select('max_subtasks_per_parent')
+        .eq('id', spaceId)
+        .maybeSingle();
+    const maxSubtasksPerParent = space?.max_subtasks_per_parent;
+    if (!maxSubtasksPerParent) return null;
+
+    const { count } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('parent_id', parentId);
+
+    if ((count ?? 0) >= maxSubtasksPerParent) {
+        return {
+            error: `This task already has the maximum of ${maxSubtasksPerParent} subtasks`,
+            code: TASK_SUBTASK_CAP_REACHED,
+        };
+    }
+    return null;
 }
 
 /**
@@ -100,6 +133,11 @@ export const createTask = withAuthenticatedAction(
                 error: 'This space requires a due date on every task',
                 code: TASK_DUE_DATE_REQUIRED,
             };
+        }
+
+        if (fields.parent_id) {
+            const capBlock = await blockIfSubtaskCapReached(supabase, fields.parent_id);
+            if (capBlock) return { data: null, ...capBlock };
         }
 
         if (fields.sublist_id) {
@@ -635,7 +673,7 @@ export const deleteTaskAndReparentChildren = withAuthenticatedAction(
  * Not built on withAuthenticatedAction - its catch also runs toGuestLimitResult on the thrown error.
  *
  * @param {string} taskId - Task to duplicate
- * @returns {{ error: string|null }}
+ * @returns {{ error: string|null, code: string|undefined }}
  */
 export async function duplicateTask(taskId) {
     const user = await getCurrentUser();
@@ -678,6 +716,11 @@ export async function duplicateTask(taskId) {
             task.depth + snapshotMaxRelativeDepth(snapshot) > FINITE_MAX_DEPTH
         ) {
             return { error: 'Duplicating this task would exceed the maximum nesting depth' };
+        }
+
+        if (task.parent_id) {
+            const capBlock = await blockIfSubtaskCapReached(supabase, task.parent_id);
+            if (capBlock) return capBlock;
         }
 
         let siblingsQuery = supabase
@@ -839,6 +882,11 @@ export const moveTask = withAuthenticatedAction(
             if (descendantIds.has(newParentId)) {
                 return { data: null, error: 'Cannot move a task into its own descendant' };
             }
+        }
+
+        if (newParentId && newParentId !== task.parent_id) {
+            const capBlock = await blockIfSubtaskCapReached(supabase, newParentId);
+            if (capBlock) return { data: null, ...capBlock };
         }
 
         const targetListId = listId ?? task.list_id;

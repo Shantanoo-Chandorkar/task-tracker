@@ -10,9 +10,11 @@ import { findAncestors, findDescendantIds, flatToTree } from '@/lib/tree';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
+import { useSpaceById } from '@/hooks/useSpaceById';
 import StatusBadge from '@/components/status/StatusBadge';
 import TaskTagPicker from './TaskTagPicker';
 import TaskRowActions from '@/components/task-list/TaskRowActions';
+import LimitWarning from '@/components/task-list/LimitWarning';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import SubtaskTree from './SubtaskTree';
 import { Button } from '@/components/ui/button';
@@ -26,7 +28,7 @@ import RichTextRenderer from '@/components/ui/RichTextRenderer';
  * @param {string} props.taskId - Task being viewed
  * @param {object[]} props.initialTasks - SSR-fetched flat task list for this list (hydrates the query)
  * @param {object[]} [props.initialStatuses] - Seeds the query cache so SubtaskTree's checkboxes don't hydrate-mismatch
- * @param {object[]} [props.initialLists] - SSR-fetched single-list array, so spaceId resolves synchronously on first paint
+ * @param {object[]} [props.initialLists] - SSR-fetched single-list array, so spaceId resolves on first paint
  */
 export default function TaskDetail({
     listId,
@@ -51,6 +53,7 @@ export default function TaskDetail({
     // Seeds the shared ['statuses', spaceId] cache so SubtaskTree's checkboxes don't hydrate-mismatch on mount.
     const spaceId = useSpaceIdForList(listId, { initialData: initialLists });
     useStatusesQuery(spaceId, { initialData: initialStatuses });
+    const maxSubtasksPerParent = useSpaceById(spaceId)?.max_subtasks_per_parent ?? null;
 
     const task = flatList.find((task) => task.id === taskId);
 
@@ -65,6 +68,9 @@ export default function TaskDetail({
         );
         return flatToTree(subtreeFlat)[0]?.children ?? [];
     }, [taskId, flatList]);
+
+    const canAddSubtask = maxSubtasksPerParent == null || children.length < maxSubtasksPerParent;
+    const isOverSubtaskCap = maxSubtasksPerParent != null && children.length > maxSubtasksPerParent;
 
     if (!task || task.list_id !== listId) {
         return (
@@ -119,6 +125,7 @@ export default function TaskDetail({
                     task={task}
                     flatList={flatList}
                     onAddSubtask={() => setAddSubtaskOpen(true)}
+                    canAddSubtask={canAddSubtask}
                     listId={listId}
                     onDeleted={handleDeleted}
                 />
@@ -166,11 +173,17 @@ export default function TaskDetail({
                         size="sm"
                         className="gap-1.5"
                         onClick={() => setAddSubtaskOpen(true)}
+                        disabled={!canAddSubtask}
                     >
                         <Plus className="h-3.5 w-3.5" />
                         Add subtask
                     </Button>
                 </div>
+                {isOverSubtaskCap && (
+                    <LimitWarning
+                        message={`This task has ${children.length} subtasks, over this space's limit of ${maxSubtasksPerParent}. Remove some or raise the limit before adding more.`}
+                    />
+                )}
                 {children.length > 0 ? (
                     <SubtaskTree nodes={children} listId={listId} flatList={flatList} />
                 ) : (
