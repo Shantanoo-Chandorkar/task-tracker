@@ -15,7 +15,11 @@ import {
 import { getCurrentUser } from '@/lib/auth/session';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
-import { NOT_AUTHENTICATED, TASK_INVALID_PRIORITY } from '@/lib/error-codes';
+import {
+    NOT_AUTHENTICATED,
+    TASK_INVALID_PRIORITY,
+    TASK_DUE_DATE_REQUIRED,
+} from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength, sanitizeRichText } from '@/lib/validation';
 import {
     resolveSpacePermission,
@@ -52,7 +56,7 @@ function snapshotMaxRelativeDepth(node) {
  * @param {string|null} [fields.due_date] - ISO date string (YYYY-MM-DD), or null
  * @param {boolean} [fields.is_recurring]
  * @param {object} [fields.recurrence_rule]
- * @returns {{ data: object|null, error: string|null }}
+ * @returns {{ data: object|null, error: string|null, code: string|undefined }}
  */
 export const createTask = withAuthenticatedAction(
     '[tasks] create',
@@ -84,6 +88,19 @@ export const createTask = withAuthenticatedAction(
         const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
         const permissionBlock = blockCreateForPermission(permissionLevel);
         if (permissionBlock) return { data: null, ...permissionBlock };
+
+        const { data: space } = await supabase
+            .from('spaces')
+            .select('require_due_date')
+            .eq('id', spaceId)
+            .maybeSingle();
+        if (space?.require_due_date && !fields.due_date) {
+            return {
+                data: null,
+                error: 'This space requires a due date on every task',
+                code: TASK_DUE_DATE_REQUIRED,
+            };
+        }
 
         if (fields.sublist_id) {
             const { data: sublist } = await supabase
@@ -192,7 +209,7 @@ export async function createTaskWithTags({ tagNames, ...taskFields }) {
  *
  * @param {string} taskId - Task ID to update
  * @param {object} fields - Partial task fields to update
- * @returns {{ data: object|null, error: string|null }}
+ * @returns {{ data: object|null, error: string|null, code: string|undefined }}
  */
 export const updateTask = withAuthenticatedAction(
     '[tasks] update',
@@ -202,7 +219,7 @@ export const updateTask = withAuthenticatedAction(
 
         const { data: existingTask } = await supabase
             .from('tasks')
-            .select('created_by, lists(space_id)')
+            .select('created_by, lists(space_id, spaces(require_due_date))')
             .eq('id', taskId)
             .maybeSingle();
         if (!existingTask) return { data: null, error: 'Task not found' };
@@ -216,6 +233,14 @@ export const updateTask = withAuthenticatedAction(
             isOwnRow: existingTask.created_by === user.id,
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
+
+        if (fields.due_date === null && existingTask.lists?.spaces?.require_due_date) {
+            return {
+                data: null,
+                error: 'This space requires a due date on every task',
+                code: TASK_DUE_DATE_REQUIRED,
+            };
+        }
 
         // Explicit allowlist, not { ...fields } - an unlisted field must never reach the update.
         const {

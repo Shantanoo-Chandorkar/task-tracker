@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import ModalShell from '@/components/ui/modal-shell';
 import StatusManager from '@/components/status/StatusManager';
 import TagManager from '@/components/tag/TagManager';
+import SpacePreferencesSection from '@/components/space/SpacePreferencesSection';
 
 /**
  * One collapsible section of the settings sheet. Only one section is open at a time.
@@ -41,8 +42,9 @@ function SettingsSection({ title, isOpen, onToggle, children }) {
  * @param {Function} props.onClose - Called when the sheet should close
  * @param {string} props.spaceId - Space these settings belong to
  * @param {string} props.spaceName - Space name, shown in the sheet title
+ * @param {boolean} props.isOwner - Whether the current user owns this space
  */
-export default function SpaceSettingsSheet({ open, onClose, spaceId, spaceName }) {
+export default function SpaceSettingsSheet({ open, onClose, spaceId, spaceName, isOwner }) {
     const [openSection, setOpenSection] = useState(null);
 
     function toggleSection(sectionKey) {
@@ -65,6 +67,13 @@ export default function SpaceSettingsSheet({ open, onClose, spaceId, spaceName }
                     onToggle={() => toggleSection('tags')}
                 >
                     <TagManager spaceId={spaceId} />
+                </SettingsSection>
+                <SettingsSection
+                    title="Preferences"
+                    isOpen={openSection === 'preferences'}
+                    onToggle={() => toggleSection('preferences')}
+                >
+                    <SpacePreferencesSection spaceId={spaceId} isOwner={isOwner} />
                 </SettingsSection>
             </div>
         </ModalShell>

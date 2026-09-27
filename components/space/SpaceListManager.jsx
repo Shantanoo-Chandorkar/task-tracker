@@ -279,6 +279,7 @@ function SpaceSection({
                 onClose={() => setSettingsOpen(false)}
                 spaceId={space.id}
                 spaceName={space.name}
+                isOwner={isOwner}
             />
 
             {canShareSpace && sharingOpen && (

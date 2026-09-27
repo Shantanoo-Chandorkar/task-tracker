@@ -4,6 +4,8 @@ import { getNextPosition } from '@/lib/position';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
+import { resolveSpacePermission } from '@/lib/permissions/space-permissions';
+import { SPACE_SETTINGS_OWNER_ONLY } from '@/lib/error-codes';
 
 /**
  * Creates a new space. Appends it after the last existing space.
@@ -48,11 +50,11 @@ export const createSpace = withAuthenticatedAction(
 );
 
 /**
- * Updates specific fields on a space (name, color, position).
+ * Updates specific fields on a space (name, color, position, require_due_date).
  *
  * @param {string} id - Space ID to update
  * @param {object} fields - Partial space fields to update
- * @returns {{ data: object|null, error: string|null }}
+ * @returns {{ data: object|null, error: string|null, code: string|undefined }}
  */
 export const updateSpace = withAuthenticatedAction(
     '[spaces] update',
@@ -67,12 +69,25 @@ export const updateSpace = withAuthenticatedAction(
             if (nameError) return { data: null, error: nameError.error };
         }
 
+        // RLS already blocks this at the DB level - this just avoids a confusing silent no-op.
+        if ('require_due_date' in fields) {
+            const permissionLevel = await resolveSpacePermission(supabase, id, user.id);
+            if (permissionLevel !== 'owner') {
+                return {
+                    data: null,
+                    error: 'Only the space owner can change this setting',
+                    code: SPACE_SETTINGS_OWNER_ONLY,
+                };
+            }
+        }
+
         // Explicit allowlist, not { ...fields } - an unlisted field must never reach the update.
-        const { name, color, position } = fields;
+        const { name, color, position, require_due_date } = fields;
         const updates = {
             ...(name !== undefined && { name }),
             ...(color !== undefined && { color }),
             ...(position !== undefined && { position }),
+            ...(typeof require_due_date === 'boolean' && { require_due_date }),
         };
 
         const { data: updatedSpace, error } = await supabase

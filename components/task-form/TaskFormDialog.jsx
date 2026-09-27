@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
+import { useSpaceById } from '@/hooks/useSpaceById';
 import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ import StagedTagPicker from './StagedTagPicker';
 import TaskTagPicker from '@/components/task-detail/TaskTagPicker';
 import LabeledField from '@/components/ui/LabeledField';
 import { createTaskWithTags, updateTask } from '@/actions/task-actions';
+import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
 import { Loader } from '@/components/ui/loader';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
@@ -75,9 +77,11 @@ export default function TaskFormDialog({
     const [recurrenceRule, setRecurrenceRule] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
+    const [dueDateError, setDueDateError] = useState('');
     const [formError, setFormError] = useState('');
 
     const spaceId = useSpaceIdForList(listId ?? task?.list_id);
+    const requiresDueDate = useSpaceById(spaceId)?.require_due_date ?? false;
     const { data: statuses = [] } = useStatusesQuery(spaceId);
 
     // Reset fields during render (not an effect) to avoid an extra render/flicker on prop change.
@@ -98,6 +102,7 @@ export default function TaskFormDialog({
             setIsRecurring(task?.is_recurring ?? false);
             setRecurrenceRule(task?.recurrence_rule ?? null);
             setTitleError('');
+            setDueDateError('');
             setFormError('');
         }
     }
@@ -111,6 +116,11 @@ export default function TaskFormDialog({
 
         if (!title.trim()) {
             setTitleError('Title is required');
+            return;
+        }
+
+        if (requiresDueDate && !dueDate) {
+            setDueDateError('This space requires a due date');
             return;
         }
 
@@ -135,12 +145,16 @@ export default function TaskFormDialog({
         };
 
         try {
-            const { error, tagErrors } = isEditing
+            const { error, code, tagErrors } = isEditing
                 ? await updateTask(task.id, fields)
                 : await createTaskWithTags(fields);
 
             if (error) {
-                setFormError(error);
+                if (code === TASK_DUE_DATE_REQUIRED) {
+                    setDueDateError(error);
+                } else {
+                    setFormError(error);
+                }
                 toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
                 return;
             }
@@ -284,12 +298,18 @@ export default function TaskFormDialog({
                     )}
 
                     {/* Due date */}
-                    <LabeledField label="Due date">
+                    <LabeledField label={requiresDueDate ? 'Due date *' : 'Due date'}>
                         <Input
                             type="date"
                             value={dueDate}
-                            onChange={(event) => setDueDate(event.target.value)}
+                            onChange={(event) => {
+                                setDueDate(event.target.value);
+                                setDueDateError('');
+                            }}
                         />
+                        {dueDateError && (
+                            <p className="text-xs text-destructive mt-1">{dueDateError}</p>
+                        )}
                     </LabeledField>
                 </div>
 
