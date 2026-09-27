@@ -51,7 +51,7 @@ function blockOutsideDismiss(event) {
  * @param {string} [props.description] - Real, visible description; defaults to an sr-only copy of the title
  * @param {'form'|'alert'|'sheet'} [props.variant] - 'form' (default), 'alert', or 'sheet' - see branches below
  * @param {'top'|'bottom'|'left'|'right'} [props.side] - Sheet edge for variant 'sheet' only (default 'bottom')
- * @param {string} [props.contentClassName] - Extra classes for the Sheet's content panel (variant 'sheet' only)
+ * @param {string} [props.contentClassName] - Extra classes for the content panel (Sheet, or Dialog on desktop)
  * @param {string} [props.headerClassName] - Extra classes for the Sheet's header (variant 'sheet' only)
  * @param {string} [props.titleClassName] - Extra classes for the title text (variant 'sheet' only)
  * @param {import('react').ReactNode} [props.footer] - Action buttons, rendered in the shared footer bar
@@ -129,7 +129,7 @@ export default function ModalShell({
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
-                className="max-w-lg"
+                className={cn('sm:max-w-lg max-h-[90vh] overflow-y-auto', contentClassName)}
                 onOpenAutoFocus={(event) => event.preventDefault()}
                 onCloseAutoFocus={onCloseAutoFocus}
                 onPointerDownOutside={blockOutsideDismiss}

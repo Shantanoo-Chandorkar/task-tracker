@@ -23,6 +23,7 @@ import {
     blockCreateForPermission,
     blockWriteForPermission,
 } from '@/lib/permissions/space-permissions';
+import { addTagToTask } from '@/actions/tag-actions';
 
 /**
  * Deepest relative depth in a subtree snapshot (0 = root with no children).
@@ -163,6 +164,28 @@ export const createTask = withAuthenticatedAction(
         return { data: createdTask, error: null };
     },
 );
+
+/**
+ * Creates a task and attaches any staged tag names to it in the same round trip.
+ *
+ * A failed tag attach never rolls back the task - the failure is reported in `tagErrors` instead.
+ *
+ * @param {object} fields - Same fields as `createTask`, plus:
+ * @param {string[]} [fields.tagNames] - Tag names to attach after the task is created
+ * @returns {{ data: object|null, error: string|null, tagErrors: string[] }}
+ */
+export async function createTaskWithTags({ tagNames, ...taskFields }) {
+    const taskResult = await createTask(taskFields);
+    if (taskResult.error || !taskResult.data) return { ...taskResult, tagErrors: [] };
+
+    const tagErrors = [];
+    for (const name of tagNames ?? []) {
+        const tagResult = await addTagToTask({ taskId: taskResult.data.id, name });
+        if (tagResult.error) tagErrors.push(`${name}: ${tagResult.error}`);
+    }
+
+    return { data: taskResult.data, error: null, tagErrors };
+}
 
 /**
  * Updates specific fields on an existing task.

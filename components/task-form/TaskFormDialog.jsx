@@ -18,7 +18,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import RecurrenceBuilder from './RecurrenceBuilder';
-import { createTask, updateTask } from '@/actions/task-actions';
+import StagedTagPicker from './StagedTagPicker';
+import TaskTagPicker from '@/components/task-detail/TaskTagPicker';
+import LabeledField from '@/components/ui/LabeledField';
+import { createTaskWithTags, updateTask } from '@/actions/task-actions';
 import { Loader } from '@/components/ui/loader';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
@@ -66,6 +69,7 @@ export default function TaskFormDialog({
     const [description, setDescription] = useState('');
     const [statusId, setStatusId] = useState('');
     const [sublistId, setSublistId] = useState('');
+    const [tagNames, setTagNames] = useState([]);
     const [dueDate, setDueDate] = useState('');
     const [isRecurring, setIsRecurring] = useState(false);
     const [recurrenceRule, setRecurrenceRule] = useState(null);
@@ -89,6 +93,7 @@ export default function TaskFormDialog({
             setDescription(task?.description ?? '');
             setStatusId(task?.status_id ?? defaultStatusId ?? fallbackStatus?.id ?? '');
             setSublistId(defaultSublistId ?? '');
+            setTagNames([]);
             setDueDate(task?.due_date ?? '');
             setIsRecurring(task?.is_recurring ?? false);
             setRecurrenceRule(task?.recurrence_rule ?? null);
@@ -120,15 +125,19 @@ export default function TaskFormDialog({
             parent_id: isEditing ? task.parent_id : (parentId ?? null),
             ...(isEditing
                 ? {}
-                : { list_id: listId, sublist_id: isRootCreate ? sublistId || null : null }),
+                : {
+                      list_id: listId,
+                      sublist_id: isRootCreate ? sublistId || null : null,
+                      tagNames,
+                  }),
             is_recurring: isRecurring,
             recurrence_rule: isRecurring ? recurrenceRule : null,
         };
 
         try {
-            const { error } = isEditing
+            const { error, tagErrors } = isEditing
                 ? await updateTask(task.id, fields)
-                : await createTask(fields);
+                : await createTaskWithTags(fields);
 
             if (error) {
                 setFormError(error);
@@ -137,6 +146,9 @@ export default function TaskFormDialog({
             }
 
             toast.success(isEditing ? 'Task updated successfully' : 'Task created successfully');
+            if (tagErrors?.length) {
+                toast.info(`Task saved, but couldn't add: ${tagErrors.join(', ')}`);
+            }
             onClose();
             // Not awaited - the dialog closes immediately instead of blocking on this refetch.
             queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
@@ -158,6 +170,7 @@ export default function TaskFormDialog({
             open={open}
             onClose={onClose}
             title={isEditing ? 'Edit Task' : 'New Task'}
+            contentClassName="sm:max-w-2xl"
             footer={
                 <>
                     <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
@@ -203,61 +216,81 @@ export default function TaskFormDialog({
                     />
                 </CharLimitField>
 
-                {/* Status */}
-                <Select value={statusId} onValueChange={setStatusId}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select status..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {statuses.map((status) => (
-                            <SelectItem key={status.id} value={status.id}>
-                                <span className="flex items-center gap-2">
-                                    <span
-                                        className="h-2 w-2 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: status.color }}
-                                    />
-                                    {status.name}
-                                </span>
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                {/* 2-column grid - stacking these four full-width each wastes space on wider screens */}
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Status */}
+                    <LabeledField label="Status">
+                        <Select value={statusId} onValueChange={setStatusId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select status..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {statuses.map((status) => (
+                                    <SelectItem key={status.id} value={status.id}>
+                                        <span className="flex items-center gap-2">
+                                            <span
+                                                className="h-2 w-2 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: status.color }}
+                                            />
+                                            {status.name}
+                                        </span>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </LabeledField>
 
-                {/* Sublist - root-level tasks only */}
-                {isRootCreate && sublists.length > 0 && (
-                    <Select
-                        value={sublistId || 'none'}
-                        onValueChange={(value) => setSublistId(value === 'none' ? '' : value)}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="No sublist" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">No sublist</SelectItem>
-                            {sublists.map((sublist) => (
-                                <SelectItem key={sublist.id} value={sublist.id}>
-                                    <span className="flex items-center gap-2">
-                                        <span
-                                            className="h-2 w-2 rounded-full flex-shrink-0"
-                                            style={{ backgroundColor: sublist.color }}
-                                        />
-                                        {sublist.name}
-                                    </span>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                )}
+                    {/* Tags */}
+                    <LabeledField label="Tags">
+                        {isEditing ? (
+                            <TaskTagPicker task={task} spaceId={spaceId} />
+                        ) : (
+                            <StagedTagPicker
+                                spaceId={spaceId}
+                                tagNames={tagNames}
+                                onChange={setTagNames}
+                            />
+                        )}
+                    </LabeledField>
 
-                {/* Due date */}
-                <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Due date</label>
-                    <Input
-                        type="date"
-                        value={dueDate}
-                        onChange={(event) => setDueDate(event.target.value)}
-                        className="w-fit"
-                    />
+                    {/* Sublist - root-level tasks only */}
+                    {isRootCreate && sublists.length > 0 && (
+                        <LabeledField label="Sublist">
+                            <Select
+                                value={sublistId || 'none'}
+                                onValueChange={(value) =>
+                                    setSublistId(value === 'none' ? '' : value)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="No sublist" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">No sublist</SelectItem>
+                                    {sublists.map((sublist) => (
+                                        <SelectItem key={sublist.id} value={sublist.id}>
+                                            <span className="flex items-center gap-2">
+                                                <span
+                                                    className="h-2 w-2 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: sublist.color }}
+                                                />
+                                                {sublist.name}
+                                            </span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </LabeledField>
+                    )}
+
+                    {/* Due date */}
+                    <LabeledField label="Due date">
+                        <Input
+                            type="date"
+                            value={dueDate}
+                            onChange={(event) => setDueDate(event.target.value)}
+                        />
+                    </LabeledField>
                 </div>
 
                 {/* Recurrence toggle */}
