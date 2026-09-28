@@ -37,12 +37,15 @@ import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
 import { useSpaceById } from '@/hooks/useSpaceById';
+import { useTaskFilters } from '@/hooks/useTaskFilters';
+import { taskMatchesFilters } from '@/lib/task-filters';
 import { duplicateTask } from '@/actions/task-actions';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import SublistFormDialog from '@/components/space/SublistFormDialog';
-import StatusCountTiles from './StatusCountTiles';
+import TaskFilterSheet from './TaskFilterSheet';
+import TaskFilterBar from './TaskFilterBar';
 import VelocityMeter from './VelocityMeter';
 import ListHeader from './ListHeader';
 import { Button } from '@/components/ui/button';
@@ -334,7 +337,7 @@ export default function TaskList({
         sublistId: null,
     });
     const { flags: collapsedGroups, toggleFlag: toggleGroup } = useUIState();
-    const [activeStatusId, setActiveStatusId] = useState(null);
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [sublistDialog, setSublistDialog] = useState({ open: false, sublist: null });
     const [deleteSublistTarget, setDeleteSublistTarget] = useState(null);
     const [deletingSublist, setDeletingSublist] = useState(false);
@@ -374,21 +377,22 @@ export default function TaskList({
         return nextCountsByStatusId;
     }, [statuses, flatList]);
 
-    function handleSelectStatus(statusId) {
-        setActiveStatusId((prev) => (prev === statusId ? null : statusId));
-    }
+    const { filters, activeCount } = useTaskFilters();
 
     const doneStatus = statuses.find((status) => status.code === 'done');
     const completedCount = doneStatus ? (countsByStatusId[doneStatus.id] ?? 0) : 0;
 
     // Grouped via a single Map pass per bucket instead of a filter-per-status - O(n), not O(n·statuses).
     const buckets = useMemo(() => {
-        function rootMatchesActiveStatus(rootTask) {
-            if (!activeStatusId) return true;
-            if (rootTask.status_id === activeStatusId) return true;
+        const hasActiveFilters = activeCount > 0;
+
+        function rootMatchesFilters(rootTask) {
+            if (!hasActiveFilters) return true;
+            const context = { doneStatusId: doneStatus?.id ?? null };
+            if (taskMatchesFilters(rootTask, filters, context)) return true;
             const descendantIds = findDescendantIds(rootTask.id, flatList);
             return flatList.some(
-                (task) => descendantIds.has(task.id) && task.status_id === activeStatusId,
+                (task) => descendantIds.has(task.id) && taskMatchesFilters(task, filters, context),
             );
         }
 
@@ -421,8 +425,8 @@ export default function TaskList({
             return { total, countsByStatusId };
         }
 
-        const bucketedRootTasks = activeStatusId
-            ? rootTasks.filter(rootMatchesActiveStatus)
+        const bucketedRootTasks = hasActiveFilters
+            ? rootTasks.filter(rootMatchesFilters)
             : rootTasks;
         const directTasks = bucketedRootTasks.filter((task) => !task.sublist_id);
         const directAllDepth = countAllDepth(directTasks);
@@ -451,7 +455,7 @@ export default function TaskList({
                 };
             }),
         ];
-    }, [rootTasks, sublists, activeStatusId, flatList]);
+    }, [rootTasks, sublists, flatList, doneStatus, activeCount, filters]);
 
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
@@ -702,15 +706,19 @@ export default function TaskList({
                     )}
                 </ListHeader>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <StatusCountTiles
-                        statuses={statuses}
-                        countsByStatusId={countsByStatusId}
-                        totalCount={flatList.length}
-                        activeStatusId={activeStatusId}
-                        onSelect={handleSelectStatus}
-                    />
-                </div>
+                <TaskFilterBar
+                    spaceId={spaceId}
+                    statuses={statuses}
+                    onOpenSheet={() => setFilterSheetOpen(true)}
+                />
+
+                <TaskFilterSheet
+                    open={filterSheetOpen}
+                    onClose={() => setFilterSheetOpen(false)}
+                    spaceId={spaceId}
+                    statuses={statuses}
+                    countsByStatusId={countsByStatusId}
+                />
 
                 <SortableContext
                     items={sublists.map((sublist) => sublist.id)}

@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import TaskList from '@/components/task-list/TaskList';
 import { attachTaskCounts } from '@/lib/list-task-counts';
 import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
+import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
 
 /**
  * List task-tree page (Server Component) - fetches everything server-side for zero-waterfall hydration.
@@ -64,10 +65,8 @@ export default async function ListPage({ params }) {
     // Matches /api/lists' computation, so the client refetch never hydration-mismatches this field.
     const listsWithCounts = await attachTaskCounts(supabase, lists || []);
     // Matches /api/spaces' computation, so the client refetch never hydration-mismatches this field.
-    const spacesWithPermission = await attachMyPermissionLevel(
-        supabase,
-        spaces || [],
-        user?.id ?? null,
+    const spacesWithPermission = await attachOwnerDisplayName(
+        await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null),
     );
 
     return (
