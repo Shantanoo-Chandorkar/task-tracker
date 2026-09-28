@@ -184,7 +184,7 @@ export default function TaskFormDialog({
             open={open}
             onClose={onClose}
             title={isEditing ? 'Edit Task' : 'New Task'}
-            contentClassName="sm:max-w-2xl"
+            contentClassName="sm:max-w-3xl"
             footer={
                 <>
                     <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
