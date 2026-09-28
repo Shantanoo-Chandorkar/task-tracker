@@ -156,7 +156,7 @@ A visitor can click **Try as guest** on the login page and get a private, pre-se
 
 **What a guest cannot do**, enforced both in the app and in the database (so calling Supabase directly does not get around it):
 
-| Rule                                                                                                        | App                                      | Database                                                                                 |
+| Rule                                                                                                        | App                                      | Database                                                                                |
 | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
 | Use the app past 30 minutes                                                                                 | proxy, `getCurrentUser`, session route   | restrictive RLS policy on every content table                                           |
 | Share, request to join, approve, change password                                                            | `blockGuestAction` in six server actions | restrictive policy on `space_collaborators` (also blocks requests _to_ a guest's space) |
