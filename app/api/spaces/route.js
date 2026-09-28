@@ -4,10 +4,11 @@ import { createSpace } from '@/actions/space-actions';
 import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
 import { getCurrentUser } from '@/lib/auth/session';
 import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
+import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
 
 /**
  * GET /api/spaces
- * Returns all spaces ordered by position, each with the caller's my_permission_level attached.
+ * Returns all spaces ordered by position, each with the caller's my_permission_level and owner_display_name attached.
  */
 export const GET = withApiErrorHandling(async function GET() {
     const unauthorized = await requireAuthResponse();
@@ -25,10 +26,8 @@ export const GET = withApiErrorHandling(async function GET() {
         return NextResponse.json({ error: 'Failed to fetch spaces' }, { status: 500 });
     }
 
-    const spacesWithPermission = await attachMyPermissionLevel(
-        supabase,
-        spaces || [],
-        user?.id ?? null,
+    const spacesWithPermission = await attachOwnerDisplayName(
+        await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null),
     );
     return NextResponse.json(spacesWithPermission);
 });

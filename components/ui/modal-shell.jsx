@@ -36,7 +36,6 @@ function ModalFooter({ children, roundedBottom, className }) {
     );
 }
 
-// Every modal requires an explicit Cancel/close click - an outside click must never dismiss it.
 function blockOutsideDismiss(event) {
     event.preventDefault();
 }
@@ -51,13 +50,13 @@ function blockOutsideDismiss(event) {
  * @param {string} [props.description] - Real, visible description; defaults to an sr-only copy of the title
  * @param {'form'|'alert'|'sheet'} [props.variant] - 'form' (default), 'alert', or 'sheet' - see branches below
  * @param {'top'|'bottom'|'left'|'right'} [props.side] - Sheet edge for variant 'sheet' only (default 'bottom')
- * @param {string} [props.contentClassName] - Extra classes for the Sheet's content panel (variant 'sheet' only)
+ * @param {string} [props.contentClassName] - Extra classes for the content panel (Sheet, or Dialog on desktop)
  * @param {string} [props.headerClassName] - Extra classes for the Sheet's header (variant 'sheet' only)
  * @param {string} [props.titleClassName] - Extra classes for the title text (variant 'sheet' only)
  * @param {import('react').ReactNode} [props.footer] - Action buttons, rendered in the shared footer bar
  * @param {string} [props.footerClassName] - Extra classes for the footer bar (e.g. a stacked button layout)
  * @param {Function} [props.onCloseAutoFocus] - Override Radix's default post-close focus return (variant 'form')
- * @param {boolean} [props.dismissOnOutsideClick] - Sheet only; default stays blocked like every other modal
+ * @param {boolean} [props.dismissOnOutsideClick] - Whether an outside click closes the modal (default true)
  * @param {import('react').ReactNode} props.children - Modal body content
  */
 export default function ModalShell({
@@ -73,16 +72,17 @@ export default function ModalShell({
     footer,
     footerClassName,
     onCloseAutoFocus,
-    dismissOnOutsideClick = false,
+    dismissOnOutsideClick = true,
     children,
 }) {
     const isDesktop = useIsDesktop();
     const handleOpenChange = (isOpen) => !isOpen && onClose();
+    const onPointerDownOutside = dismissOnOutsideClick ? undefined : blockOutsideDismiss;
 
     if (variant === 'alert') {
         return (
             <AlertDialog open={open} onOpenChange={handleOpenChange}>
-                <AlertDialogContent onPointerDownOutside={blockOutsideDismiss}>
+                <AlertDialogContent onPointerDownOutside={onPointerDownOutside}>
                     <AlertDialogHeader>
                         <AlertDialogTitle>{title}</AlertDialogTitle>
                         {description && (
@@ -111,7 +111,7 @@ export default function ModalShell({
                     }
                     onOpenAutoFocus={(event) => event.preventDefault()}
                     onCloseAutoFocus={onCloseAutoFocus}
-                    onPointerDownOutside={dismissOnOutsideClick ? undefined : blockOutsideDismiss}
+                    onPointerDownOutside={onPointerDownOutside}
                 >
                     <SheetHeader className={headerClassName}>
                         <SheetTitle className={titleClassName}>{title}</SheetTitle>
@@ -129,10 +129,10 @@ export default function ModalShell({
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
-                className="max-w-lg"
+                className={cn('sm:max-w-xl max-h-[90vh] overflow-y-auto', contentClassName)}
                 onOpenAutoFocus={(event) => event.preventDefault()}
                 onCloseAutoFocus={onCloseAutoFocus}
-                onPointerDownOutside={blockOutsideDismiss}
+                onPointerDownOutside={onPointerDownOutside}
             >
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>

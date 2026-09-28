@@ -2,26 +2,14 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
-import { Badge } from '@/components/ui/badge';
 import { useTagsQuery } from '@/hooks/useTagsQuery';
 import { addTagToTask, removeTagFromTask } from '@/actions/tag-actions';
 import { bustPageCache } from '@/lib/service-worker-cache';
-
-const TAG_NAME_MAX = 50;
+import TagComboboxField from '@/components/tag/TagComboboxField';
 
 /**
- * Tag pills for a task, with a popover combobox to attach existing space tags or create new ones.
+ * Tag pills for a task, backed by the real `addTagToTask`/`removeTagFromTask` server actions.
  * No permission gating - this page relies on the server rejection toast for every action already.
  *
  * @param {object} props
@@ -30,21 +18,12 @@ const TAG_NAME_MAX = 50;
  */
 export default function TaskTagPicker({ task, spaceId }) {
     const queryClient = useQueryClient();
-    const [open, setOpen] = useState(false);
-    const [query, setQuery] = useState('');
     const [pending, setPending] = useState(false);
+    const [removingKey, setRemovingKey] = useState(null);
     const { data: spaceTags = [] } = useTagsQuery(spaceId);
 
-    const taskTags = task.tags ?? [];
-    const taskTagIds = new Set(taskTags.map((tag) => tag.id));
-    const trimmedQuery = query.trim();
-    const suggestions = spaceTags.filter(
-        (tag) =>
-            !taskTagIds.has(tag.id) && tag.name.toLowerCase().includes(trimmedQuery.toLowerCase()),
-    );
-    const hasExactMatch = suggestions.some(
-        (tag) => tag.name.toLowerCase() === trimmedQuery.toLowerCase(),
-    );
+    const tags = (task.tags ?? []).map((tag) => ({ key: tag.id, name: tag.name }));
+    const suggestions = spaceTags.map((tag) => ({ key: tag.id, name: tag.name }));
 
     async function refreshTags() {
         await queryClient.invalidateQueries({ queryKey: ['tasks', task.list_id] });
@@ -60,8 +39,6 @@ export default function TaskTagPicker({ task, spaceId }) {
                 toast.error(result.error);
                 return;
             }
-            setQuery('');
-            setOpen(false);
             await refreshTags();
         } catch {
             toast.error('Could not reach the server. Try again.');
@@ -71,6 +48,7 @@ export default function TaskTagPicker({ task, spaceId }) {
     }
 
     async function handleRemove(tagId) {
+        setRemovingKey(tagId);
         try {
             const result = await removeTagFromTask({ taskId: task.id, tagId });
             if (result.error) {
@@ -80,64 +58,19 @@ export default function TaskTagPicker({ task, spaceId }) {
             await refreshTags();
         } catch {
             toast.error('Could not reach the server. Try again.');
+        } finally {
+            setRemovingKey(null);
         }
     }
 
     return (
-        <div className="flex flex-wrap items-center gap-1.5">
-            {taskTags.map((tag) => (
-                <Badge key={tag.id} variant="secondary" className="gap-1 pr-1">
-                    {tag.name}
-                    <button
-                        type="button"
-                        onClick={() => handleRemove(tag.id)}
-                        aria-label={`Remove tag ${tag.name}`}
-                        className="rounded-full p-0.5 hover:bg-foreground/10"
-                    >
-                        <X className="h-3 w-3" />
-                    </button>
-                </Badge>
-            ))}
-
-            <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                    <button
-                        type="button"
-                        disabled={pending}
-                        className="flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40"
-                    >
-                        <Plus className="h-3 w-3" />
-                        Tag
-                    </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-56 p-0">
-                    <Command shouldFilter={false}>
-                        <CommandInput
-                            value={query}
-                            onValueChange={setQuery}
-                            placeholder="Find or create a tag"
-                            maxLength={TAG_NAME_MAX}
-                        />
-                        <CommandList>
-                            <CommandEmpty>
-                                {trimmedQuery ? 'No matching tags' : 'Type to search or create'}
-                            </CommandEmpty>
-                            <CommandGroup>
-                                {suggestions.map((tag) => (
-                                    <CommandItem key={tag.id} onSelect={() => handleAdd(tag.name)}>
-                                        {tag.name}
-                                    </CommandItem>
-                                ))}
-                                {trimmedQuery && !hasExactMatch && (
-                                    <CommandItem onSelect={() => handleAdd(trimmedQuery)}>
-                                        Create &quot;{trimmedQuery}&quot;
-                                    </CommandItem>
-                                )}
-                            </CommandGroup>
-                        </CommandList>
-                    </Command>
-                </PopoverContent>
-            </Popover>
-        </div>
+        <TagComboboxField
+            tags={tags}
+            suggestions={suggestions}
+            onAdd={handleAdd}
+            onRemove={handleRemove}
+            addPending={pending}
+            removingKey={removingKey}
+        />
     );
 }

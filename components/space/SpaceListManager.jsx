@@ -23,7 +23,7 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/ui/loader';
@@ -38,7 +38,7 @@ import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
 import JoinSpaceDialog from './JoinSpaceDialog';
 import SpaceSharingSection from './SpaceSharingSection';
-import StatusManager from '@/components/status/StatusManager';
+import SpaceSettingsSheet from './SpaceSettingsSheet';
 import { bustPageCache } from '@/lib/service-worker-cache';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
@@ -139,7 +139,7 @@ function SpaceSection({
     onDeleteListRequest,
     onLeaveSpaceRequest,
 }) {
-    const [statusesOpen, setStatusesOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
     const [sharingOpen, setSharingOpen] = useState(false);
     const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
     // Guests cannot share; the button stays hidden until the profile confirms a registered user
@@ -185,7 +185,7 @@ function SpaceSection({
                                     variant="outline"
                                     className="border-metric/25 bg-metric/15 text-metric"
                                 >
-                                    {PERMISSION_LEVEL_LABELS[space.my_permission_level]}
+                                    {PERMISSION_LEVEL_LABELS[space.my_permission_level]} access
                                 </Badge>
                             )}
                         </span>
@@ -242,15 +242,12 @@ function SpaceSection({
             <div className="flex items-center gap-1 border-t border-border px-2 py-1.5">
                 <button
                     type="button"
-                    onClick={() => setStatusesOpen((open) => !open)}
+                    onClick={() => setSettingsOpen(true)}
                     className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+                    aria-label="Space settings"
                 >
-                    Statuses
-                    {statusesOpen ? (
-                        <ChevronUp className="h-3 w-3" />
-                    ) : (
-                        <ChevronDown className="h-3 w-3" />
-                    )}
+                    <Settings className="h-3 w-3" />
+                    Settings
                 </button>
                 {canShareSpace && (
                     <button
@@ -277,11 +274,13 @@ function SpaceSection({
                 )}
             </div>
 
-            {statusesOpen && (
-                <div className="border-t border-border px-3 py-3">
-                    <StatusManager spaceId={space.id} />
-                </div>
-            )}
+            <SpaceSettingsSheet
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+                spaceId={space.id}
+                spaceName={space.name}
+                isOwner={isOwner}
+            />
 
             {canShareSpace && sharingOpen && (
                 <div className="border-t border-border px-3 py-3">

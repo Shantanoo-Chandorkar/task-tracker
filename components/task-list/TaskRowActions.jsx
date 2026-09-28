@@ -410,7 +410,6 @@ export default function TaskRowActions({
                 open={moveSheetOpen}
                 onClose={() => setMoveSheetOpen(false)}
                 variant="sheet"
-                dismissOnOutsideClick
                 title="Move to..."
                 contentClassName="max-h-[70vh] overflow-y-auto"
             >

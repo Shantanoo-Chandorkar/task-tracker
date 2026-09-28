@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
 import CharLimitField from '@/components/ui/CharLimitField';
+import LabeledField from '@/components/ui/LabeledField';
 import {
     Select,
     SelectContent,
@@ -96,18 +97,20 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
                     </div>
                 </CharLimitField>
 
-                <Select value={spaceId} onValueChange={setSpaceId} disabled={submitting}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select a space..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {spaces.map((space) => (
-                            <SelectItem key={space.id} value={space.id}>
-                                {space.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <LabeledField label="Space">
+                    <Select value={spaceId} onValueChange={setSpaceId} disabled={submitting}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a space..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {spaces.map((space) => (
+                                <SelectItem key={space.id} value={space.id}>
+                                    {space.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </LabeledField>
             </form>
         </ModalShell>
     );

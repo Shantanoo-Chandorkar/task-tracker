@@ -20,7 +20,7 @@ import TaskRowTags from './TaskRowTags';
 import TaskRowActions from './TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import CompleteTaskDialog from './CompleteTaskDialog';
-import DepthWarning from './DepthWarning';
+import LimitWarning from './LimitWarning';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
@@ -49,8 +49,17 @@ export function PriorityTierDivider() {
  * @param {string} props.listId - The list this task tree belongs to
  * @param {string|null} [props.currentUserId] - Caller's user id, for row-level ownership checks
  * @param {'owner'|'full'|'restricted'|'read_only'|null} [props.myPermission] - Caller's tier for this space
+ * @param {number|null} [props.maxSubtasksPerParent] - Space's direct-subtask cap, or null for no limit
  */
-function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission }) {
+function TaskRow({
+    task,
+    depth,
+    flatList,
+    listId,
+    currentUserId,
+    myPermission,
+    maxSubtasksPerParent,
+}) {
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
     const expandKey = `task-row:${task.id}`;
     const isExpanded = useUIFlag(expandKey);
@@ -70,8 +79,14 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
     };
 
     const hasChildren = task.children && task.children.length > 0;
+    const directChildCount = task.children?.length ?? 0;
+    const isSubtaskCapReached =
+        maxSubtasksPerParent != null && directChildCount >= maxSubtasksPerParent;
+    const isOverSubtaskCap =
+        maxSubtasksPerParent != null && directChildCount > maxSubtasksPerParent;
     // MAX_DEPTH_CONSTANT
-    const canAddSubtask = !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH);
+    const canAddSubtask =
+        !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH) && !isSubtaskCapReached;
     const recurringLabel = useMemo(
         () => (task.is_recurring ? humanReadableLabel(task.recurrence_rule) : null),
         [task.is_recurring, task.recurrence_rule],
@@ -227,6 +242,15 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
                 />
             </div>
 
+            {/* Not dismissible - a space's subtask cap must stay visible until it's actually resolved. */}
+            {isOverSubtaskCap && (
+                <div style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth})` }}>
+                    <LimitWarning
+                        message={`This task has ${directChildCount} subtasks, over this space's limit of ${maxSubtasksPerParent}. Remove some or raise the limit before adding more.`}
+                    />
+                </div>
+            )}
+
             {/* A subtask is just a task, so it reuses the same create dialog as "New Task". */}
             <TaskFormDialog
                 open={addSubtaskOpen}
@@ -252,7 +276,13 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
                     style={{ marginLeft: `calc(var(--row-indent, 24px) * ${depth} + 20px)` }}
                 >
                     {/* Depth warning shown before children one level past the max. MAX_DEPTH_CONSTANT */}
-                    {depth === FINITE_MAX_DEPTH + 1 && <DepthWarning />}
+                    {depth === FINITE_MAX_DEPTH + 1 && (
+                        <LimitWarning
+                            message="Tasks are 4+ levels deep. Consider breaking this into separate top-level tasks for clarity."
+                            dismissible
+                            dismissKey="depth_warning_dismissed"
+                        />
+                    )}
 
                     <SortableContext
                         items={task.children.map((child) => child.id)}
@@ -270,6 +300,7 @@ function TaskRow({ task, depth, flatList, listId, currentUserId, myPermission })
                                     listId={listId}
                                     currentUserId={currentUserId}
                                     myPermission={myPermission}
+                                    maxSubtasksPerParent={maxSubtasksPerParent}
                                 />
                             </Fragment>
                         ))}

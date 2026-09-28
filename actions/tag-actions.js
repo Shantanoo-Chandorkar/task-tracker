@@ -7,7 +7,15 @@ import {
     getSpaceIdForTask,
     resolveSpacePermission,
     blockWriteForPermission,
+    blockCreateForPermission,
 } from '@/lib/permissions/space-permissions';
+import {
+    TAG_ID_REQUIRED,
+    TAG_NOT_FOUND,
+    TAG_SPACE_ID_REQUIRED,
+    TAG_DELETE_FAILED,
+    TAG_ALREADY_ON_TASK,
+} from '@/lib/error-codes';
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -47,7 +55,7 @@ async function findOrCreateTag(supabase, spaceId, name, userId) {
  * @param {object} fields
  * @param {string} fields.taskId - Task to tag
  * @param {string} fields.name - Tag name, matched case-insensitively against existing tags
- * @returns {{ data: { id: string, name: string }|null, error: string|null }}
+ * @returns {{ data: { id: string, name: string }|null, error: string|null, code: string|undefined }}
  */
 export const addTagToTask = withAuthenticatedAction(
     '[tags] add to task',
@@ -92,7 +100,14 @@ export const addTagToTask = withAuthenticatedAction(
             .from('task_tags')
             .insert({ task_id: fields.taskId, tag_id: tagId });
 
-        if (attachError && attachError.code !== UNIQUE_VIOLATION) {
+        if (attachError) {
+            if (attachError.code === UNIQUE_VIOLATION) {
+                return {
+                    data: null,
+                    error: 'This tag is already on this task',
+                    code: TAG_ALREADY_ON_TASK,
+                };
+            }
             return { data: null, error: 'Failed to tag task' };
         }
 
@@ -140,6 +155,82 @@ export const removeTagFromTask = withAuthenticatedAction(
         if (error) return { error: 'Failed to remove tag' };
 
         return { error: null };
+    },
+    { hasData: false },
+);
+
+/**
+ * Deletes a tag entity from a space entirely.
+ *
+ * `task_tags` cascades, so every task using it loses the tag automatically.
+ *
+ * @param {string} tagId - Tag id to delete
+ * @returns {{ error: string|null, code: string|null }}
+ */
+export const deleteTag = withAuthenticatedAction(
+    '[tags] delete',
+    'Unexpected error deleting tag',
+    async (user, supabase, tagId) => {
+        if (!tagId) return { error: 'Tag ID is required', code: TAG_ID_REQUIRED };
+
+        const { data: target } = await supabase
+            .from('tags')
+            .select('space_id, created_by')
+            .eq('id', tagId)
+            .maybeSingle();
+
+        if (!target) return { error: 'Tag not found', code: TAG_NOT_FOUND };
+
+        const permissionLevel = await resolveSpacePermission(supabase, target.space_id, user.id);
+        const permissionBlock = blockWriteForPermission(permissionLevel, {
+            isOwnRow: target.created_by === user.id,
+        });
+        if (permissionBlock) return permissionBlock;
+
+        const { data: deletedTag, error } = await supabase
+            .from('tags')
+            .delete()
+            .eq('id', tagId)
+            .select()
+            .maybeSingle();
+
+        if (error || !deletedTag) return { error: 'Tag not found', code: TAG_NOT_FOUND };
+
+        return { error: null, code: null };
+    },
+    { hasData: false },
+);
+
+/**
+ * Deletes every tag in a space.
+ *
+ * Permission is checked once for the whole action (like creating a tag), not per row.
+ * RLS still filters the delete per caller, so a restricted wipe only removes own tags.
+ *
+ * @param {string} spaceId - Space to clear all tags from
+ * @returns {{ count: number, error: string|null, code: string|null }}
+ */
+export const deleteAllTagsInSpace = withAuthenticatedAction(
+    '[tags] delete all in space',
+    'Unexpected error deleting tags',
+    async (user, supabase, spaceId) => {
+        if (!spaceId) {
+            return { count: 0, error: 'Space ID is required', code: TAG_SPACE_ID_REQUIRED };
+        }
+
+        const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
+        const permissionBlock = blockCreateForPermission(permissionLevel);
+        if (permissionBlock) return { count: 0, ...permissionBlock };
+
+        const { data: deletedTags, error } = await supabase
+            .from('tags')
+            .delete()
+            .eq('space_id', spaceId)
+            .select('id');
+
+        if (error) return { count: 0, error: 'Failed to delete tags', code: TAG_DELETE_FAILED };
+
+        return { count: deletedTags?.length ?? 0, error: null, code: null };
     },
     { hasData: false },
 );

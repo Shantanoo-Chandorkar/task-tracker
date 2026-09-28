@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
 import CharLimitField from '@/components/ui/CharLimitField';
+import LabeledField from '@/components/ui/LabeledField';
 import {
     Select,
     SelectContent,
@@ -81,20 +82,22 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
         >
             <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
                 {isGlobalMode && (
-                    <Select value={selectedListId} onValueChange={setSelectedListId}>
-                        <SelectTrigger className="w-full" disabled={submitting}>
-                            <SelectValue placeholder="Select list" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {lists.map((list) => (
-                                <SelectItem key={list.id} value={list.id}>
-                                    {spaceNameById.get(list.space_id)
-                                        ? `${spaceNameById.get(list.space_id)} / ${list.name}`
-                                        : list.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <LabeledField label="List">
+                        <Select value={selectedListId} onValueChange={setSelectedListId}>
+                            <SelectTrigger className="w-full" disabled={submitting}>
+                                <SelectValue placeholder="Select list" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {lists.map((list) => (
+                                    <SelectItem key={list.id} value={list.id}>
+                                        {spaceNameById.get(list.space_id)
+                                            ? `${spaceNameById.get(list.space_id)} / ${list.name}`
+                                            : list.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </LabeledField>
                 )}
 
                 <CharLimitField
