@@ -6,6 +6,8 @@ import ModalShell from '@/components/ui/modal-shell';
 import StatusManager from '@/components/status/StatusManager';
 import TagManager from '@/components/tag/TagManager';
 import SpacePreferencesSection from '@/components/space/SpacePreferencesSection';
+import WebhookSettingsSection from '@/components/webhook/WebhookSettingsSection';
+import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
 
 /**
  * One collapsible section of the settings sheet. Only one section is open at a time.
@@ -46,6 +48,9 @@ function SettingsSection({ title, isOpen, onToggle, children }) {
  */
 export default function SpaceSettingsSheet({ open, onClose, spaceId, spaceName, isOwner }) {
     const [openSection, setOpenSection] = useState(null);
+    const { data: profile } = useCurrentUserProfileQuery();
+    // Guests cannot use webhooks, and the section stays hidden until the profile confirms a registered user
+    const canManageWebhooks = isOwner && profile?.is_guest === false;
 
     function toggleSection(sectionKey) {
         setOpenSection((current) => (current === sectionKey ? null : sectionKey));
@@ -75,6 +80,15 @@ export default function SpaceSettingsSheet({ open, onClose, spaceId, spaceName, 
                 >
                     <SpacePreferencesSection spaceId={spaceId} isOwner={isOwner} />
                 </SettingsSection>
+                {canManageWebhooks && (
+                    <SettingsSection
+                        title="Webhooks"
+                        isOpen={openSection === 'webhooks'}
+                        onToggle={() => toggleSection('webhooks')}
+                    >
+                        <WebhookSettingsSection spaceId={spaceId} />
+                    </SettingsSection>
+                )}
             </div>
         </ModalShell>
     );
