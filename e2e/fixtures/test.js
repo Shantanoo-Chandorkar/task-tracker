@@ -21,8 +21,21 @@ export async function loginAs(page, user) {
 
 /**
  * Extends the base test with a `testUser` fixture - throwaway account created and torn down around each test.
+ * Also hides Next's dev-tools badge, whose position is saved in .next and can cover app buttons.
  */
 export const test = base.extend({
+    context: async ({ context }, use) => {
+        await context.addInitScript(() => {
+            const hideDevToolsOverlay = () => {
+                const style = document.createElement('style');
+                style.textContent = 'nextjs-portal { display: none !important; }';
+                document.documentElement.appendChild(style);
+            };
+            if (document.documentElement) hideDevToolsOverlay();
+            else document.addEventListener('DOMContentLoaded', hideDevToolsOverlay, { once: true });
+        });
+        await use(context);
+    },
     testUser: async ({}, use) => {
         const user = await createTestUser();
         await use(user);
