@@ -5,6 +5,8 @@ import {
     createList,
     createSublist,
     createStatus,
+    openStatusSettings,
+    statusFormDialog,
     createTask,
     spaceSection,
     startGuestSession,
@@ -100,16 +102,12 @@ test.describe('guest mode', () => {
         await sublistDialog.getByRole('button', { name: 'Cancel' }).click();
 
         await page.goto('/spaces');
-        await spaceSection(page, GUEST_SPACE_NAME)
-            .getByRole('button', { name: 'Statuses' })
-            .click();
+        const sheet = await openStatusSettings(page, GUEST_SPACE_NAME);
         for (let statusCount = 0; statusCount < 5; statusCount++) {
-            await createStatus(page, GUEST_SPACE_NAME);
+            await createStatus(page, sheet);
         }
-        await spaceSection(page, GUEST_SPACE_NAME)
-            .getByRole('button', { name: '+ Add status' })
-            .click();
-        const statusDialog = page.getByRole('dialog');
+        await sheet.getByRole('button', { name: '+ Add status' }).click();
+        const statusDialog = statusFormDialog(page);
         await statusDialog.getByPlaceholder('Status name').fill(uniqueName('Status'));
         await statusDialog.getByRole('button', { name: 'Create status' }).click();
         await expect(
