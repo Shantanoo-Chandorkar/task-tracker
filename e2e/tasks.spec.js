@@ -194,7 +194,7 @@ test.describe('tasks', () => {
         await expect(moveSheet).toBeVisible();
 
         // The sheet's own content sits over the bottom ~70vh - the overlay is only reachable near the top.
-        await page.locator('[data-slot="sheet-overlay"]').click({ position: { x: 20, y: 20 } });
+        await page.locator('[data-slot="sheet-overlay"]').click({ position: { x: 200, y: 20 } });
         await expect(moveSheet).toBeHidden();
     });
 
@@ -290,9 +290,46 @@ test.describe('tasks', () => {
         await page.keyboard.press('Escape');
     });
 
+    test('pills sit below the title and never overflow the row, at every depth', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page, { title: uniqueName('Task'), recurring: true });
+        const childTitle = await addSubtask(page, taskRow(page, parentTitle));
+
+        for (const title of [parentTitle, childTitle]) {
+            const row = taskRow(page, title);
+            const titleBox = await row
+                .getByRole('link', { name: title, exact: true })
+                .boundingBox();
+            const statusBox = await row.getByRole('combobox').boundingBox();
+            const rowBox = await row.boundingBox();
+
+            // Status is the row's last control, so it must end inside the row - never past its right edge.
+            expect(statusBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height);
+            expect(statusBox.x + statusBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+        }
+
+        const pillBox = await taskRow(page, parentTitle)
+            .getByRole('button', { name: 'Weekly', exact: true })
+            .boundingBox();
+        const parentTitleBox = await taskRow(page, parentTitle)
+            .getByRole('link', { name: parentTitle, exact: true })
+            .boundingBox();
+        expect(pillBox.y).toBeGreaterThanOrEqual(parentTitleBox.y + parentTitleBox.height);
+    });
+
     test('a recurring task computes its next occurrence on creation', async ({ page }) => {
         const title = await createTask(page, { title: uniqueName('Task'), recurring: true });
-        await expect(taskRow(page, title).getByText('Recurring')).toBeVisible();
+        const frequencyPill = taskRow(page, title).getByRole('button', {
+            name: 'Weekly',
+            exact: true,
+        });
+        await expect(frequencyPill).toBeVisible();
+
+        await frequencyPill.click();
+        await expect(page.getByRole('heading', { name: 'Repeats', exact: true })).toBeVisible();
+        await expect(page.getByText('every week', { exact: true })).toBeVisible();
+        await page.keyboard.press('Escape');
 
         const response = await page.request.get(`/api/tasks?list_id=${listId}`);
         const tasks = await response.json();
