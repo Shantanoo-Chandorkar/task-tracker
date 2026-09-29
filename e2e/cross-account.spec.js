@@ -5,6 +5,7 @@ import {
     createList,
     createSublist,
     createStatus,
+    openStatusSettings,
     createTask,
     spaceSection,
 } from './fixtures/app-data.js';
@@ -162,8 +163,8 @@ test.describe('cross-account data isolation', () => {
             .select('id')
             .eq('name', spaceName)
             .single();
-        await spaceSection(page, spaceName).getByRole('button', { name: 'Statuses' }).click();
-        const statusName = await createStatus(page, spaceName);
+        const sheet = await openStatusSettings(page, spaceName);
+        const statusName = await createStatus(page, sheet);
         const { data: status } = await adminClient()
             .from('statuses')
             .select('id')

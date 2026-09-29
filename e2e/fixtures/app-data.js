@@ -113,36 +113,55 @@ export async function createSublist(page, spaceName, listName, name = uniqueName
 }
 
 /**
- * Locates a single status's own row within its space's (already-expanded) Statuses panel.
+ * Opens a space's settings sheet and expands its Statuses section.
+ * This helper is the only opener of both toggles - neither is idempotent (docs/e2e-test-quality.md #3).
  *
- * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').Page} page - Already on /spaces.
  * @param {string} spaceName
- * @param {string} statusName
- * @returns {import('@playwright/test').Locator}
+ * @returns {Promise<import('@playwright/test').Locator>} The settings sheet.
  */
-export function statusRow(page, spaceName, statusName) {
-    return spaceSection(page, spaceName)
-        .locator('[class*="py-2.5"]')
-        .filter({ hasText: statusName });
+export async function openStatusSettings(page, spaceName) {
+    await spaceSection(page, spaceName).getByRole('button', { name: 'Space settings' }).click();
+    const sheet = page.getByRole('dialog');
+    await sheet.getByRole('button', { name: 'Statuses', exact: true }).click();
+    return sheet;
 }
 
 /**
- * Creates a status under an existing space.
+ * Locates the create/edit status form, which opens on top of the settings sheet.
  *
- * Caller must have already expanded the Statuses panel - clicking the toggle again would close it.
+ * @param {import('@playwright/test').Page} page
+ * @returns {import('@playwright/test').Locator}
+ */
+export function statusFormDialog(page) {
+    return page.getByRole('dialog').filter({ has: page.getByPlaceholder('Status name') });
+}
+
+/**
+ * Locates one status row inside the open settings sheet.
  *
- * @param {import('@playwright/test').Page} page - Already on /spaces.
- * @param {string} spaceName - Name of the space to add the status under.
+ * @param {import('@playwright/test').Locator} sheet - From openStatusSettings.
+ * @param {string} statusName
+ * @returns {import('@playwright/test').Locator}
+ */
+export function statusRow(sheet, statusName) {
+    return sheet.locator('[class*="py-2.5"]').filter({ hasText: statusName });
+}
+
+/**
+ * Creates a status through the open settings sheet's "+ Add status" form.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').Locator} sheet - From openStatusSettings, Statuses section expanded.
  * @param {string} [name] - Defaults to a generated unique name.
  * @returns {Promise<string>} The status's name.
  */
-export async function createStatus(page, spaceName, name = uniqueName('Status')) {
-    await spaceSection(page, spaceName).getByRole('button', { name: '+ Add status' }).click();
-    await submitDialog(page, {
-        placeholder: 'Status name',
-        value: name,
-        submitName: 'Create status',
-    });
+export async function createStatus(page, sheet, name = uniqueName('Status')) {
+    await sheet.getByRole('button', { name: '+ Add status' }).click();
+    const form = statusFormDialog(page);
+    await form.getByPlaceholder('Status name').fill(name);
+    await form.getByRole('button', { name: 'Create status' }).click();
+    await expect(form).toBeHidden();
     return name;
 }
 

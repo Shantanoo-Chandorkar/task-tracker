@@ -15,11 +15,19 @@ import {
 import { getCurrentUser } from '@/lib/auth/session';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
+import { toTaskRateLimitResult } from '@/lib/task-rate-limit';
 import {
     NOT_AUTHENTICATED,
     TASK_INVALID_PRIORITY,
     TASK_DUE_DATE_REQUIRED,
     TASK_SUBTASK_CAP_REACHED,
+    TASK_MOVE_CYCLE,
+    TASK_MOVE_FORBIDDEN_DESCENDANTS,
+    TASK_MOVE_FAILED,
+    TASK_NOT_FOUND,
+    TASK_DUPLICATE_FAILED,
+    TASK_REPARENT_FORBIDDEN_CHILDREN,
+    TASK_REPARENT_DELETE_FAILED,
 } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength, sanitizeRichText } from '@/lib/validation';
 import {
@@ -213,6 +221,8 @@ export const createTask = withAuthenticatedAction(
             });
             const guestLimitResult = toGuestLimitResult(error);
             if (guestLimitResult) return { data: null, ...guestLimitResult };
+            const rateLimitResult = toTaskRateLimitResult(error);
+            if (rateLimitResult) return { data: null, ...rateLimitResult };
             return { data: null, error: 'Failed to create task' };
         }
 
@@ -384,6 +394,8 @@ export const updateTask = withAuthenticatedAction(
                 code: error?.code,
                 detail: error?.message,
             });
+            const rateLimitResult = toTaskRateLimitResult(error);
+            if (rateLimitResult) return { data: null, ...rateLimitResult };
             return { data: null, error: 'Failed to update task' };
         }
 
@@ -433,7 +445,7 @@ export const completeTaskAndDescendants = withAuthenticatedAction(
                 code: error.code,
                 detail: error.message,
             });
-            return { error: 'Failed to mark tasks complete' };
+            return toTaskRateLimitResult(error) ?? { error: 'Failed to mark tasks complete' };
         }
 
         const completedCount = updatedRows?.length ?? 0;
@@ -486,7 +498,7 @@ export const uncompleteTaskAndDescendants = withAuthenticatedAction(
                 code: error.code,
                 detail: error.message,
             });
-            return { error: 'Failed to mark tasks incomplete' };
+            return toTaskRateLimitResult(error) ?? { error: 'Failed to mark tasks incomplete' };
         }
 
         const uncompletedCount = updatedRows?.length ?? 0;
@@ -539,7 +551,7 @@ export const deleteTask = withAuthenticatedAction(
             .maybeSingle();
 
         if (error || !deletedTask) {
-            return { error: 'Task not found' };
+            return toTaskRateLimitResult(error) ?? { error: 'Task not found' };
         }
 
         return { error: null };
@@ -548,11 +560,8 @@ export const deleteTask = withAuthenticatedAction(
 );
 
 /**
- * Deletes a task and re-parents its direct children to the deleted task's parent.
- * Children are spliced into the sibling list at the exact position where the deleted task sat.
- * Grandchildren (and deeper) remain attached to their own parents - only the top-level link is re-wired.
- *
- * Must re-parent BEFORE deleting to prevent the DB cascade from wiping the children first.
+ * Deletes a task and re-parents its direct children to the deleted task's parent, in one database transaction.
+ * Children take the gap where the deleted task sat; deeper descendants stay attached to their own parents.
  *
  * @param {string} taskId - ID of the task to delete
  * @returns {{ error: string|null }}
@@ -565,7 +574,7 @@ export const deleteTaskAndReparentChildren = withAuthenticatedAction(
 
         const { data: task, error: taskError } = await supabase
             .from('tasks')
-            .select('id, parent_id, position, depth, created_by, lists(space_id)')
+            .select('created_by, lists(space_id)')
             .eq('id', taskId)
             .single();
 
@@ -581,89 +590,45 @@ export const deleteTaskAndReparentChildren = withAuthenticatedAction(
         });
         if (permissionBlock) return permissionBlock;
 
-        const { data: directChildren = [] } = await supabase
-            .from('tasks')
-            .select('id, position, depth')
-            .eq('parent_id', taskId)
-            .order('position', { ascending: true });
-
-        const siblingsQuery = task.parent_id
-            ? supabase
-                  .from('tasks')
-                  .select('id, position')
-                  .eq('parent_id', task.parent_id)
-                  .neq('id', taskId)
-                  .order('position', { ascending: true })
-            : supabase
-                  .from('tasks')
-                  .select('id, position')
-                  .is('parent_id', null)
-                  .neq('id', taskId)
-                  .order('position', { ascending: true });
-
-        const { data: siblings = [] } = await siblingsQuery;
-
-        const insertIndex = siblings.filter((sibling) => sibling.position < task.position).length;
-        const newSiblingOrder = [
-            ...siblings.slice(0, insertIndex),
-            ...directChildren,
-            ...siblings.slice(insertIndex),
-        ];
-
-        // Whole-integer positions avoid accumulating float precision loss from fractional-index math
-        const positionUpdates = newSiblingOrder.map((sibling, index) => ({
-            id: sibling.id,
-            position: index + 1,
-        }));
-
-        for (const child of directChildren) {
-            // task.parent_id may be null here, which correctly re-roots the child at the top level
-            await supabase
-                .from('tasks')
-                .update({ parent_id: task.parent_id, depth: task.depth })
-                .eq('id', child.id);
-
-            // Depth delta is -1: the child moved from depth (task.depth + 1) up to task.depth
-            const { data: descendants = [] } = await supabase
-                .from('tasks')
-                .select('id, depth')
-                .eq('parent_id', child.id);
-
-            const queue = [...descendants];
-            while (queue.length > 0) {
-                const node = queue.shift();
-                await supabase
-                    .from('tasks')
-                    .update({ depth: node.depth - 1 })
-                    .eq('id', node.id);
-
-                const { data: grandchildren = [] } = await supabase
-                    .from('tasks')
-                    .select('id, depth')
-                    .eq('parent_id', node.id);
-
-                queue.push(...grandchildren);
-            }
-        }
-
-        for (const update of positionUpdates) {
-            await supabase.from('tasks').update({ position: update.position }).eq('id', update.id);
-        }
-
-        // Cascade now only reaches tasks still below the direct children, already re-parented away above
-        const { data: deletedTask, error: deleteError } = await supabase
-            .from('tasks')
-            .delete()
-            .eq('id', taskId)
-            .select()
-            .maybeSingle();
-
-        if (deleteError || !deletedTask) return { error: 'Task not found' };
+        // One transaction: children are moved up and the task deleted together, so a failure changes nothing.
+        const { error: reparentDeleteError } = await supabase.rpc('delete_task_reparent_children', {
+            p_task_id: taskId,
+        });
+        if (reparentDeleteError) return toReparentDeleteFailure(taskId, reparentDeleteError);
 
         return { error: null };
     },
     { hasData: false },
 );
+
+/**
+ * Maps a delete_task_reparent_children database error to a stable code; unrecognised errors are logged.
+ *
+ * @param {string} taskId - Task whose delete failed, for the log line
+ * @param {{ code?: string, message?: string }} reparentDeleteError - Error returned by the rpc call
+ * @returns {{ error: string, code: string }} User-safe message and stable code
+ */
+function toReparentDeleteFailure(taskId, reparentDeleteError) {
+    const rateLimitResult = toTaskRateLimitResult(reparentDeleteError);
+    if (rateLimitResult) return rateLimitResult;
+    if (reparentDeleteError.message?.includes('TASK_NOT_FOUND')) {
+        return { error: 'Task not found', code: TASK_NOT_FOUND };
+    }
+    if (reparentDeleteError.message?.includes(TASK_SUBTASK_CAP_REACHED)) {
+        return {
+            error: 'Deleting this task would give its parent more subtasks than this space allows',
+            code: TASK_SUBTASK_CAP_REACHED,
+        };
+    }
+    if (reparentDeleteError.message?.includes(TASK_REPARENT_FORBIDDEN_CHILDREN)) {
+        return {
+            error: "You can't delete this task while keeping subtasks you aren't allowed to edit",
+            code: TASK_REPARENT_FORBIDDEN_CHILDREN,
+        };
+    }
+    console.error('[tasks] reparent-delete failed', { taskId, dbCode: reparentDeleteError.code });
+    return { error: 'Failed to delete task', code: TASK_REPARENT_DELETE_FAILED };
+}
 
 /**
  * Duplicates a task and its whole subtree, inserting the copy as the next
@@ -742,95 +707,37 @@ export async function duplicateTask(taskId) {
         const nextSibling = siblings.find((sibling) => sibling.position > task.position);
         const newPosition = getPositionBetween(task.position, nextSibling?.position ?? null);
 
-        await insertSnapshotNode(
-            supabase,
-            snapshot,
-            task.parent_id,
-            true,
-            task.list_id,
-            user.id,
-            task.sublist_id,
-            newPosition,
-        );
+        // One transaction and one INSERT, so a failure never leaves a half-copied subtree.
+        const { error: duplicateError } = await supabase.rpc('duplicate_task_subtree', {
+            p_task_id: taskId,
+            p_new_root_position: newPosition,
+        });
+        if (duplicateError) return toDuplicateTaskFailure(taskId, duplicateError);
 
         return { error: null };
     } catch (thrown) {
         console.error('[tasks] duplicate threw', { taskId, detail: thrown?.message });
-        const guestLimitResult = toGuestLimitResult(thrown);
-        if (guestLimitResult) return guestLimitResult;
-        return { error: 'Failed to duplicate task' };
+        return { error: 'Failed to duplicate task', code: TASK_DUPLICATE_FAILED };
     }
 }
 
 /**
- * Recursively inserts a single snapshot node and its descendants.
- * Called by duplicateTask - not exported.
+ * Maps a duplicate_task_subtree database error to a stable code; anything unrecognised is logged and kept generic.
  *
- * @param {object} supabase - Supabase client
- * @param {object} node - Snapshot node with optional children array
- * @param {string|null} parentId - Parent ID for this insertion
- * @param {boolean} isRoot - Whether this is the root of the duplicated subtree
- * @param {string} listId - List the inserted copy belongs to
- * @param {string} createdBy - User id to attribute every inserted node (root and descendants) to
- * @param {string|null} [sublistId] - Sublist for the root node only; ignored for children
- * @param {number|null} [explicitPosition] - Exact position to use for the root node, if given
+ * @param {string} taskId - Task whose duplication failed, for the log line
+ * @param {{ code?: string, message?: string }} duplicateError - Error returned by the rpc call
+ * @returns {{ error: string, code: string }} User-safe message and stable code
  */
-async function insertSnapshotNode(
-    supabase,
-    node,
-    parentId,
-    isRoot,
-    listId,
-    createdBy,
-    sublistId = null,
-    explicitPosition = null,
-) {
-    let depth = 0;
-    if (parentId) {
-        const { data: parent } = await supabase
-            .from('tasks')
-            .select('depth')
-            .eq('id', parentId)
-            .single();
-        if (parent) depth = parent.depth + 1;
+function toDuplicateTaskFailure(taskId, duplicateError) {
+    const guestLimitResult = toGuestLimitResult(duplicateError);
+    if (guestLimitResult) return guestLimitResult;
+    const rateLimitResult = toTaskRateLimitResult(duplicateError);
+    if (rateLimitResult) return rateLimitResult;
+    if (duplicateError.message?.includes('TASK_NOT_FOUND')) {
+        return { error: 'Task not found', code: TASK_NOT_FOUND };
     }
-
-    let position;
-    if (isRoot && explicitPosition !== null) {
-        position = explicitPosition;
-    } else {
-        const filters = parentId
-            ? { parent_id: parentId }
-            : { list_id: listId, parent_id: null, sublist_id: sublistId ?? null };
-        position = await getNextPosition(supabase, 'tasks', filters, 1);
-    }
-
-    const newId = crypto.randomUUID();
-    const title = isRoot ? `${node.title} (copy)` : node.title;
-
-    const { error } = await supabase.from('tasks').insert({
-        id: newId,
-        title,
-        description: node.description ?? null,
-        status_id: node.status_id ?? null,
-        parent_id: parentId ?? null,
-        sublist_id: parentId ? null : isRoot ? (sublistId ?? null) : null,
-        list_id: listId,
-        position,
-        depth,
-        due_date: node.due_date ?? null,
-        is_recurring: node.is_recurring ?? false,
-        recurrence_rule: node.recurrence_rule ?? null,
-        next_occurrence: node.next_occurrence ?? null,
-        created_by: createdBy,
-    });
-
-    if (error) throw new Error('Failed to insert node: ' + error.message);
-
-    const children = node.children || [];
-    for (const child of children) {
-        await insertSnapshotNode(supabase, child, newId, false, listId, createdBy);
-    }
+    console.error('[tasks] duplicate failed', { taskId, dbCode: duplicateError.code });
+    return { error: 'Failed to duplicate task', code: TASK_DUPLICATE_FAILED };
 }
 
 /**
@@ -890,7 +797,6 @@ export const moveTask = withAuthenticatedAction(
         }
 
         const targetListId = listId ?? task.list_id;
-        const listChanged = targetListId !== task.list_id;
 
         if (sublistId && newParentId) {
             return { data: null, error: "A subtask can't belong to a sublist directly" };
@@ -926,16 +832,6 @@ export const moveTask = withAuthenticatedAction(
             if (maxCurrentDepth + depthDelta > FINITE_MAX_DEPTH) {
                 return { data: null, error: 'Move would exceed maximum nesting depth' };
             }
-        }
-
-        if (depthDelta !== 0 || listChanged) {
-            await updateDescendants(
-                supabase,
-                taskId,
-                depthDelta,
-                task.list_id,
-                listChanged ? targetListId : null,
-            );
         }
 
         // Root sublist target: explicit sublistId, else the promoted task's original root ancestor's sublist.
@@ -995,61 +891,45 @@ export const moveTask = withAuthenticatedAction(
             shouldPrependToStart,
         );
 
-        const { data: updatedTask, error } = await supabase
-            .from('tasks')
-            .update({
-                parent_id: newParentId ?? null,
-                sublist_id: newParentId ? null : resolvedSublistId,
-                depth: newDepth,
-                position: newPosition,
-                list_id: targetListId,
+        // One transaction for the subtree and the task itself, so a failure can never leave a half-moved tree.
+        const { data: movedTask, error: moveError } = await supabase
+            .rpc('move_task_subtree', {
+                p_task_id: taskId,
+                p_new_parent_id: newParentId ?? null,
+                p_new_sublist_id: newParentId ? null : resolvedSublistId,
+                p_new_depth: newDepth,
+                p_new_position: newPosition,
+                p_new_list_id: targetListId,
             })
-            .eq('id', taskId)
-            .select()
             .single();
 
-        if (error) {
-            return { data: null, error: 'Failed to move task' };
-        }
+        if (moveError) return { data: null, ...toMoveTaskFailure(taskId, moveError) };
 
-        return { data: updatedTask, error: null };
+        return { data: movedTask, error: null };
     },
 );
 
 /**
- * Cascades a depth delta (and list_id, if changing) to every descendant of a moved task.
+ * Maps a move_task_subtree database error to a stable code; anything unrecognised is logged and kept generic.
  *
- * @param {object} supabase - Supabase client
- * @param {string} taskId - Root of the subtree whose descendants need updating
- * @param {number} depthDelta - Amount to add to each descendant's current depth
- * @param {string} currentListId - List the subtree currently lives in, before the move
- * @param {string|null} newListId - List to move descendants into, or null if the list isn't changing
+ * @param {string} taskId - Task whose move failed, for the log line
+ * @param {{ code?: string, message?: string }} moveError - Error returned by the rpc call
+ * @returns {{ error: string, code: string }} User-safe message and stable code
  */
-async function updateDescendants(supabase, taskId, depthDelta, currentListId, newListId) {
-    const { data: allTasks } = await supabase
-        .from('tasks')
-        .select('id, parent_id, depth')
-        .eq('list_id', currentListId);
-    if (!allTasks) return;
-
-    const descendants = [];
-    const queue = [taskId];
-
-    while (queue.length > 0) {
-        const currentId = queue.shift();
-        const children = allTasks.filter((task) => task.parent_id === currentId);
-        for (const child of children) {
-            descendants.push(child);
-            queue.push(child.id);
-        }
+function toMoveTaskFailure(taskId, moveError) {
+    const rateLimitResult = toTaskRateLimitResult(moveError);
+    if (rateLimitResult) return rateLimitResult;
+    if (moveError.message?.includes(TASK_MOVE_CYCLE)) {
+        return { error: 'Cannot move a task into its own descendant', code: TASK_MOVE_CYCLE };
     }
-
-    // For v1 with typically shallow trees, individual updates are acceptable
-    for (const descendant of descendants) {
-        const updates = { depth: descendant.depth + depthDelta };
-        if (newListId) updates.list_id = newListId;
-        await supabase.from('tasks').update(updates).eq('id', descendant.id);
+    if (moveError.message?.includes(TASK_MOVE_FORBIDDEN_DESCENDANTS)) {
+        return {
+            error: "You can't move a task that contains subtasks you aren't allowed to edit",
+            code: TASK_MOVE_FORBIDDEN_DESCENDANTS,
+        };
     }
+    console.error('[tasks] move failed', { taskId, dbCode: moveError.code });
+    return { error: 'Failed to move task', code: TASK_MOVE_FAILED };
 }
 
 /**
