@@ -1,27 +1,18 @@
 'use client';
 
-import { Fragment, memo, useMemo, useState } from 'react';
+import { Fragment, memo, useState } from 'react';
 import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import {
-    Check,
-    ChevronDown,
-    ChevronRight,
-    Circle,
-    GripVertical,
-    RefreshCw,
-    Star,
-} from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Check, ChevronDown, ChevronRight, Circle, GripVertical, Star } from 'lucide-react';
 import StatusPicker from '@/components/status/StatusPicker';
 import TaskRowTags from './TaskRowTags';
+import TaskRowRecurrence from './TaskRowRecurrence';
 import TaskRowActions from './TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import CompleteTaskDialog from './CompleteTaskDialog';
 import LimitWarning from './LimitWarning';
-import { humanReadableLabel } from '@/lib/recurrence';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
@@ -87,10 +78,6 @@ function TaskRow({
     // MAX_DEPTH_CONSTANT
     const canAddSubtask =
         !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH) && !isSubtaskCapReached;
-    const recurringLabel = useMemo(
-        () => (task.is_recurring ? humanReadableLabel(task.recurrence_rule) : null),
-        [task.is_recurring, task.recurrence_rule],
-    );
 
     const {
         doneStatus,
@@ -110,9 +97,9 @@ function TaskRow({
         setComplete(task, flatList, listId, !taskIsDone);
     }
 
-    // Clicking empty row space (not a nested control) toggles expand/collapse, like the chevron.
+    // Only clicks on data-row-space wrappers toggle expand; portalled menu clicks bubble here but lack it.
     function handleRowClick(clickEvent) {
-        if (hasChildren && clickEvent.target === clickEvent.currentTarget) {
+        if (hasChildren && clickEvent.target.hasAttribute('data-row-space')) {
             toggleFlag(expandKey);
         }
     }
@@ -126,120 +113,128 @@ function TaskRow({
             {/* Task row - flat, hairline-separated: no per-row card background or radius */}
             <div
                 onClick={handleRowClick}
-                className="group flex items-center gap-1.5 py-2 px-2 border-b border-border/60 motion-safe:transition-colors duration-150 hover:bg-muted/50 cursor-default"
+                data-row-space
+                className="group flex items-start gap-1.5 py-2 px-2 border-b border-border/60 motion-safe:transition-colors duration-150 hover:bg-muted/50 cursor-pointer"
                 style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth})` }}
             >
-                {/* Drag handle - always visible (mobile has no hover to reveal it on) */}
-                <button
-                    {...listeners}
-                    {...attributes}
-                    className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground p-3 -m-3 flex-shrink-0 focus:outline-none"
-                    aria-label="Drag to reorder"
-                >
-                    <GripVertical className="h-3.5 w-3.5" />
-                </button>
-
-                {/* Hidden below lg - mobile operates entirely through the 3-dot menu, which has the same action */}
-                <button
-                    onClick={handleToggleComplete}
-                    disabled={!canToggleComplete}
-                    className={`hidden lg:flex flex-shrink-0 h-4 w-4 items-center justify-center rounded border motion-safe:transition-colors ${
-                        taskIsDone
-                            ? 'border-metric bg-metric text-background'
-                            : 'border-muted-foreground/40 hover:border-muted-foreground'
-                    } ${!canToggleComplete ? 'opacity-40' : ''}`}
-                    aria-label={taskIsDone ? 'Mark as incomplete' : 'Mark as complete'}
-                >
-                    {taskIsDone && <Check className="h-3 w-3" strokeWidth={3} />}
-                </button>
-
-                {/* Expand/collapse toggle */}
-                <button
-                    onClick={() => toggleFlag(expandKey)}
-                    className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground motion-safe:transition-colors"
-                    aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
-                >
-                    {hasChildren ? (
-                        isExpanded ? (
-                            <ChevronDown className="h-3 w-3 motion-safe:transition-transform duration-200" />
-                        ) : (
-                            <ChevronRight className="h-3 w-3 motion-safe:transition-transform duration-200" />
-                        )
-                    ) : (
-                        <Circle className="h-1.5 w-1.5 text-muted-foreground/40" />
-                    )}
-                </button>
-
-                {/* Hidden below lg - mobile operates entirely through the 3-dot menu, which has the same action */}
-                <button
-                    onClick={(clickEvent) => {
-                        clickEvent.stopPropagation();
-                        togglePriority(task);
-                    }}
-                    className="hidden lg:flex flex-shrink-0 items-center justify-center p-2 -m-2 focus:outline-none"
-                    aria-label={task.is_prioritised ? 'Remove from priority' : 'Put on priority'}
-                    aria-pressed={Boolean(task.is_prioritised)}
-                >
-                    <Star
-                        className={`h-3.5 w-3.5 motion-safe:transition-colors ${
-                            task.is_prioritised
-                                ? 'fill-amber-400 text-amber-400'
-                                : 'text-muted-foreground/40 hover:text-muted-foreground'
-                        }`}
-                    />
-                </button>
-
-                {/* Title opens the task page; clicking the empty space beside it toggles expand/collapse */}
-                <span
-                    onClick={handleRowClick}
-                    className={`flex-1 text-sm truncate min-w-0 flex items-center gap-1.5 ${
-                        taskIsDone ? 'text-muted-foreground line-through' : 'text-foreground'
-                    }`}
-                >
-                    <Link
-                        href={`/lists/${listId}/tasks/${task.id}`}
-                        className="truncate no-underline text-inherit"
+                {/* h-6 matches the 3-dot button so these controls centre on the title line, not the whole two-row block */}
+                <div data-row-space className="flex h-6 flex-shrink-0 items-center gap-1.5">
+                    {/* Drag handle - always visible (mobile has no hover to reveal it on) */}
+                    <button
+                        {...listeners}
+                        {...attributes}
+                        className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground p-3 -m-3 flex-shrink-0 focus:outline-none"
+                        aria-label="Drag to reorder"
                     >
-                        {task.title}
-                    </Link>
-                    {task.is_recurring && (
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/25 flex-shrink-0">
-                                        <RefreshCw className="h-2.5 w-2.5" />
-                                        Recurring
-                                    </span>
-                                </TooltipTrigger>
-                                {recurringLabel && (
-                                    <TooltipContent>
-                                        <p className="capitalize">{recurringLabel}</p>
-                                    </TooltipContent>
-                                )}
-                            </Tooltip>
-                        </TooltipProvider>
-                    )}
-                </span>
+                        <GripVertical className="h-3.5 w-3.5" />
+                    </button>
 
-                {/* Read-only tag summary, and the inline status picker */}
-                <TaskRowTags tags={task.tags} />
-                <div className="flex-shrink-0">
-                    <StatusPicker task={task} flatList={flatList} />
+                    {/* Hidden below lg - mobile operates entirely through the 3-dot menu, which has the same action */}
+                    <button
+                        onClick={handleToggleComplete}
+                        disabled={!canToggleComplete}
+                        className={`hidden lg:flex flex-shrink-0 h-4 w-4 items-center justify-center rounded border motion-safe:transition-colors ${
+                            taskIsDone
+                                ? 'border-metric bg-metric text-background'
+                                : 'border-muted-foreground/40 hover:border-muted-foreground'
+                        } ${!canToggleComplete ? 'opacity-40' : ''}`}
+                        aria-label={taskIsDone ? 'Mark as incomplete' : 'Mark as complete'}
+                    >
+                        {taskIsDone && <Check className="h-3 w-3" strokeWidth={3} />}
+                    </button>
+
+                    {/* Expand/collapse toggle */}
+                    <button
+                        onClick={() => toggleFlag(expandKey)}
+                        className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground motion-safe:transition-colors"
+                        aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                    >
+                        {hasChildren ? (
+                            isExpanded ? (
+                                <ChevronDown className="h-3 w-3 motion-safe:transition-transform duration-200" />
+                            ) : (
+                                <ChevronRight className="h-3 w-3 motion-safe:transition-transform duration-200" />
+                            )
+                        ) : (
+                            <Circle className="h-1.5 w-1.5 text-muted-foreground/40" />
+                        )}
+                    </button>
+
+                    {/* Hidden below lg - mobile operates entirely through the 3-dot menu, which has the same action */}
+                    <button
+                        onClick={(clickEvent) => {
+                            clickEvent.stopPropagation();
+                            togglePriority(task);
+                        }}
+                        className="hidden lg:flex flex-shrink-0 items-center justify-center p-2 -m-2 focus:outline-none"
+                        aria-label={
+                            task.is_prioritised ? 'Remove from priority' : 'Put on priority'
+                        }
+                        aria-pressed={Boolean(task.is_prioritised)}
+                    >
+                        <Star
+                            className={`h-3.5 w-3.5 motion-safe:transition-colors ${
+                                task.is_prioritised
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : 'text-muted-foreground/40 hover:text-muted-foreground'
+                            }`}
+                        />
+                    </button>
                 </div>
 
-                {/* Hover action bar */}
-                <TaskRowActions
-                    task={task}
-                    flatList={flatList}
-                    onAddSubtask={() => {
-                        setFlag(expandKey, true);
-                        setAddSubtaskOpen(true);
-                    }}
-                    canAddSubtask={canAddSubtask}
-                    listId={listId}
-                    currentUserId={currentUserId}
-                    myPermission={myPermission}
-                />
+                {/* Two lines: title + actions, then metadata - so pills can never squeeze the title */}
+                <div data-row-space className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div data-row-space className="flex items-center gap-1.5">
+                        {/* Title opens the task page; clicking the empty space beside it toggles expand/collapse */}
+                        <span
+                            onClick={handleRowClick}
+                            data-row-space
+                            className={`flex-1 text-sm truncate min-w-0 ${
+                                taskIsDone
+                                    ? 'text-muted-foreground line-through'
+                                    : 'text-foreground'
+                            }`}
+                        >
+                            <Link
+                                href={`/lists/${listId}/tasks/${task.id}`}
+                                className="truncate no-underline text-inherit"
+                            >
+                                {task.title}
+                            </Link>
+                        </span>
+
+                        {/* Hover action bar */}
+                        <TaskRowActions
+                            task={task}
+                            flatList={flatList}
+                            onAddSubtask={() => {
+                                setFlag(expandKey, true);
+                                setAddSubtaskOpen(true);
+                            }}
+                            canAddSubtask={canAddSubtask}
+                            listId={listId}
+                            currentUserId={currentUserId}
+                            myPermission={myPermission}
+                        />
+                    </div>
+
+                    {/* Read-only pills on the left; the status picker is a control, so it sits apart on the right */}
+                    <div data-row-space className="flex items-start gap-1.5">
+                        {/* Wraps so pills never push the status picker past the row edge */}
+                        <div
+                            data-row-space
+                            className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+                        >
+                            {task.is_recurring && (
+                                <TaskRowRecurrence recurrenceRule={task.recurrence_rule} />
+                            )}
+                            <TaskRowTags tags={task.tags} />
+                        </div>
+                        <div className="ml-auto flex-shrink-0">
+                            <StatusPicker task={task} flatList={flatList} />
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Not dismissible - a space's subtask cap must stay visible until it's actually resolved. */}
