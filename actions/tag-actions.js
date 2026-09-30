@@ -104,7 +104,7 @@ export const addTagToTask = withAuthenticatedAction(
             if (attachError.code === UNIQUE_VIOLATION) {
                 return {
                     data: null,
-                    error: 'This tag is already on this task',
+                    error: 'Tag is already assigned to the task',
                     code: TAG_ALREADY_ON_TASK,
                 };
             }
