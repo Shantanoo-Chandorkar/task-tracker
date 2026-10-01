@@ -250,6 +250,38 @@ test.describe('tasks', () => {
         expect(addButtonHeight).toBe(statusHeight);
     });
 
+    test('a task created with "Put on priority" starts prioritised', async ({ page }) => {
+        const title = await createTask(page, { isPrioritised: true });
+
+        // The row's star is desktop-only, so the menu label is the check that works on both viewports.
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await expect(page.getByRole('menuitem', { name: 'Remove from priority' })).toBeVisible();
+        await page.keyboard.press('Escape');
+    });
+
+    test('priority can be switched on and off from the edit form', async ({ page }) => {
+        const title = await createTask(page);
+
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        await page.getByRole('dialog').getByLabel('Put on priority').check();
+        await page.getByRole('dialog').getByRole('button', { name: 'Save changes' }).click();
+        await expect(page.getByRole('dialog')).toBeHidden();
+
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await expect(page.getByRole('menuitem', { name: 'Remove from priority' })).toBeVisible();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        const editDialog = page.getByRole('dialog');
+        await expect(editDialog.getByLabel('Put on priority')).toBeChecked();
+        await editDialog.getByLabel('Put on priority').uncheck();
+        await editDialog.getByRole('button', { name: 'Save changes' }).click();
+        await expect(editDialog).toBeHidden();
+
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await expect(page.getByRole('menuitem', { name: 'Put on priority' })).toBeVisible();
+        await page.keyboard.press('Escape');
+    });
+
     test('duplicating a task copies it and its subtree', async ({ page }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));

@@ -73,6 +73,7 @@ export default function TaskFormDialog({
     const [sublistId, setSublistId] = useState('');
     const [tagNames, setTagNames] = useState([]);
     const [dueDate, setDueDate] = useState('');
+    const [isPrioritised, setIsPrioritised] = useState(false);
     const [isRecurring, setIsRecurring] = useState(false);
     const [recurrenceRule, setRecurrenceRule] = useState(null);
     const [submitting, setSubmitting] = useState(false);
@@ -99,6 +100,7 @@ export default function TaskFormDialog({
             setSublistId(defaultSublistId ?? '');
             setTagNames([]);
             setDueDate(task?.due_date ?? '');
+            setIsPrioritised(task?.is_prioritised ?? false);
             setIsRecurring(task?.is_recurring ?? false);
             setRecurrenceRule(task?.recurrence_rule ?? null);
             setTitleError('');
@@ -140,6 +142,7 @@ export default function TaskFormDialog({
                       sublist_id: isRootCreate ? sublistId || null : null,
                       tagNames,
                   }),
+            is_prioritised: isPrioritised,
             is_recurring: isRecurring,
             recurrence_rule: isRecurring ? recurrenceRule : null,
         };
@@ -312,6 +315,17 @@ export default function TaskFormDialog({
                         )}
                     </LabeledField>
                 </div>
+
+                {/* Priority toggle - a plain column, so unlike tags it needs no step after create */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={isPrioritised}
+                        onChange={(event) => setIsPrioritised(event.target.checked)}
+                        className="rounded border-border"
+                    />
+                    <span className="text-sm text-foreground">Put on priority</span>
+                </label>
 
                 {/* Recurrence toggle */}
                 <div className="space-y-3">

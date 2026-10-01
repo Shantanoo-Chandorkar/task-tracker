@@ -29,7 +29,7 @@ import {
     TASK_REPARENT_FORBIDDEN_CHILDREN,
     TASK_REPARENT_DELETE_FAILED,
 } from '@/lib/error-codes';
-import { sanitizeString, checkMaxLength, sanitizeRichText } from '@/lib/validation';
+import { sanitizeString, checkMaxLength, checkIsBoolean, sanitizeRichText } from '@/lib/validation';
 import {
     resolveSpacePermission,
     getSpaceIdForList,
@@ -95,6 +95,7 @@ async function blockIfSubtaskCapReached(supabase, parentId) {
  * @param {string|null} [fields.sublist_id] - Root tasks only; must belong to the same list
  * @param {number} [fields.position]
  * @param {string|null} [fields.due_date] - ISO date string (YYYY-MM-DD), or null
+ * @param {boolean} [fields.is_prioritised] - Defaults to false
  * @param {boolean} [fields.is_recurring]
  * @param {object} [fields.recurrence_rule]
  * @returns {{ data: object|null, error: string|null, code: string|undefined }}
@@ -141,6 +142,15 @@ export const createTask = withAuthenticatedAction(
                 error: 'This space requires a due date on every task',
                 code: TASK_DUE_DATE_REQUIRED,
             };
+        }
+
+        if (fields.is_prioritised !== undefined) {
+            const priorityError = checkIsBoolean(
+                fields.is_prioritised,
+                'Priority',
+                TASK_INVALID_PRIORITY,
+            );
+            if (priorityError) return { data: null, ...priorityError };
         }
 
         if (fields.parent_id) {
@@ -205,6 +215,7 @@ export const createTask = withAuthenticatedAction(
                 position,
                 depth,
                 due_date: fields.due_date || null,
+                is_prioritised: fields.is_prioritised ?? false,
                 is_recurring: fields.is_recurring ?? false,
                 recurrence_rule: fields.recurrence_rule ?? null,
                 next_occurrence,
@@ -319,12 +330,13 @@ export const updateTask = withAuthenticatedAction(
             if (titleError) return { data: null, error: titleError.error };
         }
 
-        if ('is_prioritised' in updates && typeof updates.is_prioritised !== 'boolean') {
-            return {
-                data: null,
-                error: 'Priority must be true or false',
-                code: TASK_INVALID_PRIORITY,
-            };
+        if ('is_prioritised' in updates) {
+            const priorityError = checkIsBoolean(
+                updates.is_prioritised,
+                'Priority',
+                TASK_INVALID_PRIORITY,
+            );
+            if (priorityError) return { data: null, ...priorityError };
         }
 
         if ('description' in updates) {
