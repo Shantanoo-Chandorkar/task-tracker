@@ -303,6 +303,7 @@ test.describe('tasks', () => {
         const topTitle = await createTask(page);
         const middleTitle = await addSubtask(page, taskRow(page, topTitle));
         const bottomTitle = await addSubtask(page, taskRow(page, middleTitle));
+        await waitForCreatedToastsToClear(page);
         const movingTitle = await createTask(page);
 
         await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
