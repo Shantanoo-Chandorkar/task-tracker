@@ -72,7 +72,12 @@ export default async function RootLayout({ children }) {
                 <QueryProvider>
                     <UIStateProvider>{children}</UIStateProvider>
                 </QueryProvider>
-                <Toaster richColors position="bottom-right" />
+                {/* Mobile offset matches the app layout's 5rem bottom padding, so toasts clear the nav and FAB. */}
+                <Toaster
+                    richColors
+                    position="bottom-right"
+                    mobileOffset={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
+                />
                 <SpeedInsights />
             </body>
         </html>

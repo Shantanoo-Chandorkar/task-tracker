@@ -366,7 +366,7 @@ export default function TaskRowActions({
                 onClose={() => setMoveSheetOpen(false)}
                 variant="sheet"
                 title="Move to..."
-                contentClassName="max-h-[70vh] overflow-y-auto"
+                contentClassName="max-h-[70dvh] overflow-y-auto"
             >
                 <MoveDestinationList
                     groups={moveGroups}

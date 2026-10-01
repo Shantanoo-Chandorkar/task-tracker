@@ -151,7 +151,7 @@ export default function TaskFilterSheet({ open, onClose, spaceId, statuses, coun
                 </>
             }
         >
-            <div className="max-h-[70vh] overflow-y-auto">
+            <div className="max-h-[70dvh] overflow-y-auto">
                 <FilterSection
                     title="Status"
                     isOpen={openSections.status}

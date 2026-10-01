@@ -60,4 +60,22 @@ test.describe('mobile shell', () => {
 
         await expect(page.locator('#scrolling-box')).toHaveCSS('overscroll-behavior-y', 'contain');
     });
+
+    test('a small-text field is raised to 16px on touch screens only, so iPhones do not zoom', async ({
+        page,
+        isMobile,
+    }) => {
+        await page.goto('/login');
+        await page.evaluate(() => {
+            const smallTextField = document.createElement('input');
+            smallTextField.id = 'small-text-field';
+            smallTextField.className = 'text-sm';
+            document.body.appendChild(smallTextField);
+        });
+
+        await expect(page.locator('#small-text-field')).toHaveCSS(
+            'font-size',
+            isMobile ? '16px' : '14px',
+        );
+    });
 });

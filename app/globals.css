@@ -196,3 +196,13 @@
         overscroll-behavior: contain;
     }
 }
+
+/* Unlayered on purpose: it must beat the text-sm utility, or iOS zooms the page on focus. */
+@media (pointer: coarse) {
+    input,
+    textarea,
+    select,
+    [contenteditable='true'] {
+        font-size: 16px;
+    }
+}

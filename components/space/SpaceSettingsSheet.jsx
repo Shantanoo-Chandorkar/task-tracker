@@ -58,7 +58,7 @@ export default function SpaceSettingsSheet({ open, onClose, spaceId, spaceName, 
 
     return (
         <ModalShell open={open} onClose={onClose} variant="sheet" title={`${spaceName} · Settings`}>
-            <div className="max-h-[70vh] overflow-y-auto">
+            <div className="max-h-[70dvh] overflow-y-auto">
                 <SettingsSection
                     title="Statuses"
                     isOpen={openSection === 'statuses'}

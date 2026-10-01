@@ -107,7 +107,7 @@ export default function ModalShell({
                     className={
                         isPureSheet
                             ? contentClassName
-                            : cn('max-h-[90vh] overflow-y-auto', contentClassName)
+                            : cn('max-h-[90dvh] overflow-y-auto', contentClassName)
                     }
                     onOpenAutoFocus={(event) => event.preventDefault()}
                     onCloseAutoFocus={onCloseAutoFocus}
@@ -129,7 +129,7 @@ export default function ModalShell({
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
-                className={cn('sm:max-w-xl max-h-[90vh] overflow-y-auto', contentClassName)}
+                className={cn('sm:max-w-xl max-h-[90dvh] overflow-y-auto', contentClassName)}
                 onOpenAutoFocus={(event) => event.preventDefault()}
                 onCloseAutoFocus={onCloseAutoFocus}
                 onPointerDownOutside={onPointerDownOutside}
