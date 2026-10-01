@@ -6,6 +6,7 @@ import {
     createTask,
     addSubtask,
     taskRow,
+    waitForCreatedToastsToClear,
     spaceSection,
 } from './fixtures/app-data.js';
 
@@ -235,16 +236,22 @@ test.describe('tasks', () => {
         const parentTitle = await createTask(page);
         const movingTitle = await addSubtask(page, taskRow(page, parentTitle));
         const siblingTitle = await addSubtask(page, taskRow(page, parentTitle));
+        await waitForCreatedToastsToClear(page);
         const targetTitle = await createTask(page);
         const targetChildTitle = await addSubtask(page, taskRow(page, targetTitle));
+        await waitForCreatedToastsToClear(page);
 
         await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
         await page.getByRole('menuitem', { name: 'Move to...' }).click();
         const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
 
-        const targetRow = moveSheet.locator('div.min-h-11', {
-            has: moveSheet.getByRole('button', { name: `Expand ${targetTitle}` }),
-        });
+        // `has` is matched inside each row, so it must be rooted at the page, not at moveSheet.
+        // The chevron's name flips between Expand and Collapse, so the row locator must accept both.
+        const getToggleRow = (title) =>
+            moveSheet.locator('div.min-h-11', {
+                has: page.getByRole('button', { name: new RegExp(`^(Expand|Collapse) ${title}$`) }),
+            });
+        const targetRow = getToggleRow(targetTitle);
         const targetRowBox = await targetRow.boundingBox();
         const emptySpacePosition = { x: targetRowBox.width - 8, y: targetRowBox.height / 2 };
 
@@ -260,9 +267,7 @@ test.describe('tasks', () => {
         ).toHaveCount(0);
 
         // The disabled current parent has no select button, but its empty space must still toggle it.
-        const parentRow = moveSheet.locator('div.min-h-11', {
-            has: moveSheet.getByRole('button', { name: `Expand ${parentTitle}` }),
-        });
+        const parentRow = getToggleRow(parentTitle);
         const parentRowBox = await parentRow.boundingBox();
         await parentRow.click({
             position: { x: parentRowBox.width - 8, y: parentRowBox.height / 2 },
@@ -272,27 +277,52 @@ test.describe('tasks', () => {
         ).toBeVisible();
     });
 
-    test('"Move to..." can move a task under a grandchild by expanding the accordion', async ({
+    test('"Move to..." can move a task under a nested subtask by expanding the accordion', async ({
         page,
     }) => {
-        const grandparentTitle = await createTask(page);
-        const childTitle = await addSubtask(page, taskRow(page, grandparentTitle));
-        const grandchildTitle = await addSubtask(page, taskRow(page, childTitle));
+        const topTitle = await createTask(page);
+        const nestedTitle = await addSubtask(page, taskRow(page, topTitle));
         const movingTitle = await createTask(page);
 
         await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
         await page.getByRole('menuitem', { name: 'Move to...' }).click();
         const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
 
-        await moveSheet.getByRole('button', { name: `Expand ${grandparentTitle}` }).click();
-        await moveSheet.getByRole('button', { name: `Expand ${childTitle}` }).click();
-        await moveSheet.getByRole('button', { name: grandchildTitle, exact: true }).click();
+        // The nested subtask sits at depth 1, so the moved task lands at depth 2: the deepest allowed level.
+        await moveSheet.getByRole('button', { name: `Expand ${topTitle}` }).click();
+        await moveSheet.getByRole('button', { name: nestedTitle, exact: true }).click();
         await expect(page.getByText('Task moved')).toBeVisible();
 
-        await taskRow(page, grandchildTitle)
-            .getByRole('button', { name: 'Expand subtasks' })
-            .click();
+        await taskRow(page, nestedTitle).getByRole('button', { name: 'Expand subtasks' }).click();
         await expect(page.getByRole('link', { name: movingTitle, exact: true })).toBeVisible();
+    });
+
+    test('"Move to..." disables targets that would exceed the maximum nesting depth', async ({
+        page,
+    }) => {
+        const topTitle = await createTask(page);
+        const middleTitle = await addSubtask(page, taskRow(page, topTitle));
+        const bottomTitle = await addSubtask(page, taskRow(page, middleTitle));
+        const movingTitle = await createTask(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        await moveSheet.getByRole('button', { name: `Expand ${topTitle}` }).click();
+        await moveSheet.getByRole('button', { name: `Expand ${middleTitle}` }).click();
+
+        // The bottom task is already at the deepest level, so nothing can move under it.
+        await expect(
+            moveSheet.getByRole('button', { name: middleTitle, exact: true }),
+        ).toBeVisible();
+        await expect(moveSheet.getByRole('button', { name: bottomTitle, exact: true })).toHaveCount(
+            0,
+        );
+        await expect(moveSheet.getByText('Too deep')).toBeVisible();
+
+        await moveSheet.getByRole('searchbox', { name: 'Search tasks' }).fill(bottomTitle);
+        await expect(moveSheet.getByText('No matching tasks')).toBeVisible();
     });
 
     test('searching in "Move to..." finds a nested task with its path and moves the task there', async ({

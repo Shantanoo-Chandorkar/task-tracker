@@ -24,6 +24,7 @@ import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 
 /**
  * Action bar for a task row - a single, always-visible `···` dropdown with
@@ -84,7 +85,8 @@ export default function TaskRowActions({
     const movingTaskRoot = findAncestors(task.id, flatList).at(-1) ?? task;
     const currentSublistId = movingTaskRoot.sublist_id ?? null;
 
-    const moveTargetRoots = buildMoveTargetTree(flatList, task);
+    const maxAllowedDepth = NESTING_MODE === 'finite' ? FINITE_MAX_DEPTH : Infinity;
+    const moveTargetRoots = buildMoveTargetTree(flatList, task, maxAllowedDepth);
     const knownSublistIds = new Set(sublists.map((sublist) => sublist.id));
     // A root pointing at a sublist that no longer exists falls back to the Main List group.
     const getGroupIdForRoot = (root) =>

@@ -1,12 +1,13 @@
 'use client';
 
 import { ChevronDown, ChevronRight, Circle } from 'lucide-react';
+import { isMoveTargetSelectable } from '@/lib/tree';
 
 /**
  * One row of the Move To accordion plus, when expanded, its children.
  *
  * @param {object} props
- * @param {object} props.node - Task node from `buildMoveTargetTree`, with `children` and `isCurrentParent`
+ * @param {object} props.node - Task node from `buildMoveTargetTree`, with `children`, `isCurrentParent` and `isTooDeep`
  * @param {Set<string>} props.expandedIds - Ids of the rows currently expanded
  * @param {Function} props.onToggleExpand - Called with a node id to expand or collapse that row
  * @param {Function} props.onSelect - Called with the chosen task's id
@@ -41,11 +42,11 @@ export default function MoveDestinationNode({ node, expandedIds, onToggleExpand,
                     </span>
                 )}
 
-                {node.isCurrentParent ? (
+                {!isMoveTargetSelectable(node) ? (
                     <span className="flex flex-wrap items-center gap-2 py-3 text-sm text-muted-foreground">
                         {node.title}
                         <span className="rounded-full border border-input px-2 text-xs">
-                            Current parent
+                            {node.isCurrentParent ? 'Current parent' : 'Too deep'}
                         </span>
                     </span>
                 ) : (

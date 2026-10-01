@@ -219,6 +219,19 @@ export async function createTask(
 }
 
 /**
+ * Waits until every "Task created successfully" toast has gone, so stacked toasts can't cover the next control.
+ *
+ * Moves the cursor off first: Sonner pauses a toast under the cursor, and the form's Create button leaves it there.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<void>}
+ */
+export async function waitForCreatedToastsToClear(page) {
+    await page.mouse.move(0, 0);
+    await expect(page.getByText('Task created successfully')).toHaveCount(0);
+}
+
+/**
  * Adds a subtask under an existing row via its "More actions" menu.
  *
  * @param {import('@playwright/test').Page} page
