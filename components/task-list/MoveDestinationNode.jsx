@@ -7,7 +7,7 @@ import { isMoveTargetSelectable } from '@/lib/tree';
  * One row of the Move To accordion plus, when expanded, its children.
  *
  * @param {object} props
- * @param {object} props.node - Task node from `buildMoveTargetTree`, with `children`, `isCurrentParent` and `isTooDeep`
+ * @param {object} props.node - Node from `buildMoveTargetTree`, with `children`, `isCurrentParent`, `isTooDeep`
  * @param {Set<string>} props.expandedIds - Ids of the rows currently expanded
  * @param {Function} props.onToggleExpand - Called with a node id to expand or collapse that row
  * @param {Function} props.onSelect - Called with the chosen task's id
