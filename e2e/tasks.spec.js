@@ -198,6 +198,58 @@ test.describe('tasks', () => {
         await expect(moveSheet).toBeHidden();
     });
 
+    test('clicking the empty space between a title and "More actions" toggles its subtasks', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        const childTitle = await addSubtask(page, taskRow(page, parentTitle));
+        const childLink = page.getByRole('link', { name: childTitle, exact: true });
+        // Adding a subtask expands its parent, so the child starts visible.
+        await expect(childLink).toBeVisible();
+
+        const parentRow = taskRow(page, parentTitle);
+        const titleBox = await parentRow
+            .getByRole('link', { name: parentTitle, exact: true })
+            .boundingBox();
+        const actionsBox = await parentRow
+            .getByRole('button', { name: 'More actions' })
+            .boundingBox();
+        const gapX = (titleBox.x + titleBox.width + actionsBox.x) / 2;
+        const gapY = titleBox.y + titleBox.height / 2;
+
+        await page.mouse.click(gapX, gapY);
+        await expect(childLink).toBeHidden();
+
+        await page.mouse.click(gapX, gapY);
+        await expect(childLink).toBeVisible();
+    });
+
+    test('tag pills and the add-tag button are as tall as the Status select in the task form', async ({
+        page,
+    }) => {
+        const title = await createTask(page);
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        const dialog = page.getByRole('dialog');
+
+        await dialog.getByRole('button', { name: 'Tag', exact: true }).click();
+        await page.getByPlaceholder('Find or create a tag').fill('Heights');
+        await page.getByRole('option', { name: 'Create "Heights"' }).click();
+        const tagPill = dialog.locator('[data-slot="badge"]', { hasText: 'Heights' });
+        await expect(tagPill).toBeVisible();
+
+        const statusHeight = (
+            await dialog.locator('[data-slot="select-trigger"]').first().boundingBox()
+        ).height;
+        const pillHeight = (await tagPill.boundingBox()).height;
+        const addButtonHeight = (
+            await dialog.getByRole('button', { name: 'Tag', exact: true }).boundingBox()
+        ).height;
+
+        expect(pillHeight).toBe(statusHeight);
+        expect(addButtonHeight).toBe(statusHeight);
+    });
+
     test('duplicating a task copies it and its subtree', async ({ page }) => {
         const parentTitle = await createTask(page);
         const childTitle = await addSubtask(page, taskRow(page, parentTitle));
