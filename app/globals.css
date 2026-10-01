@@ -222,13 +222,13 @@
         }
     }
 
-    /* Skips disabled controls and menu buttons whose menu is already open, so they don't shift. */
     .press-feedback {
         transition:
             transform 100ms ease-out,
             opacity 100ms ease-out;
     }
 
+    /* Skips disabled controls and menu buttons whose menu is already open, so they don't shift. */
     .press-feedback:active:not(:disabled):not([aria-expanded='true']) {
         transform: scale(0.97);
         opacity: 0.8;
