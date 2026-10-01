@@ -33,4 +33,31 @@ test.describe('mobile shell', () => {
             }
         });
     }
+
+    test('taps give no gray flash or delay, and long-pressing a button cannot select its label', async ({
+        page,
+    }) => {
+        await page.goto('/login');
+        const firstButton = page.getByRole('button').first();
+
+        await expect(page.locator('html')).toHaveCSS(
+            '-webkit-tap-highlight-color',
+            'rgba(0, 0, 0, 0)',
+        );
+        await expect(firstButton).toHaveCSS('touch-action', 'manipulation');
+        await expect(firstButton).toHaveCSS('user-select', 'none');
+    });
+
+    test('a scrolling box does not pass its scroll on to the page behind it', async ({ page }) => {
+        await page.goto('/login');
+        // Uses a class the app already ships, so Tailwind has emitted its CSS.
+        await page.evaluate(() => {
+            const scrollingBox = document.createElement('div');
+            scrollingBox.id = 'scrolling-box';
+            scrollingBox.className = 'overflow-y-auto';
+            document.body.appendChild(scrollingBox);
+        });
+
+        await expect(page.locator('#scrolling-box')).toHaveCSS('overscroll-behavior-y', 'contain');
+    });
 });

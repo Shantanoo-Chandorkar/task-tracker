@@ -167,10 +167,32 @@
     }
     html {
         @apply font-sans;
+        -webkit-tap-highlight-color: transparent;
+        /* Stops iOS inflating text on rotation. */
+        -webkit-text-size-adjust: 100%;
     }
     button:not(:disabled),
     [role='button']:not([aria-disabled='true']),
     a[href] {
         cursor: pointer;
+    }
+    /* Skips the double-tap-zoom wait; touch-none (utilities layer) still wins on drag handles. */
+    button,
+    [role='button'],
+    a[href],
+    summary {
+        touch-action: manipulation;
+    }
+    /* Controls only, so long-press never selects a label; body text stays selectable. */
+    button,
+    [role='button'] {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+    /* Scrolling to the end of a sheet or list must not drag the page behind it. */
+    .overflow-y-auto,
+    .overflow-auto {
+        overscroll-behavior: contain;
     }
 }
