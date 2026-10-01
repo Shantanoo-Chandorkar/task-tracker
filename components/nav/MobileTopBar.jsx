@@ -75,7 +75,7 @@ export default function MobileTopBar({ initialSpaces, initialLists, initialProfi
             <button
                 onClick={openSearch}
                 aria-label="Search"
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+                className="press-feedback flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
             >
                 <Search className="h-4.5 w-4.5" />
             </button>

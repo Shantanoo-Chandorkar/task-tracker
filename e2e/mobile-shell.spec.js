@@ -91,4 +91,45 @@ test.describe('mobile shell', () => {
         await page.emulateMedia({ contrast: 'more' });
         await expect(bottomNav).toHaveCSS('backdrop-filter', 'none');
     });
+
+    test('pressing a bottom nav link shrinks and fades it, and only fades it with reduced motion', async ({
+        page,
+        testUser,
+        isMobile,
+    }) => {
+        test.skip(!isMobile, 'The bottom nav only exists below the lg breakpoint');
+        await loginAs(page, testUser);
+        const spacesLink = page
+            .locator('nav.translucent-bar')
+            .getByRole('link', { name: 'Spaces' });
+
+        await spacesLink.hover();
+        await page.mouse.down();
+        await expect(spacesLink).toHaveCSS('transform', /^matrix\(0\.97/);
+        await expect(spacesLink).toHaveCSS('opacity', '0.8');
+
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await expect(spacesLink).toHaveCSS('transform', 'none');
+        await expect(spacesLink).toHaveCSS('opacity', '0.8');
+
+        // Release away from the link so the press is cancelled instead of navigating.
+        await page.mouse.move(0, 0);
+        await page.mouse.up();
+    });
+
+    test('reduced motion turns slide-in movement into a plain fade', async ({ page }) => {
+        await page.goto('/login');
+        await page.evaluate(() => {
+            const slidingBox = document.createElement('div');
+            slidingBox.id = 'sliding-box';
+            slidingBox.className = 'animate-in slide-in-from-bottom';
+            document.body.appendChild(slidingBox);
+        });
+        const slidingBox = page.locator('#sliding-box');
+
+        await expect(slidingBox).toHaveCSS('--tw-enter-translate-y', '100%');
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await expect(slidingBox).toHaveCSS('--tw-enter-translate-y', '0');
+        await expect(slidingBox).toHaveCSS('--tw-enter-opacity', '0');
+    });
 });

@@ -43,7 +43,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                 <div className="flex-1 flex">
                     <Link
                         href="/"
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <Home className="h-5 w-5" />
                         Home
@@ -51,7 +51,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
 
                     <Link
                         href={tasksHref}
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <ListChecks className="h-5 w-5" />
                         Tasks
@@ -63,7 +63,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                 <div className="flex-1 flex">
                     <Link
                         href="/spaces"
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSpaces ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSpaces ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <LayoutGrid className="h-5 w-5" />
                         Spaces
@@ -71,14 +71,14 @@ export default function BottomNav({ initialSpaces, initialLists }) {
 
                     <Link
                         href="/settings"
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <Settings className="h-5 w-5" />
                         Settings
                     </Link>
                 </div>
 
-                <QuickCreateFab className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center" />
+                <QuickCreateFab className="press-feedback absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center" />
             </div>
         </nav>
     );

@@ -221,6 +221,42 @@
             backdrop-filter: none;
         }
     }
+
+    /* Skips disabled controls and menu buttons whose menu is already open, so they don't shift. */
+    .press-feedback {
+        transition:
+            transform 100ms ease-out,
+            opacity 100ms ease-out;
+    }
+
+    .press-feedback:active:not(:disabled):not([aria-expanded='true']) {
+        transform: scale(0.97);
+        opacity: 0.8;
+    }
+}
+
+/* Unlayered so it beats the animation utilities that set these variables. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        --tw-enter-translate-x: 0 !important;
+        --tw-enter-translate-y: 0 !important;
+        --tw-enter-scale: 1 !important;
+        --tw-enter-rotate: 0 !important;
+        --tw-enter-blur: 0 !important;
+        --tw-enter-opacity: 0 !important;
+        --tw-exit-translate-x: 0 !important;
+        --tw-exit-translate-y: 0 !important;
+        --tw-exit-scale: 1 !important;
+        --tw-exit-rotate: 0 !important;
+        --tw-exit-blur: 0 !important;
+        --tw-exit-opacity: 0 !important;
+    }
+
+    .press-feedback:active:not(:disabled):not([aria-expanded='true']) {
+        transform: none;
+    }
 }
 
 /* Unlayered on purpose: it must beat the text-sm utility, or iOS zooms the page on focus. */
