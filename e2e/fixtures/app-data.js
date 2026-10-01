@@ -199,11 +199,12 @@ async function openNewTaskDialog(page) {
  * @param {string} [fields.title] - Defaults to a generated unique name.
  * @param {string} [fields.description] - Typed into the rich text editor if given.
  * @param {boolean} [fields.recurring] - Checks "Recurring task" (default: weekly, no end).
+ * @param {boolean} [fields.isPrioritised] - Checks "Put on priority".
  * @returns {Promise<string>} The task's title.
  */
 export async function createTask(
     page,
-    { title = uniqueName('Task'), description, recurring = false } = {},
+    { title = uniqueName('Task'), description, recurring = false, isPrioritised = false } = {},
 ) {
     await openNewTaskDialog(page);
     const dialog = page.getByRole('dialog');
@@ -211,9 +212,23 @@ export async function createTask(
     if (description !== undefined)
         await dialog.locator('[contenteditable="true"]').fill(description);
     if (recurring) await dialog.getByLabel('Recurring task').check();
+    if (isPrioritised) await dialog.getByLabel('Put on priority').check();
     await dialog.getByRole('button', { name: 'Create task' }).click();
     await expect(dialog).toBeHidden();
     return title;
+}
+
+/**
+ * Waits until every "Task created successfully" toast has gone, so stacked toasts can't cover the next control.
+ *
+ * Moves the cursor off first: Sonner pauses a toast under the cursor, and the form's Create button leaves it there.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<void>}
+ */
+export async function waitForCreatedToastsToClear(page) {
+    await page.mouse.move(0, 0);
+    await expect(page.getByText('Task created successfully')).toHaveCount(0);
 }
 
 /**

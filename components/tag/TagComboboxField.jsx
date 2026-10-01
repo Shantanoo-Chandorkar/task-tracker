@@ -27,6 +27,7 @@ const TAG_NAME_MAX = 50;
  * @param {Function} props.onRemove - Called with the attached tag's key to detach
  * @param {boolean} [props.addPending] - Disables the trigger while an add is in flight
  * @param {string|null} [props.removingKey] - Key of the tag currently being removed, if any
+ * @param {boolean} [props.isFieldSized] - Sizes pills like a form select (h-8) so they line up beside one
  */
 export default function TagComboboxField({
     tags,
@@ -35,6 +36,7 @@ export default function TagComboboxField({
     onRemove,
     addPending,
     removingKey,
+    isFieldSized = false,
 }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
@@ -56,10 +58,15 @@ export default function TagComboboxField({
         setOpen(false);
     }
 
+    const badgeSizeClass = isFieldSized ? 'h-8 rounded-lg pl-2.5 text-sm' : '';
+    const addButtonSizeClass = isFieldSized
+        ? 'h-8 rounded-lg px-2.5 text-sm'
+        : 'rounded-full px-2 py-0.5 text-xs';
+
     return (
         <div className="flex flex-wrap items-center gap-1.5">
             {tags.map((tag) => (
-                <Badge key={tag.key} variant="secondary" className="gap-1 pr-1">
+                <Badge key={tag.key} variant="tag" className={`gap-1 pr-1 ${badgeSizeClass}`}>
                     {tag.name}
                     <button
                         type="button"
@@ -78,7 +85,7 @@ export default function TagComboboxField({
                     <button
                         type="button"
                         disabled={addPending}
-                        className="flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                        className={`flex items-center gap-1 border border-dashed border-input text-muted-foreground dark:bg-input/30 hover:text-foreground hover:border-foreground/40 ${addButtonSizeClass}`}
                     >
                         {addPending ? <Loader size="xs" /> : <Plus className="h-3 w-3" />}
                         Tag

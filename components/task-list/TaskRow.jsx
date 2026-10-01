@@ -185,9 +185,8 @@ function TaskRow({
                 {/* Two lines: title + actions, then metadata - so pills can never squeeze the title */}
                 <div data-row-space className="flex min-w-0 flex-1 flex-col gap-1">
                     <div data-row-space className="flex items-center gap-1.5">
-                        {/* Title opens the task page; clicking the empty space beside it toggles expand/collapse */}
+                        {/* No onClick here: the row's handler already toggles, a second one would cancel it out */}
                         <span
-                            onClick={handleRowClick}
                             data-row-space
                             className={`flex-1 text-sm truncate min-w-0 ${
                                 taskIsDone
@@ -219,7 +218,7 @@ function TaskRow({
                     </div>
 
                     {/* Read-only pills on the left; the status picker is a control, so it sits apart on the right */}
-                    <div data-row-space className="flex items-start gap-1.5">
+                    <div data-row-space className="flex items-center gap-1.5">
                         {/* Wraps so pills never push the status picker past the row edge */}
                         <div
                             data-row-space

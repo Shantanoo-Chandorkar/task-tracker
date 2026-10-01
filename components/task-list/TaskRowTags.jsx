@@ -27,14 +27,6 @@ export default function TaskRowTags({ tags = [] }) {
 
     if (tags.length === 0) return null;
 
-    if (tags.length === 1) {
-        return (
-            <Badge variant="secondary" className="flex-shrink-0">
-                {truncateTagName(tags[0].name)}
-            </Badge>
-        );
-    }
-
     return (
         <>
             <button
@@ -45,12 +37,14 @@ export default function TaskRowTags({ tags = [] }) {
                 }}
                 className="flex-shrink-0"
             >
-                <Badge variant="secondary">{tags.length} tags</Badge>
+                <Badge variant="tag">
+                    {tags.length === 1 ? truncateTagName(tags[0].name) : `${tags.length} tags`}
+                </Badge>
             </button>
             <ModalShell open={open} onClose={() => setOpen(false)} title="Tags">
                 <div className="flex flex-wrap gap-1.5">
                     {tags.map((tag) => (
-                        <Badge key={tag.id} variant="secondary">
+                        <Badge key={tag.id} variant="tag">
                             {tag.name}
                         </Badge>
                     ))}

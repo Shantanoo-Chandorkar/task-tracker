@@ -6,6 +6,7 @@ import {
     createTask,
     addSubtask,
     taskRow,
+    waitForCreatedToastsToClear,
     spaceSection,
 } from './fixtures/app-data.js';
 
@@ -196,6 +197,263 @@ test.describe('tasks', () => {
         // The sheet's own content sits over the bottom ~70vh - the overlay is only reachable near the top.
         await page.locator('[data-slot="sheet-overlay"]').click({ position: { x: 200, y: 20 } });
         await expect(moveSheet).toBeHidden();
+    });
+
+    test('"Move to..." keeps siblings under their real parent and disables only the direct parent', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        const movingTitle = await addSubtask(page, taskRow(page, parentTitle));
+        const siblingTitle = await addSubtask(page, taskRow(page, parentTitle));
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        await expect(moveSheet.getByText('Current parent')).toBeVisible();
+        await expect(moveSheet.getByRole('button', { name: parentTitle, exact: true })).toHaveCount(
+            0,
+        );
+        // Everything starts collapsed, so the sibling is hidden until its real parent is opened.
+        await expect(
+            moveSheet.getByRole('button', { name: siblingTitle, exact: true }),
+        ).toHaveCount(0);
+
+        await moveSheet.getByRole('button', { name: `Expand ${parentTitle}` }).click();
+        await expect(
+            moveSheet.getByRole('button', { name: siblingTitle, exact: true }),
+        ).toBeVisible();
+
+        await moveSheet.getByRole('button', { name: `Collapse ${parentTitle}` }).click();
+        await expect(
+            moveSheet.getByRole('button', { name: siblingTitle, exact: true }),
+        ).toHaveCount(0);
+    });
+
+    test('in "Move to...", the empty space beside a title toggles it and only the title moves the task', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        const movingTitle = await addSubtask(page, taskRow(page, parentTitle));
+        const siblingTitle = await addSubtask(page, taskRow(page, parentTitle));
+        await waitForCreatedToastsToClear(page);
+        const targetTitle = await createTask(page);
+        const targetChildTitle = await addSubtask(page, taskRow(page, targetTitle));
+        await waitForCreatedToastsToClear(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        // `has` is matched inside each row, so it must be rooted at the page, not at moveSheet.
+        // The chevron's name flips between Expand and Collapse, so the row locator must accept both.
+        const getToggleRow = (title) =>
+            moveSheet.locator('div.min-h-11', {
+                has: page.getByRole('button', { name: new RegExp(`^(Expand|Collapse) ${title}$`) }),
+            });
+        const targetRow = getToggleRow(targetTitle);
+        const targetRowBox = await targetRow.boundingBox();
+        const emptySpacePosition = { x: targetRowBox.width - 8, y: targetRowBox.height / 2 };
+
+        await targetRow.click({ position: emptySpacePosition });
+        await expect(
+            moveSheet.getByRole('button', { name: targetChildTitle, exact: true }),
+        ).toBeVisible();
+        await expect(page.getByText('Task moved')).toHaveCount(0);
+
+        await targetRow.click({ position: emptySpacePosition });
+        await expect(
+            moveSheet.getByRole('button', { name: targetChildTitle, exact: true }),
+        ).toHaveCount(0);
+
+        // The disabled current parent has no select button, but its empty space must still toggle it.
+        const parentRow = getToggleRow(parentTitle);
+        const parentRowBox = await parentRow.boundingBox();
+        await parentRow.click({
+            position: { x: parentRowBox.width - 8, y: parentRowBox.height / 2 },
+        });
+        await expect(
+            moveSheet.getByRole('button', { name: siblingTitle, exact: true }),
+        ).toBeVisible();
+    });
+
+    test('"Move to..." can move a task under a nested subtask by expanding the accordion', async ({
+        page,
+    }) => {
+        const topTitle = await createTask(page);
+        const nestedTitle = await addSubtask(page, taskRow(page, topTitle));
+        const movingTitle = await createTask(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        // The nested subtask sits at depth 1, so the moved task lands at depth 2: the deepest allowed level.
+        await moveSheet.getByRole('button', { name: `Expand ${topTitle}` }).click();
+        await moveSheet.getByRole('button', { name: nestedTitle, exact: true }).click();
+        await expect(page.getByText('Task moved')).toBeVisible();
+
+        await taskRow(page, nestedTitle).getByRole('button', { name: 'Expand subtasks' }).click();
+        await expect(page.getByRole('link', { name: movingTitle, exact: true })).toBeVisible();
+    });
+
+    test('"Move to..." disables targets that would exceed the maximum nesting depth', async ({
+        page,
+    }) => {
+        const topTitle = await createTask(page);
+        const middleTitle = await addSubtask(page, taskRow(page, topTitle));
+        const bottomTitle = await addSubtask(page, taskRow(page, middleTitle));
+        const movingTitle = await createTask(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        await moveSheet.getByRole('button', { name: `Expand ${topTitle}` }).click();
+        await moveSheet.getByRole('button', { name: `Expand ${middleTitle}` }).click();
+
+        // The bottom task is already at the deepest level, so nothing can move under it.
+        await expect(
+            moveSheet.getByRole('button', { name: middleTitle, exact: true }),
+        ).toBeVisible();
+        await expect(moveSheet.getByRole('button', { name: bottomTitle, exact: true })).toHaveCount(
+            0,
+        );
+        await expect(moveSheet.getByText('Too deep')).toBeVisible();
+
+        await moveSheet.getByRole('searchbox', { name: 'Search tasks' }).fill(bottomTitle);
+        await expect(moveSheet.getByText('No matching tasks')).toBeVisible();
+    });
+
+    test('searching in "Move to..." finds a nested task with its path and moves the task there', async ({
+        page,
+    }) => {
+        const grandparentTitle = await createTask(page);
+        const nestedTitle = await addSubtask(page, taskRow(page, grandparentTitle));
+        const movingTitle = await createTask(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        await moveSheet.getByRole('searchbox', { name: 'Search tasks' }).fill(nestedTitle);
+        await expect(
+            moveSheet.getByRole('button', { name: nestedTitle, exact: true }),
+        ).toBeVisible();
+        await expect(moveSheet.getByText(`Main List > ${grandparentTitle}`)).toBeVisible();
+        // Results replace the accordion, so the collapsed parent row is gone while searching.
+        await expect(
+            moveSheet.getByRole('button', { name: `Expand ${grandparentTitle}` }),
+        ).toHaveCount(0);
+
+        await moveSheet.getByRole('button', { name: nestedTitle, exact: true }).click();
+        await expect(page.getByText('Task moved')).toBeVisible();
+    });
+
+    test('"Move to..." search shows an empty message, and clearing it restores the accordion', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        await addSubtask(page, taskRow(page, parentTitle));
+        const movingTitle = await createTask(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+        const searchBox = moveSheet.getByRole('searchbox', { name: 'Search tasks' });
+
+        await searchBox.fill('no-task-has-this-title');
+        await expect(moveSheet.getByText('No matching tasks')).toBeVisible();
+
+        await searchBox.clear();
+        await expect(moveSheet.getByText('No matching tasks')).toHaveCount(0);
+        await expect(
+            moveSheet.getByRole('button', { name: `Expand ${parentTitle}` }),
+        ).toBeVisible();
+    });
+
+    test('clicking the empty space between a title and "More actions" toggles its subtasks', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        const childTitle = await addSubtask(page, taskRow(page, parentTitle));
+        const childLink = page.getByRole('link', { name: childTitle, exact: true });
+        // Adding a subtask expands its parent, so the child starts visible.
+        await expect(childLink).toBeVisible();
+
+        const parentRow = taskRow(page, parentTitle);
+        const titleBox = await parentRow
+            .getByRole('link', { name: parentTitle, exact: true })
+            .boundingBox();
+        const actionsBox = await parentRow
+            .getByRole('button', { name: 'More actions' })
+            .boundingBox();
+        const gapX = (titleBox.x + titleBox.width + actionsBox.x) / 2;
+        const gapY = titleBox.y + titleBox.height / 2;
+
+        await page.mouse.click(gapX, gapY);
+        await expect(childLink).toBeHidden();
+
+        await page.mouse.click(gapX, gapY);
+        await expect(childLink).toBeVisible();
+    });
+
+    test('tag pills and the add-tag button are as tall as the Status select in the task form', async ({
+        page,
+    }) => {
+        const title = await createTask(page);
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        const dialog = page.getByRole('dialog');
+
+        await dialog.getByRole('button', { name: 'Tag', exact: true }).click();
+        await page.getByPlaceholder('Find or create a tag').fill('Heights');
+        await page.getByRole('option', { name: 'Create "Heights"' }).click();
+        const tagPill = dialog.locator('[data-slot="badge"]', { hasText: 'Heights' });
+        await expect(tagPill).toBeVisible();
+
+        const statusHeight = (
+            await dialog.locator('[data-slot="select-trigger"]').first().boundingBox()
+        ).height;
+        const pillHeight = (await tagPill.boundingBox()).height;
+        const addButtonHeight = (
+            await dialog.getByRole('button', { name: 'Tag', exact: true }).boundingBox()
+        ).height;
+
+        expect(pillHeight).toBe(statusHeight);
+        expect(addButtonHeight).toBe(statusHeight);
+    });
+
+    test('a task created with "Put on priority" starts prioritised', async ({ page }) => {
+        const title = await createTask(page, { isPrioritised: true });
+
+        // The row's star is desktop-only, so the menu label is the check that works on both viewports.
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await expect(page.getByRole('menuitem', { name: 'Remove from priority' })).toBeVisible();
+        await page.keyboard.press('Escape');
+    });
+
+    test('priority can be switched on and off from the edit form', async ({ page }) => {
+        const title = await createTask(page);
+
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        await page.getByRole('dialog').getByLabel('Put on priority').check();
+        await page.getByRole('dialog').getByRole('button', { name: 'Save changes' }).click();
+        await expect(page.getByRole('dialog')).toBeHidden();
+
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await expect(page.getByRole('menuitem', { name: 'Remove from priority' })).toBeVisible();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        const editDialog = page.getByRole('dialog');
+        await expect(editDialog.getByLabel('Put on priority')).toBeChecked();
+        await editDialog.getByLabel('Put on priority').uncheck();
+        await editDialog.getByRole('button', { name: 'Save changes' }).click();
+        await expect(editDialog).toBeHidden();
+
+        await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
+        await expect(page.getByRole('menuitem', { name: 'Put on priority' })).toBeVisible();
+        await page.keyboard.press('Escape');
     });
 
     test('duplicating a task copies it and its subtree', async ({ page }) => {

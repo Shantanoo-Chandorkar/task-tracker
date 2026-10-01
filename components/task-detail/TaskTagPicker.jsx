@@ -15,8 +15,9 @@ import TagComboboxField from '@/components/tag/TagComboboxField';
  * @param {object} props
  * @param {object} props.task - Task whose tags are shown/edited (uses id, list_id, tags)
  * @param {string|null} props.spaceId - Space the task's list belongs to, for the tag suggestion list
+ * @param {boolean} [props.isFieldSized] - Passed through to size pills like a form select
  */
-export default function TaskTagPicker({ task, spaceId }) {
+export default function TaskTagPicker({ task, spaceId, isFieldSized = false }) {
     const queryClient = useQueryClient();
     const [pending, setPending] = useState(false);
     const [removingKey, setRemovingKey] = useState(null);
@@ -71,6 +72,7 @@ export default function TaskTagPicker({ task, spaceId }) {
             onRemove={handleRemove}
             addPending={pending}
             removingKey={removingKey}
+            isFieldSized={isFieldSized}
         />
     );
 }
