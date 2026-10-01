@@ -46,7 +46,7 @@ export default function MobileTopBar({ initialSpaces, initialLists, initialProfi
                 : 'Task Tracker';
 
     return (
-        <div className="lg:hidden sticky top-[var(--guest-banner-height,0px)] z-20 flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-3">
+        <div className="lg:hidden translucent-bar sticky top-[var(--guest-banner-height,0px)] z-20 flex items-center justify-between gap-2 border-b px-3 py-3">
             <MobileNavDrawer
                 initialSpaces={initialSpaces}
                 initialLists={initialLists}
@@ -75,7 +75,7 @@ export default function MobileTopBar({ initialSpaces, initialLists, initialProfi
             <button
                 onClick={openSearch}
                 aria-label="Search"
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+                className="press-feedback flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
             >
                 <Search className="h-4.5 w-4.5" />
             </button>

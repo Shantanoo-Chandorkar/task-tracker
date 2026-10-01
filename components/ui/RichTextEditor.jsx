@@ -197,7 +197,7 @@ export default function RichTextEditor({ value, onChange, maxLength = 10000, pla
         },
         editorProps: {
             attributes: {
-                class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] p-3 overflow-y-auto max-h-[40vh] [overflow-wrap:anywhere]',
+                class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] p-3 overflow-y-auto max-h-[40dvh] [overflow-wrap:anywhere]',
                 placeholder,
             },
         },

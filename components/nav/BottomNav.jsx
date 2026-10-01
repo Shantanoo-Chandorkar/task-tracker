@@ -38,12 +38,12 @@ export default function BottomNav({ initialSpaces, initialLists }) {
 
     return (
         // Spacer matches the FAB's width so it centers at true 50%, not an uneven flex gap.
-        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
+        <nav className="lg:hidden translucent-bar fixed bottom-0 inset-x-0 z-20 border-t pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
             <div className="relative flex items-center">
                 <div className="flex-1 flex">
                     <Link
                         href="/"
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <Home className="h-5 w-5" />
                         Home
@@ -51,7 +51,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
 
                     <Link
                         href={tasksHref}
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <ListChecks className="h-5 w-5" />
                         Tasks
@@ -63,7 +63,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                 <div className="flex-1 flex">
                     <Link
                         href="/spaces"
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSpaces ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSpaces ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <LayoutGrid className="h-5 w-5" />
                         Spaces
@@ -71,14 +71,14 @@ export default function BottomNav({ initialSpaces, initialLists }) {
 
                     <Link
                         href="/settings"
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <Settings className="h-5 w-5" />
                         Settings
                     </Link>
                 </div>
 
-                <QuickCreateFab className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center" />
+                <QuickCreateFab className="press-feedback absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center" />
             </div>
         </nav>
     );

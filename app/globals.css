@@ -50,6 +50,13 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Optical tracking: small text opens up, large text tightens; body sizes stay at 0. */
+@theme {
+    --text-xs--letter-spacing: 0.01em;
+    --text-lg--letter-spacing: -0.005em;
+    --text-xl--letter-spacing: -0.01em;
+}
+
 /* Minimalist Charcoal palette - locked in the Bucket 2b plan. Accent (orange)
    carries Shadcn's --primary (buttons, links, active nav, focus ring); the
    structural --accent token (menu/row hover backgrounds) stays neutral gray so
@@ -167,10 +174,104 @@
     }
     html {
         @apply font-sans;
+        -webkit-tap-highlight-color: transparent;
+        /* Stops iOS inflating text on rotation. */
+        -webkit-text-size-adjust: 100%;
     }
     button:not(:disabled),
     [role='button']:not([aria-disabled='true']),
     a[href] {
         cursor: pointer;
+    }
+    /* Skips the double-tap-zoom wait; touch-none (utilities layer) still wins on drag handles. */
+    button,
+    [role='button'],
+    a[href],
+    summary {
+        touch-action: manipulation;
+    }
+    /* Controls only, so long-press never selects a label; body text stays selectable. */
+    button,
+    [role='button'] {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+    /* Scrolling to the end of a sheet or list must not drag the page behind it. */
+    .overflow-y-auto,
+    .overflow-auto {
+        overscroll-behavior: contain;
+    }
+}
+
+@layer components {
+    /* Content scrolls blurred under the bar; solid wherever blur is unsupported or unwanted. */
+    .translucent-bar {
+        background-color: var(--background);
+        border-color: var(--border);
+    }
+
+    @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+        .translucent-bar {
+            background-color: color-mix(in srgb, var(--background) 80%, transparent);
+            border-color: color-mix(in srgb, var(--border) 60%, transparent);
+            -webkit-backdrop-filter: blur(20px) saturate(1.5);
+            backdrop-filter: blur(20px) saturate(1.5);
+        }
+    }
+
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+        .translucent-bar {
+            background-color: var(--background);
+            border-color: var(--border);
+            -webkit-backdrop-filter: none;
+            backdrop-filter: none;
+        }
+    }
+
+    .press-feedback {
+        transition:
+            transform 100ms ease-out,
+            opacity 100ms ease-out;
+    }
+
+    /* Skips disabled controls and menu buttons whose menu is already open, so they don't shift. */
+    .press-feedback:active:not(:disabled):not([aria-expanded='true']) {
+        transform: scale(0.97);
+        opacity: 0.8;
+    }
+}
+
+/* Unlayered so it beats the animation utilities that set these variables. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        --tw-enter-translate-x: 0 !important;
+        --tw-enter-translate-y: 0 !important;
+        --tw-enter-scale: 1 !important;
+        --tw-enter-rotate: 0 !important;
+        --tw-enter-blur: 0 !important;
+        --tw-enter-opacity: 0 !important;
+        --tw-exit-translate-x: 0 !important;
+        --tw-exit-translate-y: 0 !important;
+        --tw-exit-scale: 1 !important;
+        --tw-exit-rotate: 0 !important;
+        --tw-exit-blur: 0 !important;
+        --tw-exit-opacity: 0 !important;
+    }
+
+    .press-feedback:active:not(:disabled):not([aria-expanded='true']) {
+        transform: none;
+    }
+}
+
+/* Unlayered on purpose: it must beat the text-sm utility, or iOS zooms the page on focus. */
+@media (pointer: coarse) {
+    input,
+    textarea,
+    select,
+    [contenteditable='true'] {
+        font-size: 16px;
     }
 }
