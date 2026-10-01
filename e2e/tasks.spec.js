@@ -295,6 +295,53 @@ test.describe('tasks', () => {
         await expect(page.getByRole('link', { name: movingTitle, exact: true })).toBeVisible();
     });
 
+    test('searching in "Move to..." finds a nested task with its path and moves the task there', async ({
+        page,
+    }) => {
+        const grandparentTitle = await createTask(page);
+        const nestedTitle = await addSubtask(page, taskRow(page, grandparentTitle));
+        const movingTitle = await createTask(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        await moveSheet.getByRole('searchbox', { name: 'Search tasks' }).fill(nestedTitle);
+        await expect(
+            moveSheet.getByRole('button', { name: nestedTitle, exact: true }),
+        ).toBeVisible();
+        await expect(moveSheet.getByText(`Main List > ${grandparentTitle}`)).toBeVisible();
+        // Results replace the accordion, so the collapsed parent row is gone while searching.
+        await expect(
+            moveSheet.getByRole('button', { name: `Expand ${grandparentTitle}` }),
+        ).toHaveCount(0);
+
+        await moveSheet.getByRole('button', { name: nestedTitle, exact: true }).click();
+        await expect(page.getByText('Task moved')).toBeVisible();
+    });
+
+    test('"Move to..." search shows an empty message, and clearing it restores the accordion', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        await addSubtask(page, taskRow(page, parentTitle));
+        const movingTitle = await createTask(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+        const searchBox = moveSheet.getByRole('searchbox', { name: 'Search tasks' });
+
+        await searchBox.fill('no-task-has-this-title');
+        await expect(moveSheet.getByText('No matching tasks')).toBeVisible();
+
+        await searchBox.clear();
+        await expect(moveSheet.getByText('No matching tasks')).toHaveCount(0);
+        await expect(
+            moveSheet.getByRole('button', { name: `Expand ${parentTitle}` }),
+        ).toBeVisible();
+    });
+
     test('clicking the empty space between a title and "More actions" toggles its subtasks', async ({
         page,
     }) => {
