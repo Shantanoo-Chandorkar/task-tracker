@@ -4,6 +4,7 @@ import { useLayoutEffect, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { THEME_BACKGROUND_COLORS } from '@/lib/theme-colors';
 
 const listeners = new Set();
 
@@ -42,6 +43,11 @@ export default function ThemeToggle() {
     // useLayoutEffect (not useEffect) so this flips synchronously inside the flushSync call below.
     useLayoutEffect(() => {
         document.documentElement.classList.toggle('dark', isDark);
+        // Overrides the OS-scheme theme-color tags so the status bar follows the in-app theme.
+        const backgroundColor = THEME_BACKGROUND_COLORS[isDark ? 'dark' : 'light'];
+        document
+            .querySelectorAll('meta[name="theme-color"]')
+            .forEach((themeColorTag) => themeColorTag.setAttribute('content', backgroundColor));
     }, [isDark]);
 
     function toggle(clickEvent) {

@@ -1,5 +1,5 @@
-// Bumped on any change to this file's caching logic so `activate` evicts stale caches.
-const CACHE_NAME = 'task-tracker-shell-v5';
+// Bumped when caching logic or a precached asset (e.g. the manifest) changes, so `activate` evicts stale caches.
+const CACHE_NAME = 'task-tracker-shell-v6';
 
 // Fixed, known-ahead-of-time assets only. Page HTML and API responses are
 // cached at runtime instead - Next's chunk filenames are content-hashed and
