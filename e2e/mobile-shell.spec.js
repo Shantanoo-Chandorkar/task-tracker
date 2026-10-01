@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/test.js';
+import { test, expect, loginAs } from './fixtures/test.js';
 
 const LIGHT_BACKGROUND = '#fdfbf7';
 const DARK_BACKGROUND = '#141210';
@@ -76,5 +76,19 @@ test.describe('mobile shell', () => {
             'font-size',
             isMobile ? '16px' : '14px',
         );
+    });
+
+    test('the bottom nav is frosted glass, and goes solid when high contrast is on', async ({
+        page,
+        testUser,
+        isMobile,
+    }) => {
+        test.skip(!isMobile, 'The bottom nav only exists below the lg breakpoint');
+        await loginAs(page, testUser);
+        const bottomNav = page.locator('nav.translucent-bar');
+
+        await expect(bottomNav).toHaveCSS('backdrop-filter', /blur/);
+        await page.emulateMedia({ contrast: 'more' });
+        await expect(bottomNav).toHaveCSS('backdrop-filter', 'none');
     });
 });

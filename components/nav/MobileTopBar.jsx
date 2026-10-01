@@ -46,7 +46,7 @@ export default function MobileTopBar({ initialSpaces, initialLists, initialProfi
                 : 'Task Tracker';
 
     return (
-        <div className="lg:hidden sticky top-[var(--guest-banner-height,0px)] z-20 flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-3">
+        <div className="lg:hidden translucent-bar sticky top-[var(--guest-banner-height,0px)] z-20 flex items-center justify-between gap-2 border-b px-3 py-3">
             <MobileNavDrawer
                 initialSpaces={initialSpaces}
                 initialLists={initialLists}

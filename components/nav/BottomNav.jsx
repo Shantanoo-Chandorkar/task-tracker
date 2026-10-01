@@ -38,7 +38,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
 
     return (
         // Spacer matches the FAB's width so it centers at true 50%, not an uneven flex gap.
-        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <nav className="lg:hidden translucent-bar fixed bottom-0 inset-x-0 z-20 border-t pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
             <div className="relative flex items-center">
                 <div className="flex-1 flex">
                     <Link

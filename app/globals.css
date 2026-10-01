@@ -197,6 +197,32 @@
     }
 }
 
+@layer components {
+    /* Content scrolls blurred under the bar; solid wherever blur is unsupported or unwanted. */
+    .translucent-bar {
+        background-color: var(--background);
+        border-color: var(--border);
+    }
+
+    @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+        .translucent-bar {
+            background-color: color-mix(in srgb, var(--background) 80%, transparent);
+            border-color: color-mix(in srgb, var(--border) 60%, transparent);
+            -webkit-backdrop-filter: blur(20px) saturate(1.5);
+            backdrop-filter: blur(20px) saturate(1.5);
+        }
+    }
+
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+        .translucent-bar {
+            background-color: var(--background);
+            border-color: var(--border);
+            -webkit-backdrop-filter: none;
+            backdrop-filter: none;
+        }
+    }
+}
+
 /* Unlayered on purpose: it must beat the text-sm utility, or iOS zooms the page on focus. */
 @media (pointer: coarse) {
     input,
