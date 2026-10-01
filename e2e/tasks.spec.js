@@ -198,6 +198,103 @@ test.describe('tasks', () => {
         await expect(moveSheet).toBeHidden();
     });
 
+    test('"Move to..." keeps siblings under their real parent and disables only the direct parent', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        const movingTitle = await addSubtask(page, taskRow(page, parentTitle));
+        const siblingTitle = await addSubtask(page, taskRow(page, parentTitle));
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        await expect(moveSheet.getByText('Current parent')).toBeVisible();
+        await expect(moveSheet.getByRole('button', { name: parentTitle, exact: true })).toHaveCount(
+            0,
+        );
+        // Everything starts collapsed, so the sibling is hidden until its real parent is opened.
+        await expect(
+            moveSheet.getByRole('button', { name: siblingTitle, exact: true }),
+        ).toHaveCount(0);
+
+        await moveSheet.getByRole('button', { name: `Expand ${parentTitle}` }).click();
+        await expect(
+            moveSheet.getByRole('button', { name: siblingTitle, exact: true }),
+        ).toBeVisible();
+
+        await moveSheet.getByRole('button', { name: `Collapse ${parentTitle}` }).click();
+        await expect(
+            moveSheet.getByRole('button', { name: siblingTitle, exact: true }),
+        ).toHaveCount(0);
+    });
+
+    test('in "Move to...", the empty space beside a title toggles it and only the title moves the task', async ({
+        page,
+    }) => {
+        const parentTitle = await createTask(page);
+        const movingTitle = await addSubtask(page, taskRow(page, parentTitle));
+        const siblingTitle = await addSubtask(page, taskRow(page, parentTitle));
+        const targetTitle = await createTask(page);
+        const targetChildTitle = await addSubtask(page, taskRow(page, targetTitle));
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        const targetRow = moveSheet.locator('div.min-h-11', {
+            has: moveSheet.getByRole('button', { name: `Expand ${targetTitle}` }),
+        });
+        const targetRowBox = await targetRow.boundingBox();
+        const emptySpacePosition = { x: targetRowBox.width - 8, y: targetRowBox.height / 2 };
+
+        await targetRow.click({ position: emptySpacePosition });
+        await expect(
+            moveSheet.getByRole('button', { name: targetChildTitle, exact: true }),
+        ).toBeVisible();
+        await expect(page.getByText('Task moved')).toHaveCount(0);
+
+        await targetRow.click({ position: emptySpacePosition });
+        await expect(
+            moveSheet.getByRole('button', { name: targetChildTitle, exact: true }),
+        ).toHaveCount(0);
+
+        // The disabled current parent has no select button, but its empty space must still toggle it.
+        const parentRow = moveSheet.locator('div.min-h-11', {
+            has: moveSheet.getByRole('button', { name: `Expand ${parentTitle}` }),
+        });
+        const parentRowBox = await parentRow.boundingBox();
+        await parentRow.click({
+            position: { x: parentRowBox.width - 8, y: parentRowBox.height / 2 },
+        });
+        await expect(
+            moveSheet.getByRole('button', { name: siblingTitle, exact: true }),
+        ).toBeVisible();
+    });
+
+    test('"Move to..." can move a task under a grandchild by expanding the accordion', async ({
+        page,
+    }) => {
+        const grandparentTitle = await createTask(page);
+        const childTitle = await addSubtask(page, taskRow(page, grandparentTitle));
+        const grandchildTitle = await addSubtask(page, taskRow(page, childTitle));
+        const movingTitle = await createTask(page);
+
+        await taskRow(page, movingTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Move to...' }).click();
+        const moveSheet = page.getByRole('dialog', { name: 'Move to...' });
+
+        await moveSheet.getByRole('button', { name: `Expand ${grandparentTitle}` }).click();
+        await moveSheet.getByRole('button', { name: `Expand ${childTitle}` }).click();
+        await moveSheet.getByRole('button', { name: grandchildTitle, exact: true }).click();
+        await expect(page.getByText('Task moved')).toBeVisible();
+
+        await taskRow(page, grandchildTitle)
+            .getByRole('button', { name: 'Expand subtasks' })
+            .click();
+        await expect(page.getByRole('link', { name: movingTitle, exact: true })).toBeVisible();
+    });
+
     test('clicking the empty space between a title and "More actions" toggles its subtasks', async ({
         page,
     }) => {

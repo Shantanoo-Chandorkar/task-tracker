@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
 import { deleteTask, deleteTaskAndReparentChildren, duplicateTask } from '@/actions/task-actions';
-import { findAncestors, findDescendantIds, flattenTreeDepthFirst } from '@/lib/tree';
+import { findAncestors, buildMoveTargetTree, hasSelectableMoveTarget } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
@@ -80,45 +80,29 @@ export default function TaskRowActions({
     const grandparentId = parent?.parent_id ?? null;
     const canPromote = Boolean(task.parent_id);
 
-    // Descendants are excluded to avoid a reparent cycle.
-    // Depth-first order keeps each subtask directly after its real parent - a flat sort would scatter them.
-    const descendantIds = findDescendantIds(task.id, flatList);
-    const validTargets = flattenTreeDepthFirst(flatList).filter(
-        (flatTask) =>
-            flatTask.id !== task.id &&
-            flatTask.id !== task.parent_id &&
-            !descendantIds.has(flatTask.id),
-    );
+    // Only roots carry sublist_id, so the moving task's sublist is its top ancestor's.
+    const movingTaskRoot = findAncestors(task.id, flatList).at(-1) ?? task;
+    const currentSublistId = movingTaskRoot.sublist_id ?? null;
 
-    function getSublistIdForTarget(targetId) {
-        const ancestors = findAncestors(targetId, flatList);
-        const root =
-            ancestors.length > 0
-                ? ancestors[ancestors.length - 1]
-                : flatList.find((flatTask) => flatTask.id === targetId);
-        return root?.sublist_id ?? null;
-    }
-
-    const currentSublistId = getSublistIdForTarget(task.id);
+    const moveTargetRoots = buildMoveTargetTree(flatList, task);
+    const knownSublistIds = new Set(sublists.map((sublist) => sublist.id));
+    // A root pointing at a sublist that no longer exists falls back to the Main List group.
+    const getGroupIdForRoot = (root) =>
+        knownSublistIds.has(root.sublist_id) ? root.sublist_id : null;
 
     const targetGroups = [
-        { id: null, name: 'Main List', targets: [], color: 'var(--primary)' },
+        { id: null, name: 'Main List', color: 'var(--primary)' },
         ...sublists.map((sublist) => ({
             id: sublist.id,
             name: sublist.name,
-            targets: [],
             color: sublist.color,
         })),
-    ];
+    ].map((group) => ({
+        ...group,
+        roots: moveTargetRoots.filter((root) => getGroupIdForRoot(root) === group.id),
+    }));
 
-    validTargets.forEach((target) => {
-        const sublistId = getSublistIdForTarget(target.id);
-        const group =
-            targetGroups.find((targetGroup) => targetGroup.id === sublistId) || targetGroups[0];
-        group.targets.push(target);
-    });
-
-    const sortedGroups = [
+    const moveGroups = [
         targetGroups.find((targetGroup) => targetGroup.id === currentSublistId),
         ...targetGroups.filter((targetGroup) => targetGroup.id !== currentSublistId),
     ]
@@ -127,38 +111,7 @@ export default function TaskRowActions({
             ...group,
             canMoveToRoot: isRootTask && group.id !== task.sublist_id,
         }))
-        .filter((group) => group.canMoveToRoot || group.targets.length > 0);
-
-    const moveDestinations = sortedGroups.flatMap((group) => {
-        const groupDestinations = [
-            {
-                id: `label-${group.id || 'main'}`,
-                label: group.name,
-                isLabel: true,
-                color: group.color,
-            },
-        ];
-
-        if (group.canMoveToRoot) {
-            groupDestinations.push({
-                id: `sublist-${group.id || 'main'}`,
-                label: `Move to ${group.name}`,
-                isSublist: true,
-                sublistId: group.id,
-            });
-        }
-
-        group.targets.forEach((target) => {
-            groupDestinations.push({
-                id: target.id,
-                label: target.title,
-                depth: target.depth,
-                isTask: true,
-                targetId: target.id,
-            });
-        });
-        return groupDestinations;
-    });
+        .filter((group) => group.canMoveToRoot || hasSelectableMoveTarget(group.roots));
 
     async function handleDeleteConfirm(strategy) {
         setDeleteOpen(false);
@@ -357,7 +310,7 @@ export default function TaskRowActions({
                             </DropdownMenuItem>
                         )}
 
-                        {moveDestinations.length > 0 && (
+                        {moveGroups.length > 0 && (
                             <DropdownMenuItem
                                 onClick={() => setMoveSheetOpen(true)}
                                 disabled={!canEditRow}
@@ -414,7 +367,7 @@ export default function TaskRowActions({
                 contentClassName="max-h-[70vh] overflow-y-auto"
             >
                 <MoveDestinationList
-                    destinations={moveDestinations}
+                    groups={moveGroups}
                     onSelect={(targetId) => {
                         setMoveSheetOpen(false);
                         handleMoveTo(targetId);
