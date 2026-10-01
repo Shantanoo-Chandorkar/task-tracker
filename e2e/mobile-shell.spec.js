@@ -117,6 +117,26 @@ test.describe('mobile shell', () => {
         await page.mouse.up();
     });
 
+    test('small text is opened up slightly, large text tightened, and body text left alone', async ({
+        page,
+    }) => {
+        await page.goto('/login');
+        await page.evaluate(() => {
+            for (const sizeClass of ['text-xs', 'text-base', 'text-lg', 'text-xl']) {
+                const sampleText = document.createElement('p');
+                sampleText.id = `sample-${sizeClass}`;
+                sampleText.className = sizeClass;
+                sampleText.textContent = 'Sample';
+                document.body.appendChild(sampleText);
+            }
+        });
+
+        await expect(page.locator('#sample-text-xs')).toHaveCSS('letter-spacing', '0.12px');
+        await expect(page.locator('#sample-text-base')).toHaveCSS('letter-spacing', 'normal');
+        await expect(page.locator('#sample-text-lg')).toHaveCSS('letter-spacing', '-0.09px');
+        await expect(page.locator('#sample-text-xl')).toHaveCSS('letter-spacing', '-0.2px');
+    });
+
     test('reduced motion turns slide-in movement into a plain fade', async ({ page }) => {
         await page.goto('/login');
         await page.evaluate(() => {

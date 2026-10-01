@@ -50,6 +50,13 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Optical tracking: small text opens up, large text tightens; body sizes stay at 0. */
+@theme {
+    --text-xs--letter-spacing: 0.01em;
+    --text-lg--letter-spacing: -0.005em;
+    --text-xl--letter-spacing: -0.01em;
+}
+
 /* Minimalist Charcoal palette - locked in the Bucket 2b plan. Accent (orange)
    carries Shadcn's --primary (buttons, links, active nav, focus ring); the
    structural --accent token (menu/row hover backgrounds) stays neutral gray so
