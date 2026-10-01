@@ -257,7 +257,7 @@ export default function TaskFormDialog({
                     {/* Tags */}
                     <LabeledField label="Tags">
                         {isEditing ? (
-                            <TaskTagPicker task={task} spaceId={spaceId} />
+                            <TaskTagPicker task={task} spaceId={spaceId} isFieldSized />
                         ) : (
                             <StagedTagPicker
                                 spaceId={spaceId}

@@ -35,6 +35,7 @@ export default function StagedTagPicker({ spaceId, tagNames, onChange }) {
             suggestions={suggestions}
             onAdd={handleAdd}
             onRemove={handleRemove}
+            isFieldSized
         />
     );
 }

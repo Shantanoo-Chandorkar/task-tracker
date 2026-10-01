@@ -219,7 +219,7 @@ function TaskRow({
                     </div>
 
                     {/* Read-only pills on the left; the status picker is a control, so it sits apart on the right */}
-                    <div data-row-space className="flex items-start gap-1.5">
+                    <div data-row-space className="flex items-center gap-1.5">
                         {/* Wraps so pills never push the status picker past the row edge */}
                         <div
                             data-row-space
