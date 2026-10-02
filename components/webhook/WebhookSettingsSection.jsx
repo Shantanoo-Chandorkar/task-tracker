@@ -39,14 +39,20 @@ export default function WebhookSettingsSection({ spaceId }) {
         setEndpointBeingEdited(null);
     }
 
-    async function handleFormSaved({ secret }) {
-        closeForm();
+    async function handleFormSaved({ secret, endpointId }) {
+        // Closes only after the refetch, so "Add webhook" cannot reappear before the new endpoint is listed.
         await queryClient.invalidateQueries({ queryKey: ['webhook-endpoints', spaceId] });
-        if (secret) setRevealedSecret({ secret, heading: 'Webhook created' });
+        closeForm();
+        if (secret) setRevealedSecret({ secret, endpointId, heading: 'Webhook created' });
     }
 
-    function handleSecretRotated(secret) {
-        setRevealedSecret({ secret, heading: 'New signing secret' });
+    function handleSecretRotated(endpointId, secret) {
+        setRevealedSecret({ secret, endpointId, heading: 'New signing secret' });
+    }
+
+    // A secret card for a webhook that no longer exists is only clutter, and a stale copy of a live secret.
+    function handleEndpointDeleted(endpointId) {
+        setRevealedSecret((shown) => (shown?.endpointId === endpointId ? null : shown));
     }
 
     return (
@@ -100,7 +106,8 @@ export default function WebhookSettingsSection({ spaceId }) {
                         key={endpoint.id}
                         endpoint={endpoint}
                         onEdit={openEditForm}
-                        onSecretRotated={handleSecretRotated}
+                        onSecretRotated={(secret) => handleSecretRotated(endpoint.id, secret)}
+                        onDeleted={handleEndpointDeleted}
                     />
                 ))}
 
