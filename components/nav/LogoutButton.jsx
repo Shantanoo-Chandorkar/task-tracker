@@ -41,13 +41,14 @@ export default function LogoutButton({ onNavigate, initialProfile }) {
             });
             return;
         }
-        setIsPending(false);
 
         if (signOutResult.error) {
+            setIsPending(false);
             toast.error(signOutResult.error, { id: toastId });
             return;
         }
 
+        // Stays locked through navigation, or a second click would fire another sign-out.
         await clearAllCaches(queryClient);
         toast.success('Logged out', { id: toastId });
         onNavigate?.();

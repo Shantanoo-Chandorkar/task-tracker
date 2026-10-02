@@ -36,6 +36,7 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
         if (!email.trim() || !password) return;
 
         setSubmitting(true);
+        setError('');
 
         let signInResult;
         try {
@@ -47,13 +48,14 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
             setError('Could not reach the server. Check your connection and try again.');
             return;
         }
-        setSubmitting(false);
 
         if (signInResult.error) {
+            setSubmitting(false);
             setError(signInResult.error);
             return;
         }
 
+        // Stays locked through navigation, or a double click would submit the login twice.
         await clearAllCaches(queryClient);
         router.push(redirectTo);
         router.refresh();

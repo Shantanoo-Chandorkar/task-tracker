@@ -39,13 +39,14 @@ export default function ResetPasswordForm() {
             setError('Could not reach the server. Check your connection and try again.');
             return;
         }
-        setSubmitting(false);
 
         if (updateResult.error) {
+            setSubmitting(false);
             setError(updateResult.error);
             return;
         }
 
+        // Stays locked through navigation, or a double click would submit the new password twice.
         // /auth/confirm already established this session -- bust the cache same as LoginForm does.
         await clearAllCaches(queryClient);
         toast.info('Password updated. Log in with your new password.');
