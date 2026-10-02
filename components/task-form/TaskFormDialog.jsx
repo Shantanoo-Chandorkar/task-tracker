@@ -25,6 +25,7 @@ import LabeledField from '@/components/ui/LabeledField';
 import { createTaskWithTags, updateTask } from '@/actions/task-actions';
 import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
 import { Loader } from '@/components/ui/loader';
+import EditorErrorBoundary from '@/components/ui/EditorErrorBoundary';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
 
@@ -225,12 +226,19 @@ export default function TaskFormDialog({
                     currentLength={description.length}
                     maxLength={DESCRIPTION_MAX}
                 >
-                    <RichTextEditor
+                    <EditorErrorBoundary
                         value={description}
                         onChange={setDescription}
                         maxLength={DESCRIPTION_MAX}
                         placeholder="Description (optional)"
-                    />
+                    >
+                        <RichTextEditor
+                            value={description}
+                            onChange={setDescription}
+                            maxLength={DESCRIPTION_MAX}
+                            placeholder="Description (optional)"
+                        />
+                    </EditorErrorBoundary>
                 </CharLimitField>
 
                 {/* 2-column grid - stacking these four full-width each wastes space on wider screens */}
