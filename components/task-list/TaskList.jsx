@@ -39,7 +39,7 @@ import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
 import { useSpaceById } from '@/hooks/useSpaceById';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
 import { taskMatchesFilters } from '@/lib/task-filters';
-import { duplicateTask } from '@/actions/task-actions';
+import { useDuplicateTask } from '@/hooks/useDuplicateTask';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
@@ -51,8 +51,12 @@ import ListHeader from './ListHeader';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { fetchDeleteCounts } from '@/lib/fetch-delete-counts';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
+// Ctrl/Cmd+D inside these keeps the browser's own meaning instead of duplicating the remembered row.
+const TYPING_OR_DIALOG_SELECTOR =
+    'input, textarea, select, [contenteditable="true"], [role="dialog"]';
 const MOUSE_ACTIVATION = { distance: 5 };
 const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
 
@@ -324,6 +328,7 @@ export default function TaskList({
     currentUserId,
 }) {
     const queryClient = useQueryClient();
+    const { duplicateTaskById } = useDuplicateTask(listId);
 
     // Every mutation below only ever affects this one page - one shared bust target.
     function bustThisListPage() {
@@ -590,31 +595,29 @@ export default function TaskList({
             const isCtrl = keyboardEvent.ctrlKey || keyboardEvent.metaKey;
             if (!isCtrl || keyboardEvent.key !== 'd' || !focusedTaskId) return;
 
+            // The remembered row must not capture the key while the user types or works inside a dialog
+            if (keyboardEvent.target.closest?.(TYPING_OR_DIALOG_SELECTOR)) return;
+
             keyboardEvent.preventDefault();
-            duplicateTask(focusedTaskId).then(({ error }) => {
-                if (error) {
-                    toast.error(error);
-                    return;
-                }
-                queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-                queryClient.invalidateQueries({ queryKey: ['lists'] });
-                bustPageCache({ urls: [`/lists/${listId}`] });
-                toast.success('Task duplicated');
-            });
+            if (keyboardEvent.repeat) return;
+            duplicateTaskById(focusedTaskId);
         }
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [focusedTaskId, listId, queryClient]);
+    }, [focusedTaskId, duplicateTaskById]);
 
     async function requestDeleteSublist(sublist) {
-        const response = await fetch(`/api/sublists/${sublist.id}`);
-        const counts = await response.json();
-        setDeleteSublistTarget({
-            id: sublist.id,
-            name: sublist.name,
-            taskCount: response.ok ? counts.task_count : null,
-        });
+        try {
+            const sublistDeleteCounts = await fetchDeleteCounts(`/api/sublists/${sublist.id}`);
+            setDeleteSublistTarget({
+                id: sublist.id,
+                name: sublist.name,
+                taskCount: sublistDeleteCounts ? sublistDeleteCounts.task_count : null,
+            });
+        } catch {
+            toast.error('Could not reach the server. Try again.');
+        }
     }
 
     async function handleConfirmDeleteSublist() {

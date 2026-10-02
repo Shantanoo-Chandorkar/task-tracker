@@ -55,4 +55,26 @@ test.describe('sublists', () => {
     });
 
     // name-too-long test dropped: maxLength truncates fill(), unreachable via UI - see docs/e2e-test-quality.md.
+
+    test('deleting a sublist while the server is unreachable shows an error and keeps the page usable', async ({
+        page,
+    }) => {
+        const sublistName = await createSublist(page, spaceName, listName);
+        const sublistCountsRequest = /\/api\/sublists\/[0-9a-f-]{36}/;
+        // The context, not the page, sees requests the service worker handles.
+        await page
+            .context()
+            .route(sublistCountsRequest, (route) => route.abort('connectionrefused'));
+
+        await page.getByRole('button', { name: 'Sublist actions' }).click();
+        await page.getByRole('menuitem', { name: 'Delete' }).click();
+
+        await expect(page.getByText('Could not reach the server. Try again.')).toBeVisible();
+        await expect(page.getByText('Delete “' + sublistName + '”?')).toHaveCount(0);
+
+        await page.context().unroute(sublistCountsRequest);
+        await page.getByRole('button', { name: 'Sublist actions' }).click();
+        await page.getByRole('menuitem', { name: 'Delete' }).click();
+        await expect(page.getByText('Delete “' + sublistName + '”?')).toBeVisible();
+    });
 });

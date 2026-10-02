@@ -10,6 +10,20 @@ import {
     spaceSection,
 } from './fixtures/app-data.js';
 
+/**
+ * Records every Server Action call from now on, since a write's request leaves long before its result shows.
+ *
+ * @param {import('@playwright/test').Page} page - Page whose requests are recorded.
+ * @returns {string[]} Live list of the request URLs; read it after the action under test.
+ */
+function collectServerActionRequests(page) {
+    const serverActionRequests = [];
+    page.on('request', (request) => {
+        if (request.headers()['next-action']) serverActionRequests.push(request.url());
+    });
+    return serverActionRequests;
+}
+
 test.describe('tasks', () => {
     let listId;
 
@@ -597,5 +611,40 @@ test.describe('tasks', () => {
         expect(created.is_recurring).toBe(true);
         expect(created.next_occurrence).not.toBeNull();
         expect(new Date(created.next_occurrence).getTime()).toBeGreaterThan(Date.now());
+    });
+
+    test('Ctrl+D duplicates the clicked task exactly once, even when pressed twice quickly', async ({
+        page,
+    }) => {
+        const title = await createTask(page);
+        await waitForCreatedToastsToClear(page);
+        // The row's own click handler remembers the task; the corner avoids the title link and controls.
+        await taskRow(page, title).click({ position: { x: 2, y: 2 } });
+
+        const serverActionRequests = collectServerActionRequests(page);
+        await page.keyboard.press('Control+d');
+        await page.keyboard.press('Control+d');
+
+        await expect(page.getByText('Task duplicated')).toBeVisible();
+        await expect(taskRow(page, `${title} (copy)`)).toBeVisible();
+        expect(serverActionRequests).toHaveLength(1);
+    });
+
+    test('Ctrl+D while typing in the task form does not duplicate the remembered task', async ({
+        page,
+    }) => {
+        const title = await createTask(page);
+        await waitForCreatedToastsToClear(page);
+        await taskRow(page, title).click({ position: { x: 2, y: 2 } });
+
+        await page.getByRole('button', { name: 'Add Task' }).first().click();
+        await page.getByRole('dialog').getByPlaceholder('Task title').focus();
+
+        const serverActionRequests = collectServerActionRequests(page);
+        await page.keyboard.press('Control+d');
+
+        // A duplicate takes a server round trip to show up, but its request leaves the instant the key is handled.
+        await page.waitForTimeout(500);
+        expect(serverActionRequests).toHaveLength(0);
     });
 });

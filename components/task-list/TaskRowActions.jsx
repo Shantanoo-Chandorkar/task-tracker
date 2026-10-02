@@ -17,7 +17,8 @@ import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { MoreHorizontal } from 'lucide-react';
-import { deleteTask, deleteTaskAndReparentChildren, duplicateTask } from '@/actions/task-actions';
+import { deleteTask, deleteTaskAndReparentChildren } from '@/actions/task-actions';
+import { useDuplicateTask } from '@/hooks/useDuplicateTask';
 import { findAncestors, buildMoveTargetTree, hasSelectableMoveTarget } from '@/lib/tree';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
@@ -52,6 +53,7 @@ export default function TaskRowActions({
     myPermission,
 }) {
     const queryClient = useQueryClient();
+    const { duplicateTaskById } = useDuplicateTask(listId);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
@@ -213,30 +215,8 @@ export default function TaskRowActions({
 
     async function handleDuplicate() {
         setPending(true);
-        const toastId = toast.loading('Duplicating task...');
-
-        let error;
-        try {
-            ({ error } = await duplicateTask(task.id));
-        } catch {
-            setPending(false);
-            toast.error('Could not reach the server. Check your connection and try again.', {
-                id: toastId,
-            });
-            return;
-        }
+        await duplicateTaskById(task.id);
         setPending(false);
-
-        if (error) {
-            toast.error(error, { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-        // Duplicating creates a new task, changing the list's total count in ['lists'].
-        queryClient.invalidateQueries({ queryKey: ['lists'] });
-        bustPageCache({ urls: [`/lists/${listId}`] });
-        toast.success('Task duplicated', { id: toastId });
     }
 
     return (

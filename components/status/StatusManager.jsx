@@ -147,6 +147,8 @@ export default function StatusManager({ spaceId, initialStatuses }) {
 
         const oldIndex = statuses.findIndex((status) => status.id === active.id);
         const newIndex = statuses.findIndex((status) => status.id === over.id);
+        // The list can change mid-drag (refetch), leaving an id missing and arrayMove with a -1 index.
+        if (oldIndex < 0 || newIndex < 0) return;
         const reordered = arrayMove(statuses, oldIndex, newIndex);
 
         queryClient.setQueryData(['statuses', spaceId], reordered);

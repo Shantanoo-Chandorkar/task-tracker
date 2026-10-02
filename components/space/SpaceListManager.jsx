@@ -40,6 +40,7 @@ import JoinSpaceDialog from './JoinSpaceDialog';
 import SpaceSharingSection from './SpaceSharingSection';
 import SpaceSettingsSheet from './SpaceSettingsSheet';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { fetchDeleteCounts } from '@/lib/fetch-delete-counts';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };
@@ -423,13 +424,12 @@ export default function SpaceListManager({
     async function requestDeleteSpace(space) {
         setError('');
         try {
-            const response = await fetch(`/api/spaces/${space.id}`);
-            const spaceDeleteCounts = await response.json();
+            const spaceDeleteCounts = await fetchDeleteCounts(`/api/spaces/${space.id}`);
             setDeleteTarget({
                 type: 'space',
                 id: space.id,
                 name: space.name,
-                counts: response.ok
+                counts: spaceDeleteCounts
                     ? { lists: spaceDeleteCounts.list_count, tasks: spaceDeleteCounts.task_count }
                     : null,
             });
@@ -441,13 +441,12 @@ export default function SpaceListManager({
     async function requestDeleteList(list) {
         setError('');
         try {
-            const response = await fetch(`/api/lists/${list.id}`);
-            const listDeleteCounts = await response.json();
+            const listDeleteCounts = await fetchDeleteCounts(`/api/lists/${list.id}`);
             setDeleteTarget({
                 type: 'list',
                 id: list.id,
                 name: list.name,
-                counts: response.ok ? { tasks: listDeleteCounts.task_count } : null,
+                counts: listDeleteCounts ? { tasks: listDeleteCounts.task_count } : null,
             });
         } catch {
             toast.error('Could not reach the server. Try again.');
