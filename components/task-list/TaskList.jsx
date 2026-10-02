@@ -19,14 +19,8 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronRight, GripVertical, Plus, MoreHorizontal } from 'lucide-react';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ChevronDown, ChevronRight, GripVertical, Plus } from 'lucide-react';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
@@ -44,6 +38,8 @@ import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
 import { useSpaceById } from '@/hooks/useSpaceById';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
 import { taskMatchesFilters } from '@/lib/task-filters';
+import { getMoveTargets } from '@/lib/move-targets';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
 import { useDuplicateTask } from '@/hooks/useDuplicateTask';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
@@ -54,6 +50,7 @@ import TaskFilterBar from './TaskFilterBar';
 import VelocityMeter from './VelocityMeter';
 import ListHeader from './ListHeader';
 import { Button } from '@/components/ui/button';
+import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
 import { Loader } from '@/components/ui/loader';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
@@ -114,6 +111,7 @@ function siblingScopedCollisionDetection(args) {
  * @param {string|null} props.currentUserId - Caller's user id, for row-level ownership checks
  * @param {'owner'|'full'|'restricted'|'read_only'|null} props.myPermission - Caller's tier for this space
  * @param {number|null} [props.maxSubtasksPerParent] - Space's direct-subtask cap, or null for no limit
+ * @param {(taskId: string, neighbourId: string) => void} [props.onMoveTask] - Moves a task next to a neighbour
  * @param {boolean} [props.isInSublist] - True when a sublist heading sits above, so this heading is one level lower
  */
 function StatusGroup({
@@ -130,6 +128,7 @@ function StatusGroup({
     currentUserId,
     myPermission,
     maxSubtasksPerParent,
+    onMoveTask,
     isInSublist = false,
 }) {
     const headingId = useId();
@@ -195,6 +194,8 @@ function StatusGroup({
                                         currentUserId={currentUserId}
                                         myPermission={myPermission}
                                         maxSubtasksPerParent={maxSubtasksPerParent}
+                                        siblingTasks={tasks}
+                                        onMoveTask={onMoveTask}
                                     />
                                 </div>
                             </Fragment>
@@ -243,6 +244,8 @@ function describeBucketBreakdown(countsByStatusId, statuses) {
  * @param {Function} props.onToggle
  * @param {Function} props.onEdit
  * @param {Function} props.onDelete
+ * @param {{ previousId: string|null, nextId: string|null }} props.moveTargets - Neighbouring sublists for Move up/down
+ * @param {(sublistId: string, neighbourId: string) => void} props.onMoveSublist - Moves a sublist next to a neighbour
  */
 function SublistHeader({
     sublist,
@@ -253,6 +256,8 @@ function SublistHeader({
     onEdit,
     onDelete,
     onAddTask,
+    moveTargets,
+    onMoveSublist,
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: sublist.id,
@@ -275,7 +280,7 @@ function SublistHeader({
                 {...listeners}
                 {...attributes}
                 className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 p-3 -m-3"
-                aria-label="Drag to reorder"
+                aria-label={`Drag to reorder ${sublist.name}`}
             >
                 <GripVertical className="h-3.5 w-3.5" />
             </button>
@@ -315,29 +320,24 @@ function SublistHeader({
                 </span>
             )}
 
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                        aria-label="Sublist actions"
-                    >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-40">
-                    <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
-                    <DropdownMenuItem onClick={onAddTask}>Add task</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        onClick={onDelete}
-                        className="text-destructive focus:text-destructive"
-                    >
-                        Delete
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <RowActionsMenu label={`Sublist actions for ${sublist.name}`}>
+                <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+                <DropdownMenuItem onClick={onAddTask}>Add task</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <MoveMenuItems
+                    canMoveUp={Boolean(moveTargets.previousId)}
+                    canMoveDown={Boolean(moveTargets.nextId)}
+                    onMoveUp={() => onMoveSublist(sublist.id, moveTargets.previousId)}
+                    onMoveDown={() => onMoveSublist(sublist.id, moveTargets.nextId)}
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    onClick={onDelete}
+                    className="text-destructive focus:text-destructive"
+                >
+                    Delete
+                </DropdownMenuItem>
+            </RowActionsMenu>
         </div>
     );
 }
@@ -577,7 +577,6 @@ export default function TaskList({
                     });
 
                     if (!response.ok) {
-                        console.error('Drag reorder failed');
                         toast.error('Failed to reorder task', { id: toastId });
                         await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
                         bustThisListPage();
@@ -587,8 +586,7 @@ export default function TaskList({
                     await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
                     bustThisListPage();
                     toast.success('Order updated', { id: toastId });
-                } catch (caughtError) {
-                    console.error('Drag reorder failed:', caughtError);
+                } catch {
                     toast.error('Failed to reorder task', { id: toastId });
                     await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
                     bustThisListPage();
@@ -630,8 +628,7 @@ export default function TaskList({
                     await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
                     bustThisListPage();
                     toast.success('Order updated', { id: toastId });
-                } catch (caughtError) {
-                    console.error('Sublist reorder failed:', caughtError);
+                } catch {
                     toast.error('Failed to reorder sublist', { id: toastId });
                     await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
                     bustThisListPage();
@@ -640,6 +637,21 @@ export default function TaskList({
             () => toast.info(REORDER_BUSY_MESSAGE),
         );
     }
+
+    /** Move up / Move down: the same save path as a drag, so the same guards and the same optimistic update apply. */
+    function moveTaskNextTo(taskId, neighbourId) {
+        return handleTaskDragEnd({ active: { id: taskId }, over: { id: neighbourId } });
+    }
+
+    function moveSublistNextTo(sublistId, neighbourId) {
+        return handleSublistDragEnd({ active: { id: sublistId }, over: { id: neighbourId } });
+    }
+
+    const announcements = buildAnnouncements(
+        (rowId) =>
+            flatList.find((task) => task.id === rowId)?.title ??
+            sublists.find((sublist) => sublist.id === rowId)?.name,
+    );
 
     function handleDragEnd({ active, over }) {
         if (!over || active.id === over.id) return;
@@ -749,6 +761,7 @@ export default function TaskList({
             sensors={sensors}
             collisionDetection={siblingScopedCollisionDetection}
             onDragEnd={handleDragEnd}
+            accessibility={{ announcements, screenReaderInstructions: SCREEN_READER_INSTRUCTIONS }}
         >
             <div className="space-y-6">
                 <ListHeader
@@ -790,6 +803,8 @@ export default function TaskList({
                                 <div key={bucket.key}>
                                     <SublistHeader
                                         sublist={bucket.sublist}
+                                        moveTargets={getMoveTargets(sublists, bucket.sublist.id)}
+                                        onMoveSublist={moveSublistNextTo}
                                         taskCount={0}
                                         isCollapsed={isCollapsed}
                                         onToggle={() => toggleGroup(`sublist:${bucket.sublist.id}`)}
@@ -837,6 +852,8 @@ export default function TaskList({
                                 {bucket.sublist && (
                                     <SublistHeader
                                         sublist={bucket.sublist}
+                                        moveTargets={getMoveTargets(sublists, bucket.sublist.id)}
+                                        onMoveSublist={moveSublistNextTo}
                                         taskCount={bucket.allDepthCount}
                                         breakdownText={describeBucketBreakdown(
                                             bucket.allDepthCountsByStatusId,
@@ -894,6 +911,7 @@ export default function TaskList({
                                                 currentUserId={currentUserId}
                                                 myPermission={myPermission}
                                                 maxSubtasksPerParent={maxSubtasksPerParent}
+                                                onMoveTask={moveTaskNextTo}
                                             />
                                         ))}
                                         <StatusGroup
@@ -917,6 +935,7 @@ export default function TaskList({
                                             currentUserId={currentUserId}
                                             myPermission={myPermission}
                                             maxSubtasksPerParent={maxSubtasksPerParent}
+                                            onMoveTask={moveTaskNextTo}
                                         />
                                     </>
                                 )}

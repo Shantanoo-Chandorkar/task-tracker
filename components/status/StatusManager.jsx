@@ -24,13 +24,16 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { GripVertical } from 'lucide-react';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
 import { Loader } from '@/components/ui/loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
 import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
+import { getMoveTargets } from '@/lib/move-targets';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };
@@ -44,8 +47,10 @@ const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
  * @param {Function} props.onEditRequest - Called with the status to open it for editing
  * @param {Function} props.onDeleteRequest - Called with the status to ask for delete confirmation
  * @param {boolean} props.isOnly - Whether this is the only status (disables delete)
+ * @param {{ previousId: string|null, nextId: string|null }} props.moveTargets - Neighbouring statuses for Move up/down
+ * @param {(statusId: string, neighbourId: string) => void} props.onMoveStatus - Moves the status next to a neighbour
  */
-function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
+function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly, moveTargets, onMoveStatus }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: status.id,
     });
@@ -57,6 +62,14 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
     };
 
     const canDelete = !isOnly && !status.is_default && !status.code;
+    // A disabled item says why it is disabled, so the reason is not hidden in a tooltip
+    const deleteLabel = status.is_default
+        ? 'Cannot delete the default status'
+        : status.code
+          ? 'Built-in status - can’t be deleted'
+          : isOnly
+            ? 'Cannot delete the only status'
+            : 'Delete';
 
     return (
         <div
@@ -69,7 +82,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
                 {...attributes}
                 {...listeners}
                 className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
-                aria-label="Drag to reorder"
+                aria-label={`Drag to reorder ${status.name}`}
             >
                 <GripVertical className="h-4 w-4" />
             </button>
@@ -87,33 +100,24 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
                     <span className="ml-2 text-xs text-muted-foreground">(built-in)</span>
                 )}
             </span>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                onClick={() => onEditRequest(status)}
-                aria-label="Edit status"
-            >
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() => canDelete && onDeleteRequest(status)}
-                disabled={!canDelete}
-                title={
-                    status.is_default
-                        ? 'Cannot delete the default status'
-                        : status.code
-                          ? 'Built-in status - can’t be deleted'
-                          : isOnly
-                            ? 'Cannot delete the only status'
-                            : 'Delete status'
-                }
-            >
-                <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <RowActionsMenu label={`More actions for ${status.name}`}>
+                <DropdownMenuItem onClick={() => onEditRequest(status)}>Edit</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <MoveMenuItems
+                    canMoveUp={Boolean(moveTargets.previousId)}
+                    canMoveDown={Boolean(moveTargets.nextId)}
+                    onMoveUp={() => onMoveStatus(status.id, moveTargets.previousId)}
+                    onMoveDown={() => onMoveStatus(status.id, moveTargets.nextId)}
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    onSelect={() => onDeleteRequest(status)}
+                    disabled={!canDelete}
+                    className={canDelete ? 'text-destructive focus:text-destructive' : undefined}
+                >
+                    {deleteLabel}
+                </DropdownMenuItem>
+            </RowActionsMenu>
         </div>
     );
 }
@@ -195,6 +199,15 @@ export default function StatusManager({ spaceId, initialStatuses }) {
         );
     }
 
+    /** Move up / Move down: the same save path as a drag, so the same guards and optimistic update apply. */
+    function moveStatusNextTo(statusId, neighbourId) {
+        return handleDragEnd({ active: { id: statusId }, over: { id: neighbourId } });
+    }
+
+    const announcements = buildAnnouncements(
+        (rowId) => statuses.find((status) => status.id === rowId)?.name,
+    );
+
     function handleConfirmDelete() {
         if (!deleteTarget) return;
 
@@ -235,6 +248,10 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
+                    accessibility={{
+                        announcements,
+                        screenReaderInstructions: SCREEN_READER_INSTRUCTIONS,
+                    }}
                 >
                     <SortableContext
                         items={statuses.map((status) => status.id)}
@@ -250,6 +267,8 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                                     }
                                     onDeleteRequest={setDeleteTarget}
                                     isOnly={statuses.length === 1}
+                                    moveTargets={getMoveTargets(statuses, status.id)}
+                                    onMoveStatus={moveStatusNextTo}
                                 />
                             ))}
                         </div>

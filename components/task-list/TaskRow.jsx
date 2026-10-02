@@ -18,6 +18,7 @@ import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 import { useTaskPriority } from '@/hooks/useTaskPriority';
 import { isStartOfUnprioritisedTier } from '@/lib/tree';
+import { getMoveTargets } from '@/lib/move-targets';
 
 /**
  * Plain line between the prioritised and unprioritised tier, named so it is not an anonymous separator.
@@ -61,6 +62,8 @@ export function PriorityLine() {
  * @param {string|null} [props.currentUserId] - Caller's user id, for row-level ownership checks
  * @param {'owner'|'full'|'restricted'|'read_only'|null} [props.myPermission] - Caller's tier for this space
  * @param {number|null} [props.maxSubtasksPerParent] - Space's direct-subtask cap, or null for no limit
+ * @param {object[]} [props.siblingTasks] - Rows in this task's own sortable list, for Move up and Move down
+ * @param {(taskId: string, neighbourId: string) => void} [props.onMoveTask] - Moves a task next to a neighbour
  */
 function TaskRow({
     task,
@@ -70,6 +73,8 @@ function TaskRow({
     currentUserId,
     myPermission,
     maxSubtasksPerParent,
+    siblingTasks,
+    onMoveTask,
 }) {
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
     const expandKey = `task-row:${task.id}`;
@@ -88,6 +93,16 @@ function TaskRow({
         transform: CSS.Transform.toString(transform),
         transition,
     };
+
+    // The star changes tier, so Move up and Move down never step across the prioritised line
+    const moveTargets = onMoveTask
+        ? getMoveTargets(
+              siblingTasks,
+              task.id,
+              (row, neighbourRow) =>
+                  Boolean(row.is_prioritised) === Boolean(neighbourRow.is_prioritised),
+          )
+        : null;
 
     const hasChildren = task.children && task.children.length > 0;
     const directChildCount = task.children?.length ?? 0;
@@ -137,7 +152,7 @@ function TaskRow({
                         {...listeners}
                         {...attributes}
                         className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground p-3 -m-3 flex-shrink-0 focus:outline-none"
-                        aria-label="Drag to reorder"
+                        aria-label={`Drag to reorder ${task.title}`}
                     >
                         <GripVertical className="h-3.5 w-3.5" />
                     </button>
@@ -237,6 +252,8 @@ function TaskRow({
                             listId={listId}
                             currentUserId={currentUserId}
                             myPermission={myPermission}
+                            moveTargets={moveTargets}
+                            onMoveTask={onMoveTask}
                         />
                     </div>
 
@@ -311,6 +328,8 @@ function TaskRow({
                                     currentUserId={currentUserId}
                                     myPermission={myPermission}
                                     maxSubtasksPerParent={maxSubtasksPerParent}
+                                    siblingTasks={task.children}
+                                    onMoveTask={onMoveTask}
                                 />
                             </Fragment>
                         ))}

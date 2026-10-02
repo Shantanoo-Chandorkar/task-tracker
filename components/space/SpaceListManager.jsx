@@ -23,8 +23,9 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { GripVertical, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/ui/loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
@@ -45,6 +46,8 @@ import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
 import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { countSpaceContents } from '@/lib/delete-counts';
+import { getMoveTargets } from '@/lib/move-targets';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };
@@ -58,8 +61,10 @@ const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
  * @param {object} props.list - List to display
  * @param {Function} props.onEditRequest - Called with the list to open it for editing
  * @param {Function} props.onDeleteRequest - Called with the list to ask for delete confirmation
+ * @param {{ previousId: string|null, nextId: string|null }} props.moveTargets - Neighbouring lists for Move up/down
+ * @param {(list: object, neighbourId: string) => void} props.onMoveList - Moves the list next to a neighbour
  */
-function ListRow({ list, onEditRequest, onDeleteRequest }) {
+function ListRow({ list, onEditRequest, onDeleteRequest, moveTargets, onMoveList }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: list.id,
         data: { type: 'list', spaceId: list.space_id },
@@ -81,7 +86,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
                 {...listeners}
                 {...attributes}
                 className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
-                aria-label="Drag to reorder"
+                aria-label={`Drag to reorder ${list.name}`}
             >
                 <GripVertical className="h-3.5 w-3.5" />
             </button>
@@ -92,24 +97,23 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
             <Link href={`/lists/${list.id}`} className="flex-1 text-sm text-foreground">
                 {list.name}
             </Link>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                onClick={() => onEditRequest(list)}
-                aria-label="Edit list"
-            >
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() => onDeleteRequest(list)}
-                aria-label="Delete list"
-            >
-                <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <RowActionsMenu label={`More actions for ${list.name}`}>
+                <DropdownMenuItem onClick={() => onEditRequest(list)}>Edit</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <MoveMenuItems
+                    canMoveUp={Boolean(moveTargets.previousId)}
+                    canMoveDown={Boolean(moveTargets.nextId)}
+                    onMoveUp={() => onMoveList(list, moveTargets.previousId)}
+                    onMoveDown={() => onMoveList(list, moveTargets.nextId)}
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    onClick={() => onDeleteRequest(list)}
+                    className="text-destructive focus:text-destructive"
+                >
+                    Delete
+                </DropdownMenuItem>
+            </RowActionsMenu>
         </div>
     );
 }
@@ -131,6 +135,9 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
  * @param {Function} props.onEditListRequest - Called with the list to open it for editing
  * @param {Function} props.onDeleteListRequest - Called with the list to ask for delete confirmation
  * @param {Function} props.onLeaveSpaceRequest - Called with the space to leave it
+ * @param {{ previousId: string|null, nextId: string|null }} [props.moveTargets] - Owned-space neighbours for Move
+ * @param {(spaceId: string, neighbourId: string) => void} [props.onMoveSpace] - Moves the space next to a neighbour
+ * @param {(list: object, neighbourId: string) => void} props.onMoveListRequest - Moves a list next to a neighbour
  */
 function SpaceSection({
     space,
@@ -143,6 +150,9 @@ function SpaceSection({
     onEditListRequest,
     onDeleteListRequest,
     onLeaveSpaceRequest,
+    moveTargets,
+    onMoveSpace,
+    onMoveListRequest,
 }) {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [sharingOpen, setSharingOpen] = useState(false);
@@ -170,7 +180,7 @@ function SpaceSection({
                         {...listeners}
                         {...attributes}
                         className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
-                        aria-label="Drag to reorder"
+                        aria-label={`Drag to reorder ${space.name}`}
                     >
                         <GripVertical className="h-3.5 w-3.5" />
                     </button>
@@ -198,26 +208,25 @@ function SpaceSection({
                     )}
                 </span>
                 {isOwner && (
-                    <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                            onClick={() => onEditSpaceRequest(space)}
-                            aria-label="Edit space"
-                        >
-                            <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                    <RowActionsMenu label={`More actions for ${space.name}`}>
+                        <DropdownMenuItem onClick={() => onEditSpaceRequest(space)}>
+                            Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <MoveMenuItems
+                            canMoveUp={Boolean(moveTargets.previousId)}
+                            canMoveDown={Boolean(moveTargets.nextId)}
+                            onMoveUp={() => onMoveSpace(space.id, moveTargets.previousId)}
+                            onMoveDown={() => onMoveSpace(space.id, moveTargets.nextId)}
+                        />
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
                             onClick={() => onDeleteSpaceRequest(space)}
-                            aria-label="Delete space"
+                            className="text-destructive focus:text-destructive"
                         >
-                            <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                    </>
+                            Delete
+                        </DropdownMenuItem>
+                    </RowActionsMenu>
                 )}
             </div>
 
@@ -232,6 +241,8 @@ function SpaceSection({
                             list={list}
                             onEditRequest={onEditListRequest}
                             onDeleteRequest={onDeleteListRequest}
+                            moveTargets={getMoveTargets(lists, list.id)}
+                            onMoveList={onMoveListRequest}
                         />
                     ))}
                 </SortableContext>
@@ -438,6 +449,27 @@ export default function SpaceListManager({
         );
     }
 
+    /** Move up / Move down: the same save path as a drag, so the same guards and optimistic update apply. */
+    function moveSpaceNextTo(spaceId, neighbourId) {
+        return handleDragEnd({
+            active: { id: spaceId, data: { current: { type: 'space' } } },
+            over: { id: neighbourId },
+        });
+    }
+
+    function moveListNextTo(list, neighbourId) {
+        return handleDragEnd({
+            active: { id: list.id, data: { current: { type: 'list', spaceId: list.space_id } } },
+            over: { id: neighbourId },
+        });
+    }
+
+    const announcements = buildAnnouncements(
+        (rowId) =>
+            spaces.find((space) => space.id === rowId)?.name ??
+            lists.find((list) => list.id === rowId)?.name,
+    );
+
     function requestDeleteSpace(space) {
         requestDelete(
             {
@@ -522,6 +554,10 @@ export default function SpaceListManager({
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
+                accessibility={{
+                    announcements,
+                    screenReaderInstructions: SCREEN_READER_INSTRUCTIONS,
+                }}
             >
                 <SortableContext
                     items={ownedSpaces.map((space) => space.id)}
@@ -550,6 +586,9 @@ export default function SpaceListManager({
                                     setListDialog({ open: true, list, defaultSpaceId: null })
                                 }
                                 onDeleteListRequest={requestDeleteList}
+                                moveTargets={getMoveTargets(ownedSpaces, space.id)}
+                                onMoveSpace={moveSpaceNextTo}
+                                onMoveListRequest={moveListNextTo}
                             />
                         ))}
                     </div>
@@ -581,6 +620,7 @@ export default function SpaceListManager({
                                     }
                                     onDeleteListRequest={requestDeleteList}
                                     onLeaveSpaceRequest={handleLeaveSpace}
+                                    onMoveListRequest={moveListNextTo}
                                 />
                             ))}
                         </SortableContext>

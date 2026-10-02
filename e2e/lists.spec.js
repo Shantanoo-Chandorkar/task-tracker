@@ -21,7 +21,10 @@ test.describe('lists', () => {
         const listName = await createList(page, spaceName);
         const newName = uniqueName('Renamed list');
 
-        await listRow(page, spaceName, listName).getByRole('button', { name: 'Edit list' }).click();
+        await listRow(page, spaceName, listName)
+            .getByRole('button', { name: `More actions for ${listName}`, exact: true })
+            .click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
         await page.getByRole('dialog').getByPlaceholder('List name').fill(newName);
         await page.getByRole('dialog').getByRole('button', { name: 'Save changes' }).click();
         await expect(page.getByRole('dialog')).toBeHidden();
@@ -38,8 +41,9 @@ test.describe('lists', () => {
         const listName = await createList(page, spaceName);
 
         await listRow(page, spaceName, listName)
-            .getByRole('button', { name: 'Delete list' })
+            .getByRole('button', { name: `More actions for ${listName}`, exact: true })
             .click();
+        await page.getByRole('menuitem', { name: 'Delete' }).click();
         await expect(page.getByText('This deletes 0 tasks. This cannot be undone.')).toBeVisible();
         await page.getByRole('button', { name: 'Delete' }).click();
 

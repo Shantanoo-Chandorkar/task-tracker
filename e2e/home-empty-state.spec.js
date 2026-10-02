@@ -12,7 +12,10 @@ test.describe('home empty state', () => {
         const spaceName = await createSpace(page);
 
         await expect(
-            spaceSection(page, spaceName).getByRole('button', { name: 'Edit space' }),
+            spaceSection(page, spaceName).getByRole('button', {
+                name: `More actions for ${spaceName}`,
+                exact: true,
+            }),
         ).toBeVisible();
         await expect(page.getByText('Shared with you')).toHaveCount(0);
     });
