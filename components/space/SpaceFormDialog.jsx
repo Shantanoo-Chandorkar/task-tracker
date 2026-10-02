@@ -4,9 +4,8 @@ import { useId } from 'react';
 import { useColorNameForm } from '@/hooks/useColorNameForm';
 import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
-import CharLimitField from '@/components/ui/CharLimitField';
+import ColorNameField from '@/components/ui/ColorNameField';
 import { createSpace, updateSpace } from '@/actions/space-actions';
 
 const SPACE_NAME_MAX = 100;
@@ -57,31 +56,16 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
             }
         >
             <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
-                <CharLimitField
+                <ColorNameField
                     label="Space name"
-                    currentLength={name.length}
+                    name={name}
+                    onNameChange={setName}
+                    color={color}
+                    onColorChange={setColor}
                     maxLength={SPACE_NAME_MAX}
                     error={error}
-                >
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="color"
-                            value={color}
-                            onChange={(event) => setColor(event.target.value)}
-                            className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
-                            disabled={submitting}
-                        />
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder="Space name"
-                            className="flex-1"
-                            autoFocus
-                            disabled={submitting}
-                            maxLength={SPACE_NAME_MAX}
-                        />
-                    </div>
-                </CharLimitField>
+                    disabled={submitting}
+                />
             </form>
         </ModalShell>
     );

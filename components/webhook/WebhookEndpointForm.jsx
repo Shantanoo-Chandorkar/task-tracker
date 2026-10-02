@@ -106,23 +106,29 @@ export default function WebhookEndpointForm({ spaceId, endpoint, onSaved, onCanc
             aria-label={isEditing ? 'Edit webhook' : 'Add webhook'}
         >
             <LabeledField label="Name">
-                <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    maxLength={100}
-                    placeholder="Webhook name"
-                />
+                {({ controlId }) => (
+                    <Input
+                        id={controlId}
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        maxLength={100}
+                        placeholder="Webhook name"
+                    />
+                )}
             </LabeledField>
 
             <LabeledField label="Send events to (https address)">
-                <Input
-                    type="url"
-                    value={url}
-                    onChange={(event) => setUrl(event.target.value)}
-                    maxLength={2048}
-                    placeholder="https://hooks.example.com/..."
-                    autoComplete="off"
-                />
+                {({ controlId }) => (
+                    <Input
+                        id={controlId}
+                        type="url"
+                        value={url}
+                        onChange={(event) => setUrl(event.target.value)}
+                        maxLength={2048}
+                        placeholder="https://hooks.example.com/..."
+                        autoComplete="off"
+                    />
+                )}
             </LabeledField>
 
             <fieldset className="space-y-0.5">

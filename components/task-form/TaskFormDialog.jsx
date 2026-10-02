@@ -11,6 +11,7 @@ import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CharLimitField from '@/components/ui/CharLimitField';
+import FormError from '@/components/ui/FormError';
 import {
     Select,
     SelectContent,
@@ -236,15 +237,18 @@ export default function TaskFormDialog({
                     maxLength={TITLE_MAX}
                     error={titleError}
                 >
-                    <Input
-                        value={title}
-                        onChange={(event) => {
-                            setTitle(event.target.value);
-                            setTitleError('');
-                        }}
-                        placeholder="Task title"
-                        maxLength={TITLE_MAX}
-                    />
+                    {(titleControlProps) => (
+                        <Input
+                            {...titleControlProps}
+                            value={title}
+                            onChange={(event) => {
+                                setTitle(event.target.value);
+                                setTitleError('');
+                            }}
+                            placeholder="Task title"
+                            maxLength={TITLE_MAX}
+                        />
+                    )}
                 </CharLimitField>
 
                 {/* Description */}
@@ -253,100 +257,119 @@ export default function TaskFormDialog({
                     currentLength={description.length}
                     maxLength={DESCRIPTION_MAX}
                 >
-                    <EditorErrorBoundary
-                        value={description}
-                        onChange={setDescription}
-                        maxLength={DESCRIPTION_MAX}
-                        placeholder="Description (optional)"
-                    >
-                        <RichTextEditor
+                    {() => (
+                        <EditorErrorBoundary
                             value={description}
                             onChange={setDescription}
                             maxLength={DESCRIPTION_MAX}
                             placeholder="Description (optional)"
-                        />
-                    </EditorErrorBoundary>
+                        >
+                            <RichTextEditor
+                                value={description}
+                                onChange={setDescription}
+                                maxLength={DESCRIPTION_MAX}
+                                placeholder="Description (optional)"
+                                ariaLabel="Description"
+                            />
+                        </EditorErrorBoundary>
+                    )}
                 </CharLimitField>
 
                 {/* 2-column grid - stacking these four full-width each wastes space on wider screens */}
                 <div className="grid grid-cols-2 gap-4">
                     {/* Status */}
                     <LabeledField label="Status">
-                        <Select value={statusId} onValueChange={setStatusId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select status..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {statuses.map((status) => (
-                                    <SelectItem key={status.id} value={status.id}>
-                                        <span className="flex items-center gap-2">
-                                            <span
-                                                className="h-2 w-2 rounded-full flex-shrink-0"
-                                                style={{ backgroundColor: status.color }}
-                                            />
-                                            {status.name}
-                                        </span>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {({ controlId }) => (
+                            <Select value={statusId} onValueChange={setStatusId}>
+                                <SelectTrigger id={controlId}>
+                                    <SelectValue placeholder="Select status..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {statuses.map((status) => (
+                                        <SelectItem key={status.id} value={status.id}>
+                                            <span className="flex items-center gap-2">
+                                                <span
+                                                    className="h-2 w-2 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: status.color }}
+                                                />
+                                                {status.name}
+                                            </span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
                     </LabeledField>
 
                     {/* Tags */}
                     <LabeledField label="Tags">
-                        {isEditing ? (
-                            <TaskTagPicker task={task} spaceId={spaceId} isFieldSized />
-                        ) : (
-                            <StagedTagPicker
-                                spaceId={spaceId}
-                                tagNames={tagNames}
-                                onChange={setTagNames}
-                            />
+                        {({ labelId }) => (
+                            <div role="group" aria-labelledby={labelId}>
+                                {isEditing ? (
+                                    <TaskTagPicker task={task} spaceId={spaceId} isFieldSized />
+                                ) : (
+                                    <StagedTagPicker
+                                        spaceId={spaceId}
+                                        tagNames={tagNames}
+                                        onChange={setTagNames}
+                                    />
+                                )}
+                            </div>
                         )}
                     </LabeledField>
 
                     {/* Sublist - root-level tasks only */}
                     {isRootCreate && sublists.length > 0 && (
                         <LabeledField label="Sublist">
-                            <Select
-                                value={sublistId || 'none'}
-                                onValueChange={(value) =>
-                                    setSublistId(value === 'none' ? '' : value)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="No sublist" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">No sublist</SelectItem>
-                                    {sublists.map((sublist) => (
-                                        <SelectItem key={sublist.id} value={sublist.id}>
-                                            <span className="flex items-center gap-2">
-                                                <span
-                                                    className="h-2 w-2 rounded-full flex-shrink-0"
-                                                    style={{ backgroundColor: sublist.color }}
-                                                />
-                                                {sublist.name}
-                                            </span>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            {({ controlId }) => (
+                                <Select
+                                    value={sublistId || 'none'}
+                                    onValueChange={(value) =>
+                                        setSublistId(value === 'none' ? '' : value)
+                                    }
+                                >
+                                    <SelectTrigger id={controlId}>
+                                        <SelectValue placeholder="No sublist" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No sublist</SelectItem>
+                                        {sublists.map((sublist) => (
+                                            <SelectItem key={sublist.id} value={sublist.id}>
+                                                <span className="flex items-center gap-2">
+                                                    <span
+                                                        className="h-2 w-2 rounded-full flex-shrink-0"
+                                                        style={{ backgroundColor: sublist.color }}
+                                                    />
+                                                    {sublist.name}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
                         </LabeledField>
                     )}
 
                     {/* Due date */}
                     <LabeledField label={requiresDueDate ? 'Due date *' : 'Due date'}>
-                        <Input
-                            type="date"
-                            value={dueDate}
-                            onChange={(event) => {
-                                setDueDate(event.target.value);
-                                setDueDateError('');
-                            }}
-                        />
-                        {dueDateError && (
-                            <p className="text-xs text-destructive mt-1">{dueDateError}</p>
+                        {({ controlId }) => (
+                            <>
+                                <Input
+                                    id={controlId}
+                                    type="date"
+                                    value={dueDate}
+                                    aria-required={requiresDueDate ? true : undefined}
+                                    aria-invalid={dueDateError ? true : undefined}
+                                    aria-describedby={
+                                        dueDateError ? `${controlId}-error` : undefined
+                                    }
+                                    onChange={(event) => {
+                                        setDueDate(event.target.value);
+                                        setDueDateError('');
+                                    }}
+                                />
+                                <FormError errorId={`${controlId}-error`}>{dueDateError}</FormError>
+                            </>
                         )}
                     </LabeledField>
                 </div>

@@ -51,6 +51,19 @@ describe('JoinSpaceDialog', () => {
         expect(submitButton().disabled).toBe(false);
     });
 
+    it('labels the space id input and announces a refusal tied to it', async () => {
+        requestToJoinSpace.mockResolvedValue({ error: 'Already a member' });
+        renderOpenDialog();
+        const spaceIdInput = screen.getByLabelText('Space ID');
+
+        fireEvent.submit(spaceIdForm());
+
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toBe('Already a member');
+        expect(spaceIdInput.getAttribute('aria-invalid')).toBe('true');
+        expect(spaceIdInput.getAttribute('aria-describedby')).toBe(alert.id);
+    });
+
     it('unlocks and shows the error when the request is rejected', async () => {
         requestToJoinSpace.mockResolvedValue({ error: 'Already a member' });
         renderOpenDialog();

@@ -1,12 +1,39 @@
 'use client';
 
 import { useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { Bold, Italic, Strikethrough, List, ListOrdered, Link2, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import LinkDialog from '@/components/ui/LinkDialog';
+
+/**
+ * Icon-only toolbar button that tells screen readers its name and, for toggles, whether it is on.
+ *
+ * @param {object} props
+ * @param {string} props.label - Accessible name, e.g. "Bold".
+ * @param {boolean} [props.isActive] - Set for toggles; omit for plain actions so no pressed state is announced.
+ * @param {boolean} [props.disabled] - Disables the button.
+ * @param {Function} props.onClick - Click handler.
+ * @param {import('react').ReactNode} props.children - The icon.
+ */
+function ToolbarButton({ label, isActive, disabled, onClick, children }) {
+    return (
+        <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={label}
+            aria-pressed={isActive === undefined ? undefined : isActive}
+            onClick={onClick}
+            disabled={disabled}
+            className={`h-8 w-8 p-0 ${isActive ? 'bg-accent text-accent-foreground' : ''}`}
+        >
+            {children}
+        </Button>
+    );
+}
 
 /**
  * Formatting toolbar for the rich text editor; renders nothing until the editor instance exists.
@@ -16,6 +43,21 @@ import LinkDialog from '@/components/ui/LinkDialog';
  */
 function RichTextToolbar({ editor }) {
     const [linkDialogState, setLinkDialogState] = useState(null);
+    // Tiptap does not re-render on selection changes by default, so the pressed state must be subscribed to
+    const formatState = useEditorState({
+        editor,
+        selector: ({ editor: currentEditor }) => ({
+            isBold: currentEditor.isActive('bold'),
+            isItalic: currentEditor.isActive('italic'),
+            isStrike: currentEditor.isActive('strike'),
+            isBulletList: currentEditor.isActive('bulletList'),
+            isOrderedList: currentEditor.isActive('orderedList'),
+            isLink: currentEditor.isActive('link'),
+            canBold: currentEditor.can().chain().focus().toggleBold().run(),
+            canItalic: currentEditor.can().chain().focus().toggleItalic().run(),
+            canStrike: currentEditor.can().chain().focus().toggleStrike().run(),
+        }),
+    });
 
     /**
      * Opens the link dialog prefilled from the current selection or the link under the cursor.
@@ -66,82 +108,63 @@ function RichTextToolbar({ editor }) {
         setLinkDialogState(null);
     }
 
-    if (!editor) {
-        return null;
-    }
-
     return (
         <>
-            <div className="flex items-center gap-1 border-b border-border p-1 overflow-x-auto">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
+            <div
+                role="toolbar"
+                aria-label="Formatting"
+                className="flex items-center gap-1 border-b border-border p-1 overflow-x-auto"
+            >
+                <ToolbarButton
+                    label="Bold"
+                    isActive={formatState.isBold}
+                    disabled={!formatState.canBold}
                     onClick={() => editor.chain().focus().toggleBold().run()}
-                    disabled={!editor.can().chain().focus().toggleBold().run()}
-                    className={`h-8 w-8 p-0 ${editor.isActive('bold') ? 'bg-accent text-accent-foreground' : ''}`}
                 >
                     <Bold className="h-4 w-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
+                </ToolbarButton>
+                <ToolbarButton
+                    label="Italic"
+                    isActive={formatState.isItalic}
+                    disabled={!formatState.canItalic}
                     onClick={() => editor.chain().focus().toggleItalic().run()}
-                    disabled={!editor.can().chain().focus().toggleItalic().run()}
-                    className={`h-8 w-8 p-0 ${editor.isActive('italic') ? 'bg-accent text-accent-foreground' : ''}`}
                 >
                     <Italic className="h-4 w-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
+                </ToolbarButton>
+                <ToolbarButton
+                    label="Strikethrough"
+                    isActive={formatState.isStrike}
+                    disabled={!formatState.canStrike}
                     onClick={() => editor.chain().focus().toggleStrike().run()}
-                    disabled={!editor.can().chain().focus().toggleStrike().run()}
-                    className={`h-8 w-8 p-0 ${editor.isActive('strike') ? 'bg-accent text-accent-foreground' : ''}`}
                 >
                     <Strikethrough className="h-4 w-4" />
-                </Button>
-                <div className="w-[1px] h-4 bg-border mx-1" />
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
+                </ToolbarButton>
+                <div aria-hidden="true" className="w-[1px] h-4 bg-border mx-1" />
+                <ToolbarButton
+                    label="Bulleted list"
+                    isActive={formatState.isBulletList}
                     onClick={() => editor.chain().focus().toggleBulletList().run()}
-                    className={`h-8 w-8 p-0 ${editor.isActive('bulletList') ? 'bg-accent text-accent-foreground' : ''}`}
                 >
                     <List className="h-4 w-4" />
-                </Button>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
+                </ToolbarButton>
+                <ToolbarButton
+                    label="Numbered list"
+                    isActive={formatState.isOrderedList}
                     onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                    className={`h-8 w-8 p-0 ${editor.isActive('orderedList') ? 'bg-accent text-accent-foreground' : ''}`}
                 >
                     <ListOrdered className="h-4 w-4" />
-                </Button>
-                <div className="w-[1px] h-4 bg-border mx-1" />
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={openLinkDialog}
-                    className={`h-8 w-8 p-0 ${editor.isActive('link') ? 'bg-accent text-accent-foreground' : ''}`}
-                >
+                </ToolbarButton>
+                <div aria-hidden="true" className="w-[1px] h-4 bg-border mx-1" />
+                <ToolbarButton label="Link" isActive={formatState.isLink} onClick={openLinkDialog}>
                     <Link2 className="h-4 w-4" />
-                </Button>
-                {editor.isActive('link') && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
+                </ToolbarButton>
+                {formatState.isLink && (
+                    <ToolbarButton
+                        label="Remove link"
                         onClick={() => editor.chain().focus().unsetLink().run()}
-                        className="h-8 w-8 p-0"
                     >
                         <Unlink className="h-4 w-4" />
-                    </Button>
+                    </ToolbarButton>
                 )}
             </div>
             {linkDialogState && (
@@ -166,8 +189,15 @@ function RichTextToolbar({ editor }) {
  * @param {Function} props.onChange - Called with the new HTML string on every update.
  * @param {number} [props.maxLength=10000] - Maximum HTML character limit.
  * @param {string} [props.placeholder=''] - Placeholder hint shown in the empty editor.
+ * @param {string} props.ariaLabel - Accessible name of the editable area (a contenteditable cannot use a <label>).
  */
-export default function RichTextEditor({ value, onChange, maxLength = 10000, placeholder = '' }) {
+export default function RichTextEditor({
+    value,
+    onChange,
+    maxLength = 10000,
+    placeholder = '',
+    ariaLabel,
+}) {
     const editor = useEditor({
         // Already the default here ('use client') - set explicitly only to silence the console warning.
         immediatelyRender: false,
@@ -199,6 +229,9 @@ export default function RichTextEditor({ value, onChange, maxLength = 10000, pla
             attributes: {
                 class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] p-3 overflow-y-auto max-h-[40dvh] [overflow-wrap:anywhere]',
                 placeholder,
+                role: 'textbox',
+                'aria-label': ariaLabel,
+                'aria-multiline': 'true',
             },
         },
     });
@@ -208,12 +241,11 @@ export default function RichTextEditor({ value, onChange, maxLength = 10000, pla
     return (
         <div className="space-y-1 min-w-0">
             <div
-                className={`border rounded-md ${isExceeded ? 'border-destructive' : 'border-input'} overflow-hidden bg-background`}
+                className={`border rounded-md ${isExceeded ? 'border-destructive' : 'border-input'} overflow-hidden bg-background focus-within:ring-2 focus-within:ring-ring`}
             >
-                <RichTextToolbar editor={editor} />
+                {editor && <RichTextToolbar editor={editor} />}
                 <EditorContent editor={editor} />
             </div>
-            {isExceeded && <p className="text-xs text-destructive">Character limit exceeded</p>}
         </div>
     );
 }

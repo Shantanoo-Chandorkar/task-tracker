@@ -6,6 +6,8 @@ import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
+import LabeledField from '@/components/ui/LabeledField';
+import FormError from '@/components/ui/FormError';
 import { requestToJoinSpace } from '@/actions/collaboration-actions';
 
 /**
@@ -21,6 +23,7 @@ export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) 
     const [spaceId, setSpaceId] = useState(initialSpaceId);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const errorId = useId();
 
     // Reset the form whenever the dialog (re)opens with a new prefill -- adjusting state
     // during render, not in an effect, matches useColorNameForm's established reset pattern.
@@ -85,14 +88,21 @@ export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) 
             }
         >
             <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
-                <Input
-                    value={spaceId}
-                    onChange={(event) => setSpaceId(event.target.value)}
-                    placeholder="Paste the space ID"
-                    autoFocus
-                    disabled={submitting}
-                />
-                {error && <p className="text-xs text-destructive">{error}</p>}
+                <LabeledField label="Space ID">
+                    {({ controlId }) => (
+                        <Input
+                            id={controlId}
+                            value={spaceId}
+                            onChange={(event) => setSpaceId(event.target.value)}
+                            placeholder="Paste the space ID"
+                            autoFocus
+                            disabled={submitting}
+                            aria-invalid={error ? true : undefined}
+                            aria-describedby={error ? errorId : undefined}
+                        />
+                    )}
+                </LabeledField>
+                <FormError errorId={errorId}>{error}</FormError>
             </form>
         </ModalShell>
     );
