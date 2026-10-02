@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth/session';
+import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 import { getCurrentUserProfile } from '@/lib/profile';
 import { attachTaskCounts } from '@/lib/list-task-counts';
 import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
@@ -21,10 +22,13 @@ export default async function AppLayout({ children }) {
     const supabase = await createClient();
     const user = await getCurrentUser();
 
-    const [{ data: spaces }, { data: lists }] = await Promise.all([
+    const [spacesResult, listsResult] = await Promise.all([
         supabase.from('spaces').select('*').order('position', { ascending: true }),
         supabase.from('lists').select('*').order('position', { ascending: true }),
     ]);
+    throwIfQueryFailed('[app-layout]', spacesResult, listsResult);
+    const { data: spaces } = spacesResult;
+    const { data: lists } = listsResult;
 
     // Must match every page's own shape - whichever seeds the shared ['spaces'] key first wins.
     const initialSpaces = await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null);

@@ -3,13 +3,12 @@
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { SPACE_NOT_FOUND, ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
+import { isUuid } from '@/lib/validation';
 import { COLLABORATOR_PERMISSION_LEVELS } from '@/lib/permissions/space-permissions';
 import { sendJoinRequestEmail } from '@/lib/email/notifications/send-join-request-email';
 import { sendJoinDecisionEmail } from '@/lib/email/notifications/send-join-decision-email';
 import { sendCollaboratorLeftEmail } from '@/lib/email/notifications/send-collaborator-left-email';
 import { sendCollaboratorRemovedEmail } from '@/lib/email/notifications/send-collaborator-removed-email';
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Requests to join a space by ID. Always leaves a pending row for the owner to review, and
@@ -24,7 +23,7 @@ export const requestToJoinSpace = withAuthenticatedAction(
     'Unexpected error sending join request',
     async (user, supabase, fields) => {
         const spaceId = (fields.spaceId ?? '').trim();
-        if (!UUID_PATTERN.test(spaceId)) {
+        if (!isUuid(spaceId)) {
             return { data: null, error: 'Enter a valid space ID', code: null };
         }
 

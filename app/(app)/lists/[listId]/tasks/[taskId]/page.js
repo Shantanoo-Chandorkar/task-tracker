@@ -1,4 +1,7 @@
+import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { isUuid } from '@/lib/validation';
+import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 import TaskDetail from '@/components/task-detail/TaskDetail';
 
 /**
@@ -6,9 +9,11 @@ import TaskDetail from '@/components/task-detail/TaskDetail';
  */
 export default async function TaskDetailPage({ params }) {
     const { listId, taskId } = await params;
+    // A malformed id would make Postgres error instead of returning no row, which must not look like an outage.
+    if (!isUuid(listId) || !isUuid(taskId)) notFound();
     const supabase = await createClient();
 
-    const [{ data: tasks }, { data: list }] = await Promise.all([
+    const [tasksResult, listResult] = await Promise.all([
         supabase
             .from('tasks')
             .select('*, statuses(id, name, color, is_default, position), task_tags(tags(id, name))')
@@ -17,14 +22,20 @@ export default async function TaskDetailPage({ params }) {
             .order('position', { ascending: true }),
         supabase.from('lists').select('space_id').eq('id', listId).maybeSingle(),
     ]);
+    throwIfQueryFailed('[task-detail-page]', tasksResult, listResult);
 
-    const { data: statuses } = list
-        ? await supabase
-              .from('statuses')
-              .select('*')
-              .eq('space_id', list.space_id)
-              .order('position', { ascending: true })
-        : { data: [] };
+    const { data: tasks } = tasksResult;
+    const { data: list } = listResult;
+    // RLS returns null for a list the user cannot see, so a missing list and a foreign one look identical here.
+    if (!list || !(tasks || []).some((task) => task.id === taskId)) notFound();
+
+    const statusesResult = await supabase
+        .from('statuses')
+        .select('*')
+        .eq('space_id', list.space_id)
+        .order('position', { ascending: true });
+    throwIfQueryFailed('[task-detail-page]', statusesResult);
+    const { data: statuses } = statusesResult;
 
     const normalizedTasks = (tasks || []).map((task) => ({
         ...task,
@@ -40,7 +51,7 @@ export default async function TaskDetailPage({ params }) {
                 taskId={taskId}
                 initialTasks={normalizedTasks}
                 initialStatuses={statuses || []}
-                initialLists={list ? [{ id: listId, space_id: list.space_id }] : []}
+                initialLists={[{ id: listId, space_id: list.space_id }]}
             />
         </div>
     );
