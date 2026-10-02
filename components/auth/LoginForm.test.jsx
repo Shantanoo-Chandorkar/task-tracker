@@ -3,13 +3,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import LoginForm from './LoginForm';
 
-const routerPush = vi.fn();
+const routerReplace = vi.fn();
 const routerRefresh = vi.fn();
 const signInAction = vi.fn();
 const clearAllCaches = vi.fn();
 
 vi.mock('next/navigation', () => ({
-    useRouter: () => ({ push: routerPush, refresh: routerRefresh }),
+    useRouter: () => ({ replace: routerReplace, refresh: routerRefresh }),
 }));
 vi.mock('next/link', () => ({ default: ({ children, href }) => <a href={href}>{children}</a> }));
 vi.mock('@/actions/auth-actions', () => ({ signInAction: (...args) => signInAction(...args) }));
@@ -43,10 +43,10 @@ describe('LoginForm', () => {
         await waitFor(() => expect(clearAllCaches).toHaveBeenCalledTimes(1));
 
         expect(submitButton().disabled).toBe(true);
-        expect(routerPush).not.toHaveBeenCalled();
+        expect(routerReplace).not.toHaveBeenCalled();
 
         finishClearingCaches();
-        await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/'));
+        await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/'));
         expect(signInAction).toHaveBeenCalledTimes(1);
     });
 
@@ -71,5 +71,19 @@ describe('LoginForm', () => {
         fireEvent.click(submitButton());
 
         await waitFor(() => expect(screen.queryByText('Wrong email or password')).toBeNull());
+    });
+
+    it('goes to the app once, with no second refresh request, and stays locked meanwhile', async () => {
+        signInAction.mockResolvedValue({ error: null });
+        clearAllCaches.mockResolvedValue();
+        renderLoginForm();
+
+        fireEvent.click(submitButton());
+        await waitFor(() => expect(routerReplace).toHaveBeenCalledTimes(1));
+        fireEvent.click(submitButton());
+
+        expect(routerRefresh).not.toHaveBeenCalled();
+        expect(submitButton().disabled).toBe(true);
+        expect(signInAction).toHaveBeenCalledTimes(1);
     });
 });

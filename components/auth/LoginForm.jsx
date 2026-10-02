@@ -57,8 +57,8 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
 
         // Stays locked through navigation, or a double click would submit the login twice.
         await clearAllCaches(queryClient);
-        router.push(redirectTo);
-        router.refresh();
+        // replace keeps Back off the login card; no refresh, the action's cookie already refreshed the router.
+        router.replace(redirectTo);
     }
 
     return (

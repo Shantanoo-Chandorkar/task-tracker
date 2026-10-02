@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUser } from '@/lib/auth/session';
@@ -167,7 +168,16 @@ export async function signInAction(fields) {
             };
         }
 
-        await resetAttempts('signin', email, ipAddress);
+        // After the response, so the counter reset is not on the path to the redirect.
+        after(async () => {
+            try {
+                await resetAttempts('signin', email, ipAddress);
+            } catch (thrown) {
+                console.error('[auth] resetting sign-in attempts failed', {
+                    detail: thrown?.message,
+                });
+            }
+        });
         return { error: null, code: null };
     } catch (thrown) {
         logAuthFailure(AUTH_ERROR_CODES.SIGNIN_FAILED, email, thrown?.message);
