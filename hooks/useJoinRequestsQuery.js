@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 /**
  * Pending join requests for one space, for its owner to review. Only fetch when the caller
@@ -13,13 +14,8 @@ import { useQuery } from '@tanstack/react-query';
 export function useJoinRequestsQuery(spaceId, options = {}) {
     return useQuery({
         queryKey: ['space-collaborators', spaceId, 'pending'],
-        queryFn: async () => {
-            const response = await fetch(
-                `/api/space-collaborators?space_id=${spaceId}&status=pending`,
-            );
-            if (!response.ok) throw new Error('Failed to fetch join requests');
-            return response.json();
-        },
+        queryFn: ({ signal }) =>
+            fetchJson(`/api/space-collaborators?space_id=${spaceId}&status=pending`, { signal }),
         enabled: Boolean(spaceId),
         ...options,
     });

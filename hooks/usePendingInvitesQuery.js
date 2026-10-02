@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 /**
  * Pending (sent, not yet redeemed or revoked) email invites for one space.
@@ -12,11 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 export function usePendingInvitesQuery(spaceId, options = {}) {
     return useQuery({
         queryKey: ['space-invites', spaceId, 'pending'],
-        queryFn: async () => {
-            const response = await fetch(`/api/space-invites?space_id=${spaceId}`);
-            if (!response.ok) throw new Error('Failed to fetch invites');
-            return response.json();
-        },
+        queryFn: ({ signal }) => fetchJson(`/api/space-invites?space_id=${spaceId}`, { signal }),
         enabled: Boolean(spaceId),
         ...options,
     });

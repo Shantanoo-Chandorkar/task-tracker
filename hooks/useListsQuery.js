@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -14,11 +15,7 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
 export function useListsQuery(options = {}) {
     return useQuery({
         queryKey: ['lists'],
-        queryFn: async () => {
-            const response = await fetch('/api/lists');
-            if (!response.ok) throw new Error('Failed to fetch lists');
-            return response.json();
-        },
+        queryFn: ({ signal }) => fetchJson('/api/lists', { signal }),
         staleTime: FIVE_MINUTES_MS,
         ...options,
     });

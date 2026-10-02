@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 /**
  * Accepted collaborators for one space.
@@ -12,13 +13,8 @@ import { useQuery } from '@tanstack/react-query';
 export function useCollaboratorsQuery(spaceId, options = {}) {
     return useQuery({
         queryKey: ['space-collaborators', spaceId, 'accepted'],
-        queryFn: async () => {
-            const response = await fetch(
-                `/api/space-collaborators?space_id=${spaceId}&status=accepted`,
-            );
-            if (!response.ok) throw new Error('Failed to fetch collaborators');
-            return response.json();
-        },
+        queryFn: ({ signal }) =>
+            fetchJson(`/api/space-collaborators?space_id=${spaceId}&status=accepted`, { signal }),
         enabled: Boolean(spaceId),
         ...options,
     });

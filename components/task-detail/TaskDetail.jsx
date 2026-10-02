@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { findAncestors, findDescendantIds, flatToTree } from '@/lib/tree';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useTasksQuery } from '@/hooks/useTasksQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSpaceById } from '@/hooks/useSpaceById';
 import StatusBadge from '@/components/status/StatusBadge';
@@ -40,15 +40,7 @@ export default function TaskDetail({
     const router = useRouter();
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
 
-    const { data: flatList = [] } = useQuery({
-        queryKey: ['tasks', listId],
-        queryFn: async () => {
-            const response = await fetch(`/api/tasks?list_id=${listId}`);
-            if (!response.ok) throw new Error('Failed to fetch tasks');
-            return response.json();
-        },
-        initialData: initialTasks,
-    });
+    const { data: flatList = [] } = useTasksQuery(listId, { initialData: initialTasks });
 
     // Seeds the shared ['statuses', spaceId] cache so SubtaskTree's checkboxes don't hydrate-mismatch on mount.
     const spaceId = useSpaceIdForList(listId, { initialData: initialLists });

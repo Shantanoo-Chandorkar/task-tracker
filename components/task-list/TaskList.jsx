@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useId, useState, useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
     closestCenter,
@@ -32,6 +32,7 @@ import {
 } from '@/lib/tree';
 import { useUIState } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useTasksQuery } from '@/hooks/useTasksQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
@@ -388,15 +389,7 @@ export default function TaskList({
     } = useDeleteConfirm();
     const deleteSublistConfirm = useConfirmAction(Boolean(deleteSublistTarget));
 
-    const { data: flatList = [] } = useQuery({
-        queryKey: ['tasks', listId],
-        queryFn: async () => {
-            const response = await fetch(`/api/tasks?list_id=${listId}`);
-            if (!response.ok) throw new Error('Failed to fetch tasks');
-            return response.json();
-        },
-        initialData: initialTasks,
-    });
+    const { data: flatList = [] } = useTasksQuery(listId, { initialData: initialTasks });
 
     const spaceId = useSpaceIdForList(listId, { initialData: initialLists });
     const { data: statuses = [] } = useStatusesQuery(spaceId, { initialData: initialStatuses });
