@@ -60,29 +60,31 @@ export function useColorNameForm({
 
     async function handleSubmit(event) {
         event.preventDefault();
-        if (!name.trim() || !isValid()) return;
+        if (submitting || !name.trim() || !isValid()) return;
 
         const fields = { name: name.trim(), color, ...buildFields() };
 
         setSubmitting(true);
-        let result;
+        let submitResult;
         try {
-            result = isEditing ? await update(entity.id, fields) : await create(fields);
+            submitResult = isEditing ? await update(entity.id, fields) : await create(fields);
         } catch {
             setSubmitting(false);
             setError('Could not reach the server. Check your connection and try again.');
             return;
         }
-        setSubmitting(false);
 
-        if (result.error) {
-            setError(result.error);
+        if (submitResult.error) {
+            setSubmitting(false);
+            setError(submitResult.error);
             return;
         }
 
+        // Stays locked through the refetch, or a second click in that window would create a duplicate.
         await queryClient.invalidateQueries({ queryKey: invalidateQueryKey });
         if (bustCache) bustPageCache(bustCache());
         onClose();
+        setSubmitting(false);
     }
 
     return { isEditing, name, setName, color, setColor, submitting, error, handleSubmit };
