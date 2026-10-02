@@ -20,7 +20,8 @@ describe('PriorityLine', () => {
     it('uses the star colour, a thin width and a short height', () => {
         const { container } = render(<PriorityLine />);
 
-        expect(container.firstChild.className).toContain('bg-amber-400');
+        expect(container.firstChild.className).toContain('bg-amber-600');
+        expect(container.firstChild.className).toContain('dark:bg-amber-400');
         expect(container.firstChild.className).toContain('w-[3px]');
         expect(container.firstChild.className).toContain('h-4');
     });

@@ -241,7 +241,7 @@ export default function RichTextEditor({
     return (
         <div className="space-y-1 min-w-0">
             <div
-                className={`border rounded-md ${isExceeded ? 'border-destructive' : 'border-input'} overflow-hidden bg-background focus-within:ring-2 focus-within:ring-ring`}
+                className={`border rounded-md ${isExceeded ? 'border-destructive' : 'border-field'} overflow-hidden bg-background focus-within:ring-2 focus-within:ring-ring`}
             >
                 {editor && <RichTextToolbar editor={editor} />}
                 <EditorContent editor={editor} />

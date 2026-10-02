@@ -89,7 +89,7 @@ export default function TagComboboxField({
                     <button
                         type="button"
                         disabled={addPending}
-                        className={`flex items-center gap-1 border border-dashed border-input text-muted-foreground dark:bg-input/30 hover:text-foreground hover:border-foreground/40 ${addButtonSizeClass}`}
+                        className={`flex items-center gap-1 border border-dashed border-field text-muted-foreground dark:bg-input/30 hover:text-foreground hover:border-foreground/40 ${addButtonSizeClass}`}
                     >
                         {addPending ? <Loader size="xs" /> : <Plus className="h-3 w-3" />}
                         Tag

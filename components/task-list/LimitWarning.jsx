@@ -47,12 +47,12 @@ export default function LimitWarning({ message, dismissible = false, dismissKey 
 
     return (
         <div className="flex items-start gap-2 mx-2 my-1 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-400 flex-1">{message}</p>
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 dark:text-amber-400 flex-1">{message}</p>
             {dismissible && (
                 <button
                     onClick={() => dismiss(dismissKey)}
-                    className="hit-area text-amber-500/70 hover:text-amber-400 flex-shrink-0"
+                    className="hit-area text-amber-700 hover:text-amber-900 dark:text-amber-500 dark:hover:text-amber-400 flex-shrink-0"
                     aria-label="Dismiss warning"
                 >
                     <X className="h-3 w-3" />

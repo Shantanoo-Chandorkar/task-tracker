@@ -36,7 +36,7 @@ export default function HomeTaskSection({ title, tasks, emptyMessage, showsPrior
                                 {showsPriorityStar && (
                                     <Star
                                         aria-hidden="true"
-                                        className="h-3.5 w-3.5 flex-shrink-0 fill-amber-400 text-amber-400"
+                                        className="h-3.5 w-3.5 flex-shrink-0 fill-amber-600 text-amber-600 dark:fill-amber-400 dark:text-amber-400"
                                     />
                                 )}
                                 <span className="min-w-0 flex-1">

@@ -169,9 +169,7 @@ function StatusGroup({
                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {status ? status.name : 'No Status'}
                     </span>
-                    <span className="text-xs text-muted-foreground/60">
-                        ({count ?? tasks.length})
-                    </span>
+                    <span className="text-xs text-muted-foreground">({count ?? tasks.length})</span>
                 </button>
             </Heading>
 
@@ -203,7 +201,7 @@ function StatusGroup({
 
                     {canWrite && (
                         <button
-                            className="flex items-center gap-1.5 px-8 py-1.5 rounded-md text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted motion-safe:transition-colors w-full text-left"
+                            className="flex items-center gap-1.5 px-8 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-safe:transition-colors w-full text-left"
                             onClick={onAddTask}
                         >
                             <Plus className="h-3 w-3" />
@@ -278,7 +276,7 @@ function SublistHeader({
             <button
                 {...listeners}
                 {...attributes}
-                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 p-3 -m-3"
+                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0 p-3 -m-3"
                 aria-label={`Drag to reorder ${sublist.name}`}
             >
                 <GripVertical className="h-3.5 w-3.5" />
@@ -307,7 +305,7 @@ function SublistHeader({
                     <span className="text-sm font-semibold text-foreground truncate">
                         {sublist.name}
                     </span>
-                    <span className="text-xs text-muted-foreground/60 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground flex-shrink-0">
                         ({taskCount})
                     </span>
                 </button>
@@ -841,7 +839,7 @@ export default function TaskList({
                                     />
                                     {!isCollapsed && canWrite && (
                                         <button
-                                            className="flex items-center gap-1.5 ml-4 md:ml-8 mr-2 my-0.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted motion-safe:transition-colors"
+                                            className="flex items-center gap-1.5 ml-4 md:ml-8 mr-2 my-0.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-safe:transition-colors"
                                             onClick={() =>
                                                 setCreateDialog({
                                                     open: true,

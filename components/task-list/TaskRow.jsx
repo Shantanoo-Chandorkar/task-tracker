@@ -45,7 +45,7 @@ export function PriorityTierDivider() {
  */
 export function PriorityLine() {
     return (
-        <div className="pointer-events-none absolute -left-1.5 top-1 h-4 w-[3px] rounded-full bg-amber-400 lg:hidden">
+        <div className="pointer-events-none absolute -left-1.5 top-1 h-4 w-[3px] rounded-full bg-amber-600 dark:bg-amber-400 lg:hidden">
             <span className="sr-only">Prioritised</span>
         </div>
     );
@@ -157,7 +157,7 @@ function TaskRow({
                     <button
                         {...listeners}
                         {...attributes}
-                        className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground p-3 -m-3 flex-shrink-0 focus:outline-none"
+                        className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-3 -m-3 flex-shrink-0"
                         aria-label={`Drag to reorder ${task.title}`}
                     >
                         <GripVertical className="h-3.5 w-3.5" />
@@ -170,7 +170,7 @@ function TaskRow({
                         className={`hit-area hidden lg:flex flex-shrink-0 h-4 w-4 items-center justify-center rounded border motion-safe:transition-colors ${
                             taskIsDone
                                 ? 'border-metric bg-metric text-background'
-                                : 'border-muted-foreground/40 hover:border-muted-foreground'
+                                : 'border-field hover:border-foreground'
                         } ${!canToggleComplete ? 'opacity-40' : ''}`}
                         aria-label={taskIsDone ? 'Mark as incomplete' : 'Mark as complete'}
                     >
@@ -209,7 +209,7 @@ function TaskRow({
                             clickEvent.stopPropagation();
                             togglePriority(task);
                         }}
-                        className="hidden lg:flex flex-shrink-0 items-center justify-center p-2 -m-2 focus:outline-none"
+                        className="hidden lg:flex flex-shrink-0 items-center justify-center p-2 -m-2"
                         aria-label={
                             task.is_prioritised ? 'Remove from priority' : 'Put on priority'
                         }
@@ -218,8 +218,8 @@ function TaskRow({
                         <Star
                             className={`h-3.5 w-3.5 motion-safe:transition-colors ${
                                 task.is_prioritised
-                                    ? 'fill-amber-400 text-amber-400'
-                                    : 'text-muted-foreground/40 hover:text-muted-foreground'
+                                    ? 'fill-amber-600 text-amber-600 dark:fill-amber-400 dark:text-amber-400'
+                                    : 'text-muted-foreground hover:text-foreground'
                             }`}
                         />
                     </button>

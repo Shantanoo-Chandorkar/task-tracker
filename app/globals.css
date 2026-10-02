@@ -27,6 +27,7 @@
     --color-chart-1: var(--chart-1);
     --color-ring: var(--ring);
     --color-input: var(--input);
+    --color-field: var(--field-border);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
     --color-accent-foreground: var(--accent-foreground);
@@ -70,18 +71,20 @@
     --card-foreground: #1c1917;
     --popover: #f2eee8;
     --popover-foreground: #1c1917;
-    --primary: #c2410c;
+    --primary: #c0400c;
     --primary-foreground: #ffffff;
     --secondary: #f2eee8;
     --secondary-foreground: #1c1917;
     --muted: #f2eee8;
-    --muted-foreground: #737373;
-    --accent: #f2eee8;
+    --muted-foreground: #6c6c6c;
+    --accent: #e5dfd5;
     --accent-foreground: #1c1917;
-    --destructive: oklch(0.577 0.245 27.325);
+    --destructive: oklch(0.54 0.245 27.325);
     --border: #e7e5e4;
     --input: #e7e5e4;
-    --ring: #c2410c;
+    /* Form controls need 3:1 against the page and cards; --border stays soft for dividers and cards */
+    --field-border: #8b8989;
+    --ring: #c0400c;
     --metric: #7e22ce;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
@@ -91,12 +94,12 @@
     --radius: 0.625rem;
     --sidebar: #f2eee8;
     --sidebar-foreground: #1c1917;
-    --sidebar-primary: #c2410c;
+    --sidebar-primary: #c0400c;
     --sidebar-primary-foreground: #ffffff;
     --sidebar-accent: #e7e5e4;
     --sidebar-accent-foreground: #1c1917;
     --sidebar-border: #e7e5e4;
-    --sidebar-ring: #c2410c;
+    --sidebar-ring: #c0400c;
 }
 
 .dark {
@@ -113,11 +116,12 @@
     --secondary-foreground: #fffaf5;
     --muted: #292521;
     --muted-foreground: #a3a3a3;
-    --accent: #292521;
+    --accent: #3a3531;
     --accent-foreground: #fffaf5;
     --destructive: oklch(0.704 0.191 22.216);
     --border: #2a2a2a;
     --input: #2a2a2a;
+    --field-border: #707070;
     --ring: #fdba74;
     --metric: #d8b4fe;
     --chart-1: oklch(0.87 0 0);
@@ -171,6 +175,11 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+    /* One visible keyboard focus indicator everywhere; controls that draw their own ring keep it via outline-none */
+    :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
     }
     html {
         @apply font-sans;

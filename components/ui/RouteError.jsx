@@ -23,7 +23,7 @@ export default function RouteError({ error, retry, showHomeLink = true }) {
         <div className="flex min-h-[60vh] items-center justify-center p-8">
             <div className="max-w-md w-full space-y-4">
                 <Alert className="border-amber-500/50 bg-amber-500/10">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-500" />
                     <AlertTitle>Something went wrong</AlertTitle>
                     <AlertDescription>
                         An unexpected error occurred. Please try again.

@@ -85,7 +85,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest, moveTargets, onMoveList
             <button
                 {...listeners}
                 {...attributes}
-                className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
                 aria-label={`Drag to reorder ${list.name}`}
             >
                 <GripVertical className="h-3.5 w-3.5" />
@@ -182,7 +182,7 @@ function SpaceSection({
                     <button
                         {...listeners}
                         {...attributes}
-                        className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                        className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
                         aria-label={`Drag to reorder ${space.name}`}
                     >
                         <GripVertical className="h-3.5 w-3.5" />
