@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
+import { removeRowFromCache } from '@/lib/query-cache';
 import {
     deleteWebhookEndpoint,
     rotateWebhookSecret,
@@ -34,11 +36,14 @@ const ACTION_BUTTON_CLASS = 'h-10 gap-1.5';
  * @param {object} props.endpoint - Endpoint row (never contains the secret)
  * @param {Function} props.onEdit - Called with the endpoint to open the edit form
  * @param {Function} props.onSecretRotated - Called with the new secret to show it once
+ * @param {Function} props.onDeleted - Called with the endpoint id once it is deleted
  */
-export default function WebhookEndpointCard({ endpoint, onEdit, onSecretRotated }) {
+export default function WebhookEndpointCard({ endpoint, onEdit, onSecretRotated, onDeleted }) {
     const queryClient = useQueryClient();
     const [pendingAction, setPendingAction] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
+    const rotateConfirm = useConfirmAction(confirmAction === 'rotate');
+    const deleteConfirm = useConfirmAction(confirmAction === 'delete');
     const [isLogOpen, setIsLogOpen] = useState(false);
 
     const endpointStatus = describeEndpointStatus(endpoint);
@@ -101,28 +106,40 @@ export default function WebhookEndpointCard({ endpoint, onEdit, onSecretRotated 
     }
 
     function handleRotate() {
-        return runEndpointAction(
-            'rotate',
-            () => rotateWebhookSecret(endpoint.id),
-            async (rotateResult) => {
+        return rotateConfirm.runConfirmedAction({
+            entityKey: `webhook-rotate:${endpoint.id}`,
+            loadingMessage: 'Rotating the signing secret...',
+            successMessage: 'Signing secret rotated',
+            action: () => rotateWebhookSecret(endpoint.id),
+            onSuccess: async (rotateResult) => {
                 await refreshEndpoints();
                 onSecretRotated(rotateResult.data.secret);
             },
-        );
+            close: () => setConfirmAction(null),
+        });
     }
 
     function handleDelete() {
-        return runEndpointAction(
-            'delete',
-            () => deleteWebhookEndpoint(endpoint.id),
-            async () => {
-                await refreshEndpoints();
-                toast.success('Webhook deleted');
+        return deleteConfirm.runConfirmedAction({
+            entityKey: `webhook-delete:${endpoint.id}`,
+            loadingMessage: 'Deleting webhook...',
+            successMessage: 'Webhook deleted',
+            action: () => deleteWebhookEndpoint(endpoint.id),
+            // The row leaves the list at once, so the popup closes onto the final screen; the reload is quiet.
+            onSuccess: () => {
+                onDeleted(endpoint.id);
+                removeRowFromCache(
+                    queryClient,
+                    ['webhook-endpoints', endpoint.space_id],
+                    endpoint.id,
+                );
+                refreshEndpoints();
             },
-        );
+            close: () => setConfirmAction(null),
+        });
     }
 
-    const isBusy = pendingAction !== null;
+    const isBusy = pendingAction !== null || rotateConfirm.isPending || deleteConfirm.isPending;
 
     return (
         <div className="space-y-3 rounded-xl border border-border bg-card p-3">
@@ -220,12 +237,17 @@ export default function WebhookEndpointCard({ endpoint, onEdit, onSecretRotated 
             <ModalShell
                 open={confirmAction === 'rotate'}
                 onClose={() => setConfirmAction(null)}
+                isBusy={rotateConfirm.isPending}
+                errorMessage={rotateConfirm.errorMessage}
                 variant="alert"
                 title="Rotate the signing secret?"
                 description="You get a new secret now. The old one keeps working for 24 hours so your receiver can switch over."
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setConfirmAction(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setConfirmAction(null)}
+                            disabled={rotateConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
@@ -233,7 +255,7 @@ export default function WebhookEndpointCard({ endpoint, onEdit, onSecretRotated 
                             disabled={isBusy}
                             className="gap-1.5"
                         >
-                            {pendingAction === 'rotate' && <Loader size="xs" />}
+                            {rotateConfirm.isPending && <Loader size="xs" />}
                             Rotate
                         </AlertDialogAction>
                     </>
@@ -243,12 +265,17 @@ export default function WebhookEndpointCard({ endpoint, onEdit, onSecretRotated 
             <ModalShell
                 open={confirmAction === 'delete'}
                 onClose={() => setConfirmAction(null)}
+                isBusy={deleteConfirm.isPending}
+                errorMessage={deleteConfirm.errorMessage}
                 variant="alert"
                 title={<>Delete &ldquo;{endpoint.name}&rdquo;?</>}
                 description="Events stop being sent and its delivery history is removed. This cannot be undone."
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setConfirmAction(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setConfirmAction(null)}
+                            disabled={deleteConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
@@ -256,7 +283,7 @@ export default function WebhookEndpointCard({ endpoint, onEdit, onSecretRotated 
                             disabled={isBusy}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {pendingAction === 'delete' && <Loader size="xs" />}
+                            {deleteConfirm.isPending && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
                     </>

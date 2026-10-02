@@ -31,8 +31,9 @@ export default function StatusPicker({ task, flatList }) {
     const [pending, setPending] = useState(false);
     const spaceId = useSpaceIdForList(task.list_id);
     const { data: statuses = [], isLoading: isStatusesLoading } = useStatusesQuery(spaceId);
-    const { doneStatus, defaultStatus, setComplete, confirmState, closeConfirm, confirmCascade } =
-        useTaskCompletion(task.list_id);
+    const { doneStatus, defaultStatus, setComplete, completeDialogProps } = useTaskCompletion(
+        task.list_id,
+    );
 
     async function handleChange(newStatusId) {
         const isCompleteTransition = doneStatus && newStatusId === doneStatus.id;
@@ -108,14 +109,7 @@ export default function StatusPicker({ task, flatList }) {
                 </SelectContent>
             </Select>
 
-            <CompleteTaskDialog
-                open={!!confirmState}
-                onClose={closeConfirm}
-                task={confirmState?.task}
-                isComplete={confirmState?.isComplete}
-                descendantCount={confirmState?.descendantCount ?? 0}
-                onConfirm={confirmCascade}
-            />
+            <CompleteTaskDialog {...completeDialogProps} />
         </>
     );
 }

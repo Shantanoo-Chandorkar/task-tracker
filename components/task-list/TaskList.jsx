@@ -30,7 +30,12 @@ import {
 import { toast } from 'sonner';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
-import { flatToTree, findDescendantIds, isStartOfUnprioritisedTier } from '@/lib/tree';
+import {
+    flatToTree,
+    findDescendantIds,
+    isStartOfUnprioritisedTier,
+    countSublistTasks,
+} from '@/lib/tree';
 import { useUIState } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
@@ -51,7 +56,8 @@ import ListHeader from './ListHeader';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { bustPageCache } from '@/lib/service-worker-cache';
-import { fetchDeleteCounts } from '@/lib/fetch-delete-counts';
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 // Ctrl/Cmd+D inside these keeps the browser's own meaning instead of duplicating the remembered row.
@@ -344,8 +350,12 @@ export default function TaskList({
     const { flags: collapsedGroups, toggleFlag: toggleGroup } = useUIState();
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [sublistDialog, setSublistDialog] = useState({ open: false, sublist: null });
-    const [deleteSublistTarget, setDeleteSublistTarget] = useState(null);
-    const [deletingSublist, setDeletingSublist] = useState(false);
+    const {
+        deleteTarget: deleteSublistTarget,
+        setDeleteTarget: setDeleteSublistTarget,
+        requestDelete: requestDeleteSublistConfirm,
+    } = useDeleteConfirm();
+    const deleteSublistConfirm = useConfirmAction(Boolean(deleteSublistTarget));
 
     const { data: flatList = [] } = useQuery({
         queryKey: ['tasks', listId],
@@ -607,50 +617,45 @@ export default function TaskList({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [focusedTaskId, duplicateTaskById]);
 
-    async function requestDeleteSublist(sublist) {
-        try {
-            const sublistDeleteCounts = await fetchDeleteCounts(`/api/sublists/${sublist.id}`);
-            setDeleteSublistTarget({
+    function requestDeleteSublist(sublist) {
+        requestDeleteSublistConfirm(
+            {
                 id: sublist.id,
                 name: sublist.name,
-                taskCount: sublistDeleteCounts ? sublistDeleteCounts.task_count : null,
-            });
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-        }
+                // Counted from the loaded tasks, since the sublist's own task_count skips nested subtasks.
+                taskCount: countSublistTasks(sublist.id, flatList),
+            },
+            {
+                countsUrl: `/api/sublists/${sublist.id}`,
+                withFreshCounts: (openTarget, fetched) => ({
+                    ...openTarget,
+                    taskCount: fetched.task_count,
+                }),
+            },
+        );
     }
 
-    async function handleConfirmDeleteSublist() {
+    function handleConfirmDeleteSublist() {
         if (!deleteSublistTarget) return;
+        const sublistId = deleteSublistTarget.id;
 
-        setDeletingSublist(true);
-        const toastId = toast.loading('Deleting sublist...');
-
-        let result;
-        try {
-            result = await deleteSublist(deleteSublistTarget.id);
-        } catch {
-            setDeletingSublist(false);
-            setDeleteSublistTarget(null);
-            toast.error('Could not reach the server. Check your connection and try again.', {
-                id: toastId,
-            });
-            return;
-        }
-        setDeletingSublist(false);
-        setDeleteSublistTarget(null);
-
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-        // Deleting a sublist cascades to delete all its tasks, changing the list's total count.
-        queryClient.invalidateQueries({ queryKey: ['lists'] });
-        bustThisListPage();
-        toast.success('Sublist deleted', { id: toastId });
+        return deleteSublistConfirm.runConfirmedAction({
+            entityKey: `sublist-delete:${sublistId}`,
+            loadingMessage: 'Deleting sublist...',
+            successMessage: 'Sublist deleted',
+            action: () => deleteSublist(sublistId),
+            // Its tasks go with it, so the popup waits for both reloads instead of showing them regrouped.
+            onSuccess: async () => {
+                await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ['sublists', listId] }),
+                    queryClient.invalidateQueries({ queryKey: ['tasks', listId] }),
+                ]);
+                // Deleting a sublist cascades to delete all its tasks, changing the list's total count.
+                queryClient.invalidateQueries({ queryKey: ['lists'] });
+                bustThisListPage();
+            },
+            close: () => setDeleteSublistTarget(null),
+        });
     }
 
     if (flatList.length === 0 && sublists.length === 0) {
@@ -902,6 +907,8 @@ export default function TaskList({
             <ModalShell
                 open={!!deleteSublistTarget}
                 onClose={() => setDeleteSublistTarget(null)}
+                isBusy={deleteSublistConfirm.isPending}
+                errorMessage={deleteSublistConfirm.errorMessage}
                 variant="alert"
                 title={<>Delete &ldquo;{deleteSublistTarget?.name}&rdquo;?</>}
                 description={
@@ -911,15 +918,18 @@ export default function TaskList({
                 }
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteSublistTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setDeleteSublistTarget(null)}
+                            disabled={deleteSublistConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDeleteSublist}
-                            disabled={deletingSublist}
+                            disabled={deleteSublistConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deletingSublist && <Loader size="xs" />}
+                            {deleteSublistConfirm.isPending && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
                     </>

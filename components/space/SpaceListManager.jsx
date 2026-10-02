@@ -40,7 +40,10 @@ import JoinSpaceDialog from './JoinSpaceDialog';
 import SpaceSharingSection from './SpaceSharingSection';
 import SpaceSettingsSheet from './SpaceSettingsSheet';
 import { bustPageCache } from '@/lib/service-worker-cache';
-import { fetchDeleteCounts } from '@/lib/fetch-delete-counts';
+import { removeRowFromCache } from '@/lib/query-cache';
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
+import { countSpaceContents } from '@/lib/delete-counts';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };
@@ -323,10 +326,9 @@ export default function SpaceListManager({
             ? { open: true, prefillSpaceId: joinId }
             : { open: false, prefillSpaceId: '' };
     });
-    const [error, setError] = useState('');
     // { type: 'space'|'list'|'leave-space', id, name, counts }
-    const [deleteTarget, setDeleteTarget] = useState(null);
-    const [deleting, setDeleting] = useState(false);
+    const { deleteTarget, setDeleteTarget, requestDelete } = useDeleteConfirm();
+    const deleteConfirm = useConfirmAction(Boolean(deleteTarget));
 
     const { data: spaces = [] } = useSpacesQuery({ initialData: initialSpaces });
     const { data: lists = [] } = useListsQuery({ initialData: initialLists });
@@ -421,81 +423,74 @@ export default function SpaceListManager({
         toast[persistError ? 'error' : 'success'](persistError ?? 'Order saved', { id: toastId });
     }
 
-    async function requestDeleteSpace(space) {
-        setError('');
-        try {
-            const spaceDeleteCounts = await fetchDeleteCounts(`/api/spaces/${space.id}`);
-            setDeleteTarget({
+    function requestDeleteSpace(space) {
+        requestDelete(
+            {
                 type: 'space',
                 id: space.id,
                 name: space.name,
-                counts: spaceDeleteCounts
-                    ? { lists: spaceDeleteCounts.list_count, tasks: spaceDeleteCounts.task_count }
-                    : null,
-            });
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-        }
+                counts: countSpaceContents(space.id, lists),
+            },
+            {
+                countsUrl: `/api/spaces/${space.id}`,
+                withFreshCounts: (openTarget, fetched) => ({
+                    ...openTarget,
+                    counts: { lists: fetched.list_count, tasks: fetched.task_count },
+                }),
+            },
+        );
     }
 
-    async function requestDeleteList(list) {
-        setError('');
-        try {
-            const listDeleteCounts = await fetchDeleteCounts(`/api/lists/${list.id}`);
-            setDeleteTarget({
+    function requestDeleteList(list) {
+        requestDelete(
+            {
                 type: 'list',
                 id: list.id,
                 name: list.name,
-                counts: listDeleteCounts ? { tasks: listDeleteCounts.task_count } : null,
-            });
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-        }
+                counts: { tasks: list.task_count ?? 0 },
+            },
+            {
+                countsUrl: `/api/lists/${list.id}`,
+                withFreshCounts: (openTarget, fetched) => ({
+                    ...openTarget,
+                    counts: { tasks: fetched.task_count },
+                }),
+            },
+        );
     }
 
-    async function handleConfirmDelete() {
+    function handleConfirmDelete() {
         if (!deleteTarget) return;
-        const { type } = deleteTarget;
+        const { type, id: targetId } = deleteTarget;
+        const copyByType = {
+            space: { loading: 'Deleting space...', done: 'Space deleted' },
+            list: { loading: 'Deleting list...', done: 'List deleted' },
+            'leave-space': { loading: 'Leaving space...', done: 'Left space' },
+        };
 
-        setDeleting(true);
-        const toastId = toast.loading(
-            type === 'space'
-                ? 'Deleting space...'
-                : type === 'list'
-                  ? 'Deleting list...'
-                  : 'Leaving space...',
-        );
-
-        let result;
-        try {
-            if (type === 'space') result = await deleteSpace(deleteTarget.id);
-            else if (type === 'list') result = await deleteList(deleteTarget.id);
-            else result = await leaveSpace({ spaceId: deleteTarget.id });
-        } catch {
-            setDeleting(false);
-            setDeleteTarget(null);
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        setDeleting(false);
-
-        setDeleteTarget(null);
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
-            setError(result.error);
-        } else {
-            if (type === 'space') bustPageCache({ prefixes: ['/lists/'] });
-            else if (type === 'list') bustPageCache({ urls: [`/lists/${deleteTarget.id}`] });
-            await refetchAll();
-            toast.success(
-                type === 'space'
-                    ? 'Space deleted'
-                    : type === 'list'
-                      ? 'List deleted'
-                      : 'Left space',
-                { id: toastId },
-            );
-        }
+        return deleteConfirm.runConfirmedAction({
+            entityKey: `${type}-delete:${targetId}`,
+            loadingMessage: copyByType[type].loading,
+            successMessage: copyByType[type].done,
+            action: () => {
+                if (type === 'space') return deleteSpace(targetId);
+                if (type === 'list') return deleteList(targetId);
+                return leaveSpace({ spaceId: targetId });
+            },
+            // The row leaves the lists at once, so the popup closes onto the final screen; the reload is quiet.
+            onSuccess: () => {
+                if (type === 'list') bustPageCache({ urls: [`/lists/${targetId}`] });
+                else bustPageCache({ prefixes: ['/lists/'] });
+                removeRowFromCache(queryClient, type === 'list' ? ['lists'] : ['spaces'], targetId);
+                if (type !== 'list') {
+                    queryClient.setQueryData(['lists'], (cachedLists) =>
+                        cachedLists?.filter((list) => list.space_id !== targetId),
+                    );
+                }
+                refetchAll();
+            },
+            close: () => setDeleteTarget(null),
+        });
     }
 
     return (
@@ -506,12 +501,6 @@ export default function SpaceListManager({
                     Spaces group your lists. Each list holds its own tasks. Drag to reorder.
                 </p>
             </div>
-
-            {error && (
-                <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
-                    {error}
-                </p>
-            )}
 
             <DndContext
                 id="space-list-dnd"
@@ -625,6 +614,8 @@ export default function SpaceListManager({
             <ModalShell
                 open={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
+                isBusy={deleteConfirm.isPending}
+                errorMessage={deleteConfirm.errorMessage}
                 variant="alert"
                 title={
                     deleteTarget?.type === 'leave-space'
@@ -642,15 +633,18 @@ export default function SpaceListManager({
                 }
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setDeleteTarget(null)}
+                            disabled={deleteConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
-                            disabled={deleting}
+                            disabled={deleteConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleting && <Loader size="xs" />}
+                            {deleteConfirm.isPending && <Loader size="xs" />}
                             {deleteTarget?.type === 'leave-space' ? 'Leave' : 'Delete'}
                         </AlertDialogAction>
                     </>

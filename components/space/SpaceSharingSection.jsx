@@ -17,6 +17,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { removeRowFromCache } from '@/lib/query-cache';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';
 import { useCollaboratorsQuery } from '@/hooks/useCollaboratorsQuery';
 import { usePendingInvitesQuery } from '@/hooks/usePendingInvitesQuery';
@@ -73,7 +75,7 @@ export default function SpaceSharingSection({ space }) {
     );
     // { action: 'reject'|'remove'|'revoke-invite', targetId, label } while a confirm dialog is open, else null.
     const [confirmTarget, setConfirmTarget] = useState(null);
-    const [confirming, setConfirming] = useState(false);
+    const sharingConfirm = useConfirmAction(Boolean(confirmTarget));
     const [inviteEmail, setInviteEmail] = useState('');
     const [sendingInvite, setSendingInvite] = useState(false);
     const [inviteError, setInviteError] = useState('');
@@ -131,47 +133,41 @@ export default function SpaceSharingSection({ space }) {
         await refetch();
     }
 
-    async function handleConfirm() {
+    function handleConfirm() {
         if (!confirmTarget) return;
         const { action, targetId } = confirmTarget;
-
-        setConfirming(true);
-        const loadingLabelByAction = {
-            reject: 'Rejecting...',
-            remove: 'Removing...',
-            'revoke-invite': 'Revoking...',
+        const actionByName = {
+            reject: {
+                loadingMessage: 'Rejecting...',
+                successMessage: 'Request rejected',
+                run: () => rejectJoinRequest({ requestId: targetId }),
+            },
+            remove: {
+                loadingMessage: 'Removing...',
+                successMessage: 'Collaborator removed',
+                run: () => removeCollaborator({ collaboratorId: targetId }),
+            },
+            'revoke-invite': {
+                loadingMessage: 'Revoking...',
+                successMessage: 'Invite revoked',
+                run: () => revokeSpaceInvite({ inviteId: targetId }),
+            },
         };
-        const toastId = toast.loading(loadingLabelByAction[action]);
+        const chosenAction = actionByName[action];
 
-        let actionResult;
-        try {
-            if (action === 'reject') {
-                actionResult = await rejectJoinRequest({ requestId: targetId });
-            } else if (action === 'remove') {
-                actionResult = await removeCollaborator({ collaboratorId: targetId });
-            } else {
-                actionResult = await revokeSpaceInvite({ inviteId: targetId });
-            }
-        } catch {
-            setConfirming(false);
-            setConfirmTarget(null);
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        setConfirming(false);
-        setConfirmTarget(null);
-
-        if (actionResult.error) {
-            toast.error(actionResult.error, { id: toastId });
-            return;
-        }
-        const successLabelByAction = {
-            reject: 'Request rejected',
-            remove: 'Collaborator removed',
-            'revoke-invite': 'Invite revoked',
-        };
-        toast.success(successLabelByAction[action], { id: toastId });
-        await refetch();
+        return sharingConfirm.runConfirmedAction({
+            entityKey: `${action}:${targetId}`,
+            loadingMessage: chosenAction.loadingMessage,
+            successMessage: chosenAction.successMessage,
+            action: chosenAction.run,
+            // The row leaves the list at once, so the popup closes onto the final screen; the reload is quiet.
+            onSuccess: () => {
+                removeRowFromCache(queryClient, ['space-collaborators', space.id], targetId);
+                removeRowFromCache(queryClient, ['space-invites', space.id], targetId);
+                refetch();
+            },
+            close: () => setConfirmTarget(null),
+        });
     }
 
     async function handlePermissionChange(collaboratorId, newPermissionLevel) {
@@ -409,6 +405,8 @@ export default function SpaceSharingSection({ space }) {
             <ModalShell
                 open={!!confirmTarget}
                 onClose={() => setConfirmTarget(null)}
+                isBusy={sharingConfirm.isPending}
+                errorMessage={sharingConfirm.errorMessage}
                 variant="alert"
                 title={
                     {
@@ -426,15 +424,18 @@ export default function SpaceSharingSection({ space }) {
                 }
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setConfirmTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setConfirmTarget(null)}
+                            disabled={sharingConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirm}
-                            disabled={confirming}
+                            disabled={sharingConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {confirming && <Loader size="xs" />}
+                            {sharingConfirm.isPending && <Loader size="xs" />}
                             {
                                 { reject: 'Reject', remove: 'Remove', 'revoke-invite': 'Revoke' }[
                                     confirmTarget?.action

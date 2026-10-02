@@ -17,7 +17,7 @@ import { useUIFlag, toggleFlag } from '@/providers/UIStateProvider';
  * @param {number} [props.depth] - Current nesting depth (0 = direct children)
  */
 export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
-    const { doneStatus, defaultStatus, setComplete, confirmState, closeConfirm, confirmCascade } =
+    const { doneStatus, defaultStatus, setComplete, completeDialogProps } =
         useTaskCompletion(listId);
 
     const handleToggle = useCallback(
@@ -41,14 +41,7 @@ export default function SubtaskTree({ nodes, listId, flatList, depth = 0 }) {
                     onToggle={handleToggle}
                 />
             ))}
-            <CompleteTaskDialog
-                open={!!confirmState}
-                onClose={closeConfirm}
-                task={confirmState?.task}
-                isComplete={confirmState?.isComplete}
-                descendantCount={confirmState?.descendantCount ?? 0}
-                onConfirm={confirmCascade}
-            />
+            <CompleteTaskDialog {...completeDialogProps} />
         </div>
     );
 }

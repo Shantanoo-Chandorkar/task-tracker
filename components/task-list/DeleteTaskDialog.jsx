@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
+import { Loader } from '@/components/ui/loader';
 
 /**
  * Confirmation dialog for deleting a task; offers reparent-first or cascade-delete when it has children.
@@ -13,9 +15,25 @@ import { Button } from '@/components/ui/button';
  * @param {object} props.task - The task being deleted
  * @param {object[]} props.flatList - Full flat task list, used to detect direct children
  * @param {Function} props.onConfirm - Called with 'cascade' or 'reparent' strategy
+ * @param {boolean} [props.isPending] - While true the popup is locked and the chosen button spins
+ * @param {string} [props.errorMessage] - Failure text shown inside the popup, which stays open
  */
-export default function DeleteTaskDialog({ open, onClose, task, flatList, onConfirm }) {
+export default function DeleteTaskDialog({
+    open,
+    onClose,
+    task,
+    flatList,
+    onConfirm,
+    isPending = false,
+    errorMessage,
+}) {
+    const [chosenStrategy, setChosenStrategy] = useState(null);
     if (!task) return null;
+
+    function confirmWith(strategy) {
+        setChosenStrategy(strategy);
+        return onConfirm(strategy);
+    }
 
     const directChildren = flatList.filter((t) => t.parent_id === task.id);
     const hasChildren = directChildren.length > 0;
@@ -25,16 +43,22 @@ export default function DeleteTaskDialog({ open, onClose, task, flatList, onConf
             <ModalShell
                 open={open}
                 onClose={onClose}
+                isBusy={isPending}
+                errorMessage={errorMessage}
                 variant="alert"
                 title={<>Delete &ldquo;{task.title}&rdquo;?</>}
                 description="This cannot be undone."
                 footer={
                     <>
-                        <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel onClick={onClose} disabled={isPending}>
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => onConfirm('cascade')}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => confirmWith('cascade')}
+                            disabled={isPending}
+                            className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
+                            {isPending && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
                     </>
@@ -47,6 +71,8 @@ export default function DeleteTaskDialog({ open, onClose, task, flatList, onConf
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={isPending}
+            errorMessage={errorMessage}
             variant="alert"
             title={<>Delete &ldquo;{task.title}&rdquo;?</>}
             description={
@@ -61,19 +87,27 @@ export default function DeleteTaskDialog({ open, onClose, task, flatList, onConf
                 <>
                     <Button
                         variant="outline"
-                        onClick={() => onConfirm('reparent')}
-                        className="w-full"
+                        onClick={() => confirmWith('reparent')}
+                        disabled={isPending}
+                        className="w-full gap-1.5"
                     >
+                        {isPending && chosenStrategy === 'reparent' && <Loader size="xs" />}
                         Move subtasks to parent
                     </Button>
                     <Button
                         variant="destructive"
-                        onClick={() => onConfirm('cascade')}
-                        className="w-full"
+                        onClick={() => confirmWith('cascade')}
+                        disabled={isPending}
+                        className="w-full gap-1.5"
                     >
+                        {isPending && chosenStrategy === 'cascade' && <Loader size="xs" />}
                         Delete everything
                     </Button>
-                    <AlertDialogCancel onClick={onClose} className="w-full mt-0">
+                    <AlertDialogCancel
+                        onClick={onClose}
+                        disabled={isPending}
+                        className="w-full mt-0"
+                    >
                         Cancel
                     </AlertDialogCancel>
                 </>

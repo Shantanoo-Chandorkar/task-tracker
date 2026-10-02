@@ -79,15 +79,8 @@ function TaskRow({
     const canAddSubtask =
         !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH) && !isSubtaskCapReached;
 
-    const {
-        doneStatus,
-        defaultStatus,
-        isDone,
-        setComplete,
-        confirmState,
-        closeConfirm,
-        confirmCascade,
-    } = useTaskCompletion(listId);
+    const { doneStatus, defaultStatus, isDone, setComplete, completeDialogProps } =
+        useTaskCompletion(listId);
     const taskIsDone = isDone(task);
     const { togglePriority } = useTaskPriority(listId);
     const canToggleComplete = Boolean(doneStatus && defaultStatus);
@@ -254,14 +247,7 @@ function TaskRow({
             />
 
             {/* Cascade complete/incomplete confirmation for the row checkbox */}
-            <CompleteTaskDialog
-                open={!!confirmState}
-                onClose={closeConfirm}
-                task={confirmState?.task}
-                isComplete={confirmState?.isComplete}
-                descendantCount={confirmState?.descendantCount ?? 0}
-                onConfirm={confirmCascade}
-            />
+            <CompleteTaskDialog {...completeDialogProps} />
 
             {/* Children container with connecting line */}
             {hasChildren && isExpanded && (

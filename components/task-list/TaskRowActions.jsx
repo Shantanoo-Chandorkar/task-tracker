@@ -25,6 +25,8 @@ import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { claimInFlight } from '@/lib/in-flight-entities';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 
 /**
@@ -58,6 +60,7 @@ export default function TaskRowActions({
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
     const [pending, setPending] = useState(false);
+    const deleteConfirm = useConfirmAction(deleteOpen);
     const isRootTask = !task.parent_id;
 
     // UX hints only - RLS and the app-layer pre-checks are the real backstop if a control is missed.
@@ -67,15 +70,8 @@ export default function TaskRowActions({
 
     const { data: sublists = [] } = useSublistsQuery(listId);
 
-    const {
-        doneStatus,
-        defaultStatus,
-        isDone,
-        setComplete,
-        confirmState,
-        closeConfirm,
-        confirmCascade,
-    } = useTaskCompletion(listId);
+    const { doneStatus, defaultStatus, isDone, setComplete, completeDialogProps } =
+        useTaskCompletion(listId);
     const taskIsDone = isDone(task);
     const { togglePriority } = useTaskPriority(listId);
 
@@ -117,37 +113,27 @@ export default function TaskRowActions({
         }))
         .filter((group) => group.canMoveToRoot || hasSelectableMoveTarget(group.roots));
 
-    async function handleDeleteConfirm(strategy) {
-        setDeleteOpen(false);
-        setPending(true);
-        const toastId = toast.loading('Deleting task...');
-
-        let error;
-        try {
-            ({ error } =
+    function handleDeleteConfirm(strategy) {
+        return deleteConfirm.runConfirmedAction({
+            entityKey: `task-mutate:${task.id}`,
+            loadingMessage: 'Deleting task...',
+            successMessage: 'Task deleted',
+            action: () =>
                 strategy === 'reparent'
-                    ? await deleteTaskAndReparentChildren(task.id)
-                    : await deleteTask(task.id));
-        } catch {
-            setPending(false);
-            toast.error('Could not reach the server. Check your connection and try again.', {
-                id: toastId,
-            });
-            return;
-        }
-        setPending(false);
-
-        if (error) {
-            toast.error(error, { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-        // Deleting a task changes the list's total count, which the sidebar reads from ['lists'].
-        queryClient.invalidateQueries({ queryKey: ['lists'] });
-        bustPageCache({ urls: [`/lists/${listId}`] });
-        toast.success('Task deleted', { id: toastId });
-        onDeleted?.();
+                    ? deleteTaskAndReparentChildren(task.id)
+                    : deleteTask(task.id),
+            // Subtree deletes change other rows, so the popup waits for the reload instead of patching the cache.
+            onSuccess: async () => {
+                await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                // Deleting a task changes the list's total count, which the sidebar reads from ['lists'].
+                queryClient.invalidateQueries({ queryKey: ['lists'] });
+                bustPageCache({ urls: [`/lists/${listId}`] });
+            },
+            close: () => {
+                setDeleteOpen(false);
+                onDeleted?.();
+            },
+        });
     }
 
     /**
@@ -159,34 +145,39 @@ export default function TaskRowActions({
      * @param {string} successMessage - Toast text shown once the move succeeds
      */
     async function performMove(body, successMessage) {
+        const releaseInFlight = claimInFlight(`task-mutate:${task.id}`);
+        if (!releaseInFlight) return;
         setPending(true);
         const toastId = toast.loading('Moving task...');
 
-        let response;
         try {
-            response = await fetch(`/api/tasks/${task.id}/move`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-        } catch {
+            let response;
+            try {
+                response = await fetch(`/api/tasks/${task.id}/move`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+            } catch {
+                toast.error('Could not reach the server. Check your connection and try again.', {
+                    id: toastId,
+                });
+                return;
+            }
+            const moveResponseBody = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                toast.error(moveResponseBody?.error || 'Failed to move task', { id: toastId });
+                return;
+            }
+
+            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+            bustPageCache({ urls: [`/lists/${listId}`] });
+            toast.success(successMessage, { id: toastId });
+        } finally {
             setPending(false);
-            toast.error('Could not reach the server. Check your connection and try again.', {
-                id: toastId,
-            });
-            return;
+            releaseInFlight();
         }
-        const moveResponseBody = await response.json().catch(() => null);
-        setPending(false);
-
-        if (!response.ok) {
-            toast.error(moveResponseBody?.error || 'Failed to move task', { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-        bustPageCache({ urls: [`/lists/${listId}`] });
-        toast.success(successMessage, { id: toastId });
     }
 
     function handlePromote() {
@@ -328,17 +319,12 @@ export default function TaskRowActions({
                 task={task}
                 flatList={flatList}
                 onConfirm={handleDeleteConfirm}
+                isPending={deleteConfirm.isPending}
+                errorMessage={deleteConfirm.errorMessage}
             />
 
             {/* Cascade complete/incomplete confirmation - only shown when descendants would also change */}
-            <CompleteTaskDialog
-                open={!!confirmState}
-                onClose={closeConfirm}
-                task={confirmState?.task}
-                isComplete={confirmState?.isComplete}
-                descendantCount={confirmState?.descendantCount ?? 0}
-                onConfirm={confirmCascade}
-            />
+            <CompleteTaskDialog {...completeDialogProps} />
 
             {/* Move-to destination picker - same bottom sheet on every breakpoint */}
             <ModalShell

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import {
@@ -126,9 +127,8 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
 export default function StatusManager({ spaceId, initialStatuses }) {
     const queryClient = useQueryClient();
     const [statusDialog, setStatusDialog] = useState({ open: false, status: null });
-    const [error, setError] = useState('');
     const [deleteTarget, setDeleteTarget] = useState(null);
-    const [deleting, setDeleting] = useState(false);
+    const deleteConfirm = useConfirmAction(Boolean(deleteTarget));
 
     const { data: statuses = [], isLoading } = useStatusesQuery(
         spaceId,
@@ -185,32 +185,24 @@ export default function StatusManager({ spaceId, initialStatuses }) {
         toast.success('Order saved', { id: toastId });
     }
 
-    async function handleConfirmDelete() {
+    function handleConfirmDelete() {
         if (!deleteTarget) return;
 
-        setDeleting(true);
-        const toastId = toast.loading('Deleting status...');
-
-        let result;
-        try {
-            result = await deleteStatus(deleteTarget.id);
-        } catch {
-            setDeleting(false);
-            setDeleteTarget(null);
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        setDeleting(false);
-        setDeleteTarget(null);
-
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
-            setError(result.error);
-        } else {
-            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-            bustPageCache({ prefixes: ['/lists/'] });
-            toast.success('Status deleted', { id: toastId });
-        }
+        return deleteConfirm.runConfirmedAction({
+            entityKey: `status-delete:${deleteTarget.id}`,
+            loadingMessage: 'Deleting status...',
+            successMessage: 'Status deleted',
+            action: () => deleteStatus(deleteTarget.id),
+            // Tasks lose the deleted status, so the popup waits for both reloads instead of showing stale groups.
+            onSuccess: async () => {
+                await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ['statuses'] }),
+                    queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+                ]);
+                bustPageCache({ prefixes: ['/lists/'] });
+            },
+            close: () => setDeleteTarget(null),
+        });
     }
 
     return (
@@ -221,12 +213,6 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                     Manage the statuses used to organize your tasks. Drag to reorder.
                 </p>
             </div>
-
-            {error && (
-                <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
-                    {error}
-                </p>
-            )}
 
             {isLoading ? (
                 <div className="flex items-center justify-center gap-2 rounded-xl bg-card py-6 text-sm text-muted-foreground">
@@ -280,20 +266,25 @@ export default function StatusManager({ spaceId, initialStatuses }) {
             <ModalShell
                 open={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
+                isBusy={deleteConfirm.isPending}
+                errorMessage={deleteConfirm.errorMessage}
                 variant="alert"
                 title={<>Delete &ldquo;{deleteTarget?.name}&rdquo;?</>}
                 description="Tasks using this status will lose it. This cannot be undone."
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setDeleteTarget(null)}
+                            disabled={deleteConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
-                            disabled={deleting}
+                            disabled={deleteConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleting && <Loader size="xs" />}
+                            {deleteConfirm.isPending && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
                     </>

@@ -113,12 +113,31 @@ function AlertDialogDescription({ className, ...props }) {
     );
 }
 
-function AlertDialogAction({ className, variant = 'default', size = 'default', ...props }) {
+/**
+ * Confirm button of an alert dialog. Unlike Radix's default it never closes the dialog on click,
+ * so the caller can keep it open with a spinner and close it once the work has finished.
+ *
+ * @param {object} props
+ * @param {Function} [props.onClick] - Runs on click; the caller closes the dialog when its work is done.
+ */
+function AlertDialogAction({
+    className,
+    variant = 'default',
+    size = 'default',
+    onClick,
+    ...props
+}) {
+    function handleClick(clickEvent) {
+        clickEvent.preventDefault();
+        onClick?.(clickEvent);
+    }
+
     return (
         <Button variant={variant} size={size} asChild>
             <AlertDialogPrimitive.Action
                 data-slot="alert-dialog-action"
                 className={cn(className)}
+                onClick={handleClick}
                 {...props}
             />
         </Button>
