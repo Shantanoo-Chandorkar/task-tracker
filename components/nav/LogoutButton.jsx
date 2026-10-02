@@ -62,7 +62,7 @@ export default function LogoutButton({ onNavigate, initialProfile }) {
             size="icon"
             onClick={handleLogout}
             disabled={isPending}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="hit-area [--hit-size:44px] h-8 w-8 text-muted-foreground hover:text-foreground"
             aria-label={logoutLabel}
             title={logoutLabel}
         >

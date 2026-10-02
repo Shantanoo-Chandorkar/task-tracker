@@ -178,6 +178,13 @@
         /* Stops iOS inflating text on rotation. */
         -webkit-text-size-adjust: 100%;
     }
+    /* Keeps a focused or scrolled-to item clear of the sticky top bar and bottom nav (below lg only). */
+    @media (max-width: 1023.98px) {
+        html {
+            scroll-padding-top: calc(var(--guest-banner-height, 0px) + 4rem);
+            scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+        }
+    }
     button:not(:disabled),
     [role='button']:not([aria-disabled='true']),
     a[href] {
@@ -227,6 +234,22 @@
             -webkit-backdrop-filter: none;
             backdrop-filter: none;
         }
+    }
+
+    /* Grows the tap area to --hit-size (default 24px, WCAG 2.5.8) without changing how the control looks. */
+    .hit-area {
+        position: relative;
+    }
+    .hit-area::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        min-width: var(--hit-size, 24px);
+        min-height: var(--hit-size, 24px);
+        transform: translate(-50%, -50%);
     }
 
     .press-feedback {

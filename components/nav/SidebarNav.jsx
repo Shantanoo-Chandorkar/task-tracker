@@ -71,7 +71,7 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
                 Spaces
             </Link>
 
-            <div className="px-2 pb-2 text-[11px] font-semibold tracking-wider text-muted-foreground">
+            <div className="px-2 pb-2 text-xs font-semibold tracking-wider text-muted-foreground">
                 LISTS
             </div>
 
@@ -83,7 +83,7 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
 
                     return (
                         <div key={space.id}>
-                            <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                            <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
                                 {space.name}
                             </div>
                             {spaceLists.map((list) => {

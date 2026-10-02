@@ -76,7 +76,7 @@ const SubtaskTreeNode = memo(function SubtaskTreeNode({
             <div className="flex items-center gap-2 py-1.5">
                 <button
                     onClick={() => toggleFlag(expandKey)}
-                    className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                    className="hit-area flex-shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground"
                     aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
                 >
                     {hasChildren ? (
@@ -89,14 +89,17 @@ const SubtaskTreeNode = memo(function SubtaskTreeNode({
                         <Circle className="h-1.5 w-1.5 text-muted-foreground/40" />
                     )}
                 </button>
-                <input
-                    type="checkbox"
-                    checked={node.status_id === doneStatus?.id}
-                    onChange={(e) => onToggle(node, e.target.checked)}
-                    disabled={!doneStatus || !defaultStatus}
-                    aria-label={`Mark "${node.title}" complete`}
-                    className="h-3.5 w-3.5 rounded border-border accent-primary flex-shrink-0"
-                />
+                {/* The label carries the larger tap area; a native checkbox cannot take a pseudo-element */}
+                <label className="hit-area flex flex-shrink-0">
+                    <input
+                        type="checkbox"
+                        checked={node.status_id === doneStatus?.id}
+                        onChange={(e) => onToggle(node, e.target.checked)}
+                        disabled={!doneStatus || !defaultStatus}
+                        aria-label={`Mark "${node.title}" complete`}
+                        className="h-3.5 w-3.5 rounded border-border accent-primary"
+                    />
+                </label>
                 <Link
                     href={`/lists/${listId}/tasks/${node.id}`}
                     className="flex flex-1 items-center gap-2 text-sm text-foreground hover:text-foreground min-w-0"

@@ -26,7 +26,7 @@ export default function RowActionsMenu({ label, isPending = false, isCompact = f
                 <Button
                     variant="ghost"
                     size="icon"
-                    className={`flex-shrink-0 text-muted-foreground hover:text-foreground ${isCompact ? 'h-6 w-6' : 'h-7 w-7'}`}
+                    className={`hit-area [--hit-size:44px] lg:[--hit-size:24px] flex-shrink-0 text-muted-foreground hover:text-foreground ${isCompact ? 'h-6 w-6' : 'h-7 w-7'}`}
                     disabled={isPending}
                     aria-label={label}
                 >

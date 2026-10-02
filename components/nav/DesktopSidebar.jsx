@@ -19,7 +19,7 @@ export default function DesktopSidebar({ initialSpaces, initialLists, initialPro
         <aside className="hidden lg:flex sticky top-0 h-screen w-[20%] flex-shrink-0 flex-col border-r border-border bg-sidebar p-3">
             <Link
                 href="/"
-                className="mb-4 flex items-center gap-2 px-2 text-[15px] font-semibold text-foreground no-underline"
+                className="mb-4 flex items-center gap-2 px-2 text-[0.9375rem] font-semibold text-foreground no-underline"
             >
                 Task Tracker
             </Link>
@@ -31,7 +31,7 @@ export default function DesktopSidebar({ initialSpaces, initialLists, initialPro
                     <Search className="h-3.5 w-3.5" />
                     Quick Search
                 </span>
-                <kbd className="rounded border border-border bg-muted px-1 text-[10px]">⌘K</kbd>
+                <kbd className="rounded border border-border bg-muted px-1 text-xs">⌘K</kbd>
             </button>
             <SidebarNav
                 initialSpaces={initialSpaces}

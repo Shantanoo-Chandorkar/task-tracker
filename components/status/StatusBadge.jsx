@@ -12,7 +12,7 @@ export default function StatusBadge({ name, color, className = '' }) {
 
     return (
         <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${className}`}
+            className={`inline-flex max-w-full items-center px-2 py-0.5 rounded-full text-xs font-medium min-w-0 [overflow-wrap:anywhere] ${className}`}
             style={{
                 backgroundColor: color ? `${color}26` : 'transparent', // 26 = 15% opacity in hex
                 color: color ?? 'inherit',

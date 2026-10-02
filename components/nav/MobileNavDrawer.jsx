@@ -22,7 +22,7 @@ export default function MobileNavDrawer({ initialSpaces, initialLists, initialPr
             <button
                 onClick={() => setIsOpen(true)}
                 aria-label="Open navigation"
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-foreground"
+                className="hit-area [--hit-size:44px] flex h-8 w-8 flex-shrink-0 items-center justify-center text-foreground"
             >
                 <Menu className="h-5 w-5" />
             </button>
@@ -34,7 +34,7 @@ export default function MobileNavDrawer({ initialSpaces, initialLists, initialPr
                 title="Task Tracker"
                 contentClassName="flex w-[80%] flex-col bg-sidebar p-3"
                 headerClassName="p-0 pb-4"
-                titleClassName="text-[15px] font-semibold"
+                titleClassName="text-[0.9375rem] font-semibold"
             >
                 <SidebarNav onNavigate={() => setIsOpen(false)} />
             </ModalShell>

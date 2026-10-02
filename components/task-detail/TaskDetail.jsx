@@ -124,7 +124,9 @@ export default function TaskDetail({
 
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
-                <h1 className="text-lg font-semibold text-foreground flex-1">{task.title}</h1>
+                <h1 className="text-lg font-semibold text-foreground flex-1 min-w-0 [overflow-wrap:anywhere]">
+                    {task.title}
+                </h1>
                 <TaskRowActions
                     task={task}
                     flatList={flatList}

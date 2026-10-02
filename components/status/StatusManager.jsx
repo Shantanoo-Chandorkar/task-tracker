@@ -81,7 +81,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly, moveTargets
             <button
                 {...attributes}
                 {...listeners}
-                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
+                className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
                 aria-label={`Drag to reorder ${status.name}`}
             >
                 <GripVertical className="h-4 w-4" />
@@ -91,7 +91,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly, moveTargets
                 className="h-4 w-4 rounded-full flex-shrink-0"
                 style={{ backgroundColor: status.color }}
             />
-            <span className="flex-1 text-sm text-foreground">
+            <span className="flex-1 text-sm text-foreground min-w-0 [overflow-wrap:anywhere]">
                 {status.name}
                 {status.is_default && (
                     <span className="ml-2 text-xs text-muted-foreground">(default)</span>

@@ -37,7 +37,9 @@ function FilterCheckboxRow({ label, checked, onCheckedChange, dotColor, count })
                     style={{ backgroundColor: dotColor }}
                 />
             )}
-            <span className="text-sm text-foreground flex-1">{label}</span>
+            <span className="text-sm text-foreground flex-1 min-w-0 [overflow-wrap:anywhere]">
+                {label}
+            </span>
             {count != null && <span className="text-xs text-muted-foreground">{count}</span>}
         </label>
     );

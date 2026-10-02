@@ -52,7 +52,7 @@ export default function LimitWarning({ message, dismissible = false, dismissKey 
             {dismissible && (
                 <button
                     onClick={() => dismiss(dismissKey)}
-                    className="text-amber-500/70 hover:text-amber-400 flex-shrink-0"
+                    className="hit-area text-amber-500/70 hover:text-amber-400 flex-shrink-0"
                     aria-label="Dismiss warning"
                 >
                     <X className="h-3 w-3" />

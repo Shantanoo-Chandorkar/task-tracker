@@ -47,7 +47,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                     <Link
                         href="/"
                         aria-current={isHome ? 'page' : undefined}
-                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <Home aria-hidden="true" className="h-5 w-5" />
                         Home
@@ -56,7 +56,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                     <Link
                         href={tasksHref}
                         aria-current={isTasks ? 'page' : undefined}
-                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <ListChecks aria-hidden="true" className="h-5 w-5" />
                         Tasks
@@ -69,7 +69,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                     <Link
                         href="/spaces"
                         aria-current={isSpaces ? 'page' : undefined}
-                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSpaces ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isSpaces ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <LayoutGrid aria-hidden="true" className="h-5 w-5" />
                         Spaces
@@ -78,7 +78,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                     <Link
                         href="/settings"
                         aria-current={isSettings ? 'page' : undefined}
-                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
+                        className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <Settings aria-hidden="true" className="h-5 w-5" />
                         Settings

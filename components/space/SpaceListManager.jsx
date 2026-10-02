@@ -85,7 +85,7 @@ function ListRow({ list, onEditRequest, onDeleteRequest, moveTargets, onMoveList
             <button
                 {...listeners}
                 {...attributes}
-                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
                 aria-label={`Drag to reorder ${list.name}`}
             >
                 <GripVertical className="h-3.5 w-3.5" />
@@ -94,7 +94,10 @@ function ListRow({ list, onEditRequest, onDeleteRequest, moveTargets, onMoveList
                 className="h-3 w-3 rounded-full flex-shrink-0"
                 style={{ backgroundColor: list.color }}
             />
-            <Link href={`/lists/${list.id}`} className="flex-1 text-sm text-foreground">
+            <Link
+                href={`/lists/${list.id}`}
+                className="flex-1 text-sm text-foreground min-w-0 [overflow-wrap:anywhere]"
+            >
                 {list.name}
             </Link>
             <RowActionsMenu label={`More actions for ${list.name}`}>
@@ -179,7 +182,7 @@ function SpaceSection({
                     <button
                         {...listeners}
                         {...attributes}
-                        className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+                        className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
                         aria-label={`Drag to reorder ${space.name}`}
                     >
                         <GripVertical className="h-3.5 w-3.5" />
@@ -189,7 +192,7 @@ function SpaceSection({
                     className="h-4 w-4 rounded-full flex-shrink-0"
                     style={{ backgroundColor: space.color }}
                 />
-                <span className="flex-1 text-sm font-semibold text-foreground">
+                <span className="flex-1 text-sm font-semibold text-foreground min-w-0 [overflow-wrap:anywhere]">
                     {space.name}
                     {!isOwner && (
                         <span className="ml-2 inline-flex items-center gap-1.5 align-middle">

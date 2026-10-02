@@ -35,7 +35,7 @@ export default function TaskRowTags({ tags = [] }) {
                     clickEvent.stopPropagation();
                     setOpen(true);
                 }}
-                className="flex-shrink-0"
+                className="hit-area flex-shrink-0"
             >
                 <Badge variant="tag">
                     {tags.length === 1 ? truncateTagName(tags[0].name) : `${tags.length} tags`}

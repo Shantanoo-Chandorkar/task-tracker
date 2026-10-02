@@ -25,7 +25,9 @@ import { deleteTag, deleteAllTagsInSpace } from '@/actions/tag-actions';
 function TagRow({ tag, onDeleteRequest }) {
     return (
         <div className="flex items-center gap-3 py-2.5 px-3 border-b border-border last:border-b-0">
-            <span className="flex-1 text-sm text-foreground">{tag.name}</span>
+            <span className="flex-1 text-sm text-foreground min-w-0 [overflow-wrap:anywhere]">
+                {tag.name}
+            </span>
             <Button
                 variant="ghost"
                 size="icon"

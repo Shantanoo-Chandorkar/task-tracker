@@ -132,6 +132,9 @@ function TaskRow({
         }
     }
 
+    // Each nested container already shifts its rows right, so one indent per level is enough (not depth times)
+    const nestedRowPadding = depth > 0 ? 'var(--row-indent, 24px)' : 0;
+
     return (
         <div
             ref={setNodeRef}
@@ -143,7 +146,7 @@ function TaskRow({
                 onClick={handleRowClick}
                 data-row-space
                 className="group flex items-start gap-1.5 py-2 px-2 border-b border-border/60 motion-safe:transition-colors duration-150 hover:bg-muted/50 cursor-pointer"
-                style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth})` }}
+                style={{ paddingLeft: nestedRowPadding }}
             >
                 {/* h-6 matches the 3-dot button so these controls centre on the title line, not the whole two-row block */}
                 <div data-row-space className="flex h-6 flex-shrink-0 items-center gap-1.5">
@@ -161,7 +164,7 @@ function TaskRow({
                     <button
                         onClick={handleToggleComplete}
                         disabled={!canToggleComplete}
-                        className={`hidden lg:flex flex-shrink-0 h-4 w-4 items-center justify-center rounded border motion-safe:transition-colors ${
+                        className={`hit-area hidden lg:flex flex-shrink-0 h-4 w-4 items-center justify-center rounded border motion-safe:transition-colors ${
                             taskIsDone
                                 ? 'border-metric bg-metric text-background'
                                 : 'border-muted-foreground/40 hover:border-muted-foreground'
@@ -174,7 +177,7 @@ function TaskRow({
                     {/* Expand/collapse toggle */}
                     <button
                         onClick={() => toggleFlag(expandKey)}
-                        className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground motion-safe:transition-colors"
+                        className="hit-area flex-shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground motion-safe:transition-colors"
                         aria-label={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
                     >
                         {hasChildren ? (
@@ -222,11 +225,11 @@ function TaskRow({
                 {/* Two lines: title + actions, then metadata - so pills can never squeeze the title */}
                 <div data-row-space className="relative flex min-w-0 flex-1 flex-col gap-1">
                     {task.is_prioritised && <PriorityLine />}
-                    <div data-row-space className="flex items-center gap-1.5">
+                    <div data-row-space className="flex items-center gap-[2rem]">
                         {/* No onClick here: the row's handler already toggles, a second one would cancel it out */}
                         <span
                             data-row-space
-                            className={`flex-1 text-sm truncate min-w-0 ${
+                            className={`flex-1 min-w-0 text-sm line-clamp-2 lg:line-clamp-1 [overflow-wrap:anywhere] ${
                                 taskIsDone
                                     ? 'text-muted-foreground line-through'
                                     : 'text-foreground'
@@ -234,7 +237,7 @@ function TaskRow({
                         >
                             <Link
                                 href={`/lists/${listId}/tasks/${task.id}`}
-                                className="truncate no-underline text-inherit"
+                                className="no-underline text-inherit"
                             >
                                 {task.title}
                             </Link>
@@ -258,7 +261,7 @@ function TaskRow({
                     </div>
 
                     {/* Read-only pills on the left; the status picker is a control, so it sits apart on the right */}
-                    <div data-row-space className="flex items-center gap-1.5">
+                    <div data-row-space className="flex items-center gap-[2rem]">
                         {/* Wraps so pills never push the status picker past the row edge */}
                         <div
                             data-row-space
@@ -278,7 +281,7 @@ function TaskRow({
 
             {/* Not dismissible - a space's subtask cap must stay visible until it's actually resolved. */}
             {isOverSubtaskCap && (
-                <div style={{ paddingLeft: `calc(var(--row-indent, 24px) * ${depth})` }}>
+                <div style={{ paddingLeft: nestedRowPadding }}>
                     <LimitWarning
                         message={`This task has ${directChildCount} subtasks, over this space's limit of ${maxSubtasksPerParent}. Remove some or raise the limit before adding more.`}
                     />
@@ -300,7 +303,7 @@ function TaskRow({
             {hasChildren && isExpanded && (
                 <div
                     className="border-l border-border motion-safe:transition-all duration-200"
-                    style={{ marginLeft: `calc(var(--row-indent, 24px) * ${depth} + 20px)` }}
+                    style={{ marginLeft: '20px' }}
                 >
                     {/* Depth warning shown before children one level past the max. MAX_DEPTH_CONSTANT */}
                     {depth === FINITE_MAX_DEPTH + 1 && (
