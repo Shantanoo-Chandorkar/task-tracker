@@ -64,4 +64,20 @@ describe('signInAction', () => {
         expect(signInResult.error).toContain('Too many attempts');
         expect(signInWithPassword).not.toHaveBeenCalled();
     });
+
+    it('logs a failed sign-in with its code but never the email address', async () => {
+        const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        signInWithPassword.mockResolvedValue({ error: { message: 'Invalid login credentials' } });
+        const { signInAction } = await import('./auth-actions');
+
+        await signInAction({
+            email: 'secret.person@example.com',
+            password: 'a-long-enough-password',
+        });
+
+        expect(consoleWarn).toHaveBeenCalledTimes(1);
+        expect(JSON.stringify(consoleWarn.mock.calls[0])).not.toContain('secret.person');
+        expect(consoleWarn.mock.calls[0][0]).toContain('AUTH_SIGNIN_FAILED');
+        consoleWarn.mockRestore();
+    });
 });

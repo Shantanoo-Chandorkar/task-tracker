@@ -25,14 +25,13 @@ const LOCKOUT_ERROR_MESSAGE = (minutes) =>
     `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 
 /**
- * Logs an auth failure server-side with enough context to investigate, never the password.
+ * Logs an auth failure server-side, never the password or the email address (personal data).
  *
  * @param {string} code - One of AUTH_ERROR_CODES
- * @param {string} email - The email involved (already trimmed/lowercased by the caller)
  * @param {string} detail - The underlying error message, if any
  */
-function logAuthFailure(code, email, detail) {
-    console.warn(`[auth] ${code}`, { email, detail });
+function logAuthFailure(code, detail) {
+    console.warn(`[auth] ${code}`, { detail });
 }
 
 /**
@@ -109,7 +108,7 @@ export async function signUpAction(fields) {
                 // Same response as a fresh signup - this is what prevents account enumeration
                 return { error: null, code: null };
             }
-            logAuthFailure(AUTH_ERROR_CODES.SIGNUP_FAILED, email, generateLinkError.message);
+            logAuthFailure(AUTH_ERROR_CODES.SIGNUP_FAILED, generateLinkError.message);
             return { error: 'Failed to create account', code: AUTH_ERROR_CODES.SIGNUP_FAILED };
         }
 
@@ -118,7 +117,7 @@ export async function signUpAction(fields) {
 
         return { error: null, code: null };
     } catch (thrown) {
-        logAuthFailure(AUTH_ERROR_CODES.SIGNUP_FAILED, email, thrown?.message);
+        logAuthFailure(AUTH_ERROR_CODES.SIGNUP_FAILED, thrown?.message);
         return { error: 'Unexpected error creating account', code: AUTH_ERROR_CODES.SIGNUP_FAILED };
     }
 }
@@ -154,7 +153,7 @@ export async function signInAction(fields) {
 
         if (error) {
             // Unconfirmed email still counts toward the lockout below -- not a free, unthrottled probe.
-            logAuthFailure(AUTH_ERROR_CODES.SIGNIN_FAILED, email, error.message);
+            logAuthFailure(AUTH_ERROR_CODES.SIGNIN_FAILED, error.message);
             await recordFailedAttempt('signin', email, ipAddress);
             if (error.message === 'Email not confirmed') {
                 return {
@@ -180,7 +179,7 @@ export async function signInAction(fields) {
         });
         return { error: null, code: null };
     } catch (thrown) {
-        logAuthFailure(AUTH_ERROR_CODES.SIGNIN_FAILED, email, thrown?.message);
+        logAuthFailure(AUTH_ERROR_CODES.SIGNIN_FAILED, thrown?.message);
         return { error: 'Unexpected error signing in', code: AUTH_ERROR_CODES.SIGNIN_FAILED };
     }
 }
@@ -196,13 +195,13 @@ export async function signOutAction() {
         const { error } = await supabase.auth.signOut();
 
         if (error) {
-            logAuthFailure(AUTH_ERROR_CODES.SIGNOUT_FAILED, null, error.message);
+            logAuthFailure(AUTH_ERROR_CODES.SIGNOUT_FAILED, error.message);
             return { error: 'Failed to sign out', code: AUTH_ERROR_CODES.SIGNOUT_FAILED };
         }
 
         return { error: null, code: null };
     } catch (thrown) {
-        logAuthFailure(AUTH_ERROR_CODES.SIGNOUT_FAILED, null, thrown?.message);
+        logAuthFailure(AUTH_ERROR_CODES.SIGNOUT_FAILED, thrown?.message);
         return { error: 'Unexpected error signing out', code: AUTH_ERROR_CODES.SIGNOUT_FAILED };
     }
 }
@@ -249,7 +248,7 @@ export async function requestPasswordResetAction(fields) {
 
         if (error) {
             // Includes "user not found" -- swallowed silently, same generic response either way.
-            logAuthFailure(AUTH_ERROR_CODES.RESET_REQUEST_FAILED, email, error.message);
+            logAuthFailure(AUTH_ERROR_CODES.RESET_REQUEST_FAILED, error.message);
         } else {
             // Our own /auth/confirm verifies hashed_token and sets the session -- skips Supabase's own redirect hop.
             const resetLink = `${process.env.SITE_URL}/auth/confirm?token_hash=${generatedLink.properties.hashed_token}&type=recovery&next=/reset-password`;
@@ -258,7 +257,7 @@ export async function requestPasswordResetAction(fields) {
 
         return { error: null, code: null };
     } catch (thrown) {
-        logAuthFailure(AUTH_ERROR_CODES.RESET_REQUEST_FAILED, email, thrown?.message);
+        logAuthFailure(AUTH_ERROR_CODES.RESET_REQUEST_FAILED, thrown?.message);
         // Still the generic shape -- an unexpected throw must not read differently than "email didn't exist".
         return { error: null, code: null };
     }
@@ -300,7 +299,7 @@ export async function updatePasswordAction(fields) {
         const { error } = await supabase.auth.updateUser({ password: newPassword });
 
         if (error) {
-            logAuthFailure(AUTH_ERROR_CODES.PASSWORD_UPDATE_FAILED, user.email, error.message);
+            logAuthFailure(AUTH_ERROR_CODES.PASSWORD_UPDATE_FAILED, error.message);
             return {
                 error: 'Failed to update password',
                 code: AUTH_ERROR_CODES.PASSWORD_UPDATE_FAILED,
@@ -310,7 +309,7 @@ export async function updatePasswordAction(fields) {
         await resetAttempts('password_reset', user.email, ipAddress);
         return { error: null, code: null };
     } catch (thrown) {
-        logAuthFailure(AUTH_ERROR_CODES.PASSWORD_UPDATE_FAILED, user.email, thrown?.message);
+        logAuthFailure(AUTH_ERROR_CODES.PASSWORD_UPDATE_FAILED, thrown?.message);
         return {
             error: 'Unexpected error updating password',
             code: AUTH_ERROR_CODES.PASSWORD_UPDATE_FAILED,
