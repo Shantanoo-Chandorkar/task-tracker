@@ -6,6 +6,7 @@ import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { getClientIp } from '@/lib/auth/rate-limit';
 import { generateInviteToken, hashInviteToken } from '@/lib/invites/invite-tokens';
 import { INVITE_EXPIRY_DAYS } from '@/lib/invites/invite-config';
+import { maskEmail } from '@/lib/mask-email';
 import { takeInviteSendSlot } from '@/lib/invites/invite-rate-limit';
 import { sendSpaceInviteEmail } from '@/lib/email/notifications/send-space-invite-email';
 import {
@@ -246,7 +247,7 @@ export const redeemSpaceInvite = withAuthenticatedAction(
         if (invite.invited_email.toLowerCase() !== user.email.toLowerCase()) {
             return {
                 data: null,
-                error: `This invite was sent to ${invite.invited_email}. You are signed in as ${user.email}.`,
+                error: `This invite was sent to ${maskEmail(invite.invited_email)}. You are signed in as ${user.email}.`,
                 code: INVITE_EMAIL_MISMATCH,
             };
         }
