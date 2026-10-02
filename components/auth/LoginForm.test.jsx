@@ -61,6 +61,32 @@ describe('LoginForm', () => {
         expect(clearAllCaches).not.toHaveBeenCalled();
     });
 
+    it('announces the error and ties it to both fields', async () => {
+        signInAction.mockResolvedValue({ error: 'Wrong email or password' });
+        renderLoginForm();
+
+        fireEvent.click(submitButton());
+
+        const alert = await screen.findByRole('alert');
+        expect(alert.textContent).toBe('Wrong email or password');
+        for (const field of [
+            screen.getByLabelText('Email'),
+            screen.getByLabelText('Password', { selector: 'input' }),
+        ]) {
+            expect(field.getAttribute('aria-invalid')).toBe('true');
+            expect(field.getAttribute('aria-describedby')).toBe(alert.id);
+        }
+    });
+
+    it('marks both fields as required', () => {
+        renderLoginForm();
+
+        expect(screen.getByLabelText('Email').getAttribute('aria-required')).toBe('true');
+        expect(
+            screen.getByLabelText('Password', { selector: 'input' }).getAttribute('aria-required'),
+        ).toBe('true');
+    });
+
     it('clears the previous error as soon as a new attempt starts', async () => {
         signInAction.mockResolvedValueOnce({ error: 'Wrong email or password' });
         renderLoginForm();

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import CharLimitField from '@/components/ui/CharLimitField';
+import FormError from '@/components/ui/FormError';
 import PasswordInput from '@/components/auth/PasswordInput';
 import { signUpAction } from '@/actions/auth-actions';
 
@@ -27,6 +28,10 @@ export default function SignupForm({ redirectTo = '/' }) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [isSignedUp, setIsSignedUp] = useState(false);
+    const errorId = useId();
+    const passwordHintId = useId();
+    // One shared message: the server does not say which field was wrong
+    const errorFieldProps = error ? { 'aria-invalid': true, 'aria-describedby': errorId } : {};
 
     const isValid = displayName.trim() && email.trim() && password.length >= MIN_PASSWORD_LENGTH;
 
@@ -67,7 +72,13 @@ export default function SignupForm({ redirectTo = '/' }) {
             <p className="mt-1 text-sm text-muted-foreground">Create your Task Tracker account.</p>
 
             {isSignedUp ? (
-                <div className="mt-6 space-y-1.5">
+                <div
+                    role="status"
+                    tabIndex={-1}
+                    // The focused form was just removed; without this, focus falls back to the page body
+                    ref={(confirmationNode) => confirmationNode?.focus()}
+                    className="mt-6 space-y-1.5 outline-none"
+                >
                     <p className="text-sm text-foreground">Account created.</p>
                     <p className="text-xs text-muted-foreground">
                         Check your email to confirm it and get started.
@@ -75,22 +86,20 @@ export default function SignupForm({ redirectTo = '/' }) {
                 </div>
             ) : (
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                    <CharLimitField
-                        label="Name"
-                        htmlFor="displayName"
-                        currentLength={displayName.length}
-                        maxLength={50}
-                    >
-                        <Input
-                            id="displayName"
-                            type="text"
-                            autoComplete="name"
-                            value={displayName}
-                            onChange={(event) => setDisplayName(event.target.value)}
-                            disabled={submitting}
-                            autoFocus
-                            maxLength={50}
-                        />
+                    <CharLimitField label="Name" currentLength={displayName.length} maxLength={50}>
+                        {(nameControlProps) => (
+                            <Input
+                                {...nameControlProps}
+                                type="text"
+                                autoComplete="name"
+                                value={displayName}
+                                onChange={(event) => setDisplayName(event.target.value)}
+                                disabled={submitting}
+                                autoFocus
+                                maxLength={50}
+                                aria-required="true"
+                            />
+                        )}
                     </CharLimitField>
 
                     <div className="space-y-1.5">
@@ -104,6 +113,8 @@ export default function SignupForm({ redirectTo = '/' }) {
                             value={email}
                             onChange={(event) => setEmail(event.target.value)}
                             disabled={submitting}
+                            aria-required="true"
+                            {...errorFieldProps}
                         />
                     </div>
 
@@ -117,13 +128,18 @@ export default function SignupForm({ redirectTo = '/' }) {
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                             disabled={submitting}
+                            aria-required="true"
+                            {...errorFieldProps}
+                            aria-describedby={
+                                error ? `${passwordHintId} ${errorId}` : passwordHintId
+                            }
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <p id={passwordHintId} className="text-xs text-muted-foreground">
                             At least {MIN_PASSWORD_LENGTH} characters.
                         </p>
                     </div>
 
-                    {error && <p className="text-xs text-destructive">{error}</p>}
+                    <FormError errorId={errorId}>{error}</FormError>
 
                     <Button
                         type="submit"
