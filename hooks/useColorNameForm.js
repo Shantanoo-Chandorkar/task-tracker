@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { withSavedRow } from '@/lib/query-cache';
+import { createClientId } from '@/lib/client-id';
 
 /**
  * Shared name/color create-or-edit form state for the near-identical Space/List/Sublist/Status dialogs.
@@ -46,6 +47,8 @@ export function useColorNameForm({
     const [openedEntity, setOpenedEntity] = useState(entity);
     const isEditing = Boolean(openedEntity);
 
+    // Made when the dialog opens and kept for retries, so a retry after a lost reply cannot create a second row
+    const [createRequestId, setCreateRequestId] = useState(() => createClientId());
     const [name, setName] = useState('');
     const [color, setColor] = useState('#6b7280');
     const [submitting, setSubmitting] = useState(false);
@@ -57,6 +60,7 @@ export function useColorNameForm({
         setLastResetKey(resetKey);
         if (open) {
             setOpenedEntity(entity);
+            setCreateRequestId(createClientId());
             setSubmitting(false);
             setName(entity?.name ?? '');
             setColor(entity?.color ?? '#6b7280');
@@ -74,7 +78,9 @@ export function useColorNameForm({
         setSubmitting(true);
         let submitResult;
         try {
-            submitResult = isEditing ? await update(openedEntity.id, fields) : await create(fields);
+            submitResult = isEditing
+                ? await update(openedEntity.id, fields)
+                : await create({ ...fields, ...(createRequestId && { id: createRequestId }) });
         } catch {
             setSubmitting(false);
             setError('Could not reach the server. Check your connection and try again.');

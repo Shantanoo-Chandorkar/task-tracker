@@ -6,6 +6,10 @@ import { toast } from 'sonner';
 import { duplicateTask } from '@/actions/task-actions';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
+import { createClientId } from '@/lib/client-id';
+
+// Copy id per source task: kept after a lost reply so a retry cannot copy twice, cleared once the server answers
+const pendingCopyIds = new Map();
 
 /**
  * Duplicates a task with toast feedback, for both the row menu and the Ctrl/Cmd+D shortcut.
@@ -21,11 +25,15 @@ export function useDuplicateTask(listId) {
             const releaseInFlight = claimInFlight(`task-duplicate:${taskId}`);
             if (!releaseInFlight) return;
             const toastId = toast.loading('Duplicating task...');
+            const newRootId = pendingCopyIds.get(taskId) ?? createClientId();
+            if (newRootId) pendingCopyIds.set(taskId, newRootId);
 
             try {
                 let duplicateError;
                 try {
-                    ({ error: duplicateError } = await duplicateTask(taskId));
+                    ({ error: duplicateError } = await duplicateTask(taskId, newRootId));
+                    // The server answered, so the next copy is a new one
+                    pendingCopyIds.delete(taskId);
                 } catch {
                     // A rejected server action means the request never completed (offline, server down)
                     toast.error(

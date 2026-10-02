@@ -1,6 +1,7 @@
 'use server';
 
 import { getNextPosition } from '@/lib/position';
+import { readClientId, findOwnRowById, insertRowOnce } from '@/lib/idempotent-create';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
@@ -15,6 +16,7 @@ import {
  * in that space.
  *
  * @param {object} fields
+ * @param {string} [fields.id] - Optional client-made UUID; a retry with the same id returns the first try's row
  * @param {string} fields.name - Required list name
  * @param {string} fields.space_id - Required parent space ID
  * @param {string} [fields.color] - Hex color string, defaults to grey
@@ -24,6 +26,17 @@ export const createList = withAuthenticatedAction(
     '[lists] create',
     'Unexpected error creating list',
     async (user, supabase, fields) => {
+        const clientId = readClientId(fields);
+        if (clientId.failure) return { data: null, ...clientId.failure };
+        const replayedList = await findOwnRowById(
+            supabase,
+            'lists',
+            clientId.id,
+            'created_by',
+            user.id,
+        );
+        if (replayedList) return { data: replayedList, error: null };
+
         const name = sanitizeString(fields.name, true);
         if (!name) {
             return { data: null, error: 'List name is required' };
@@ -41,17 +54,18 @@ export const createList = withAuthenticatedAction(
 
         const position = await getNextPosition(supabase, 'lists', { space_id: fields.space_id });
 
-        const { data: createdList, error } = await supabase
-            .from('lists')
-            .insert({
+        const { data: createdList, error } = await insertRowOnce(
+            supabase,
+            'lists',
+            {
                 name,
                 space_id: fields.space_id,
                 color: fields.color ?? '#6b7280',
                 position,
                 created_by: user.id,
-            })
-            .select()
-            .single();
+            },
+            { clientId: clientId.id, ownerColumn: 'created_by', userId: user.id },
+        );
 
         if (error) {
             const guestLimitResult = toGuestLimitResult(error);

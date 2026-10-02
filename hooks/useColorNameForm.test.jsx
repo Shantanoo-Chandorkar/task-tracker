@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useColorNameForm } from './useColorNameForm';
 
 vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+// Counts up so each "new id" is visibly different; `unavailable` mimics a browser without crypto.randomUUID
+const clientIds = vi.hoisted(() => ({ counter: 0, unavailable: false }));
+vi.mock('@/lib/client-id', () => ({
+    createClientId: () => (clientIds.unavailable ? undefined : `client-id-${++clientIds.counter}`),
+}));
 
 const createSubmitEvent = () => ({ preventDefault: vi.fn() });
 
@@ -295,5 +300,89 @@ describe('useColorNameForm lock lifetime (dialog still on screen after onClose)'
         expect(formHook.current.submitting).toBe(false);
         expect(formHook.current.isEditing).toBe(true);
         expect(formHook.current.name).toBe('Chores');
+    });
+});
+
+describe('useColorNameForm client-made id for create', () => {
+    beforeEach(() => {
+        clientIds.counter = 0;
+        clientIds.unavailable = false;
+    });
+
+    it('sends the same id when the user retries after a failed attempt', async () => {
+        const create = vi
+            .fn()
+            .mockRejectedValueOnce(new Error('response lost'))
+            .mockResolvedValue({ error: null });
+        const { formHook } = renderParentDrivenForm({
+            create,
+            update: vi.fn(),
+            initialEntity: null,
+        });
+        act(() => formHook.current.setName('Groceries'));
+
+        await act(async () => {
+            await formHook.current.handleSubmit(createSubmitEvent());
+        });
+        await act(async () => {
+            await formHook.current.handleSubmit(createSubmitEvent());
+        });
+
+        expect(create).toHaveBeenCalledTimes(2);
+        expect(create.mock.calls[0][0].id).toBeDefined();
+        expect(create.mock.calls[1][0].id).toBe(create.mock.calls[0][0].id);
+    });
+
+    it('makes a new id each time the dialog is opened', async () => {
+        const create = vi.fn().mockResolvedValue({ error: null });
+        const { formHook, closeLikeParent, reopenLikeParent } = renderParentDrivenForm({
+            create,
+            update: vi.fn(),
+            initialEntity: null,
+        });
+        act(() => formHook.current.setName('First'));
+        await act(async () => {
+            await formHook.current.handleSubmit(createSubmitEvent());
+        });
+        closeLikeParent();
+        reopenLikeParent(null);
+        act(() => formHook.current.setName('Second'));
+        await act(async () => {
+            await formHook.current.handleSubmit(createSubmitEvent());
+        });
+
+        expect(create.mock.calls[1][0].id).not.toBe(create.mock.calls[0][0].id);
+    });
+
+    it('sends no id when editing', async () => {
+        const update = vi.fn().mockResolvedValue({ error: null });
+        const { formHook } = renderParentDrivenForm({
+            create: vi.fn(),
+            update,
+            initialEntity: { id: 'list-1', name: 'Groceries', color: '#112233' },
+        });
+
+        await act(async () => {
+            await formHook.current.handleSubmit(createSubmitEvent());
+        });
+
+        expect(update.mock.calls[0][1]).not.toHaveProperty('id');
+    });
+
+    it('sends no id when the browser cannot make one, leaving it to the server', async () => {
+        clientIds.unavailable = true;
+        const create = vi.fn().mockResolvedValue({ error: null });
+        const { formHook } = renderParentDrivenForm({
+            create,
+            update: vi.fn(),
+            initialEntity: null,
+        });
+        act(() => formHook.current.setName('Groceries'));
+
+        await act(async () => {
+            await formHook.current.handleSubmit(createSubmitEvent());
+        });
+
+        expect(create.mock.calls[0][0]).not.toHaveProperty('id');
     });
 });

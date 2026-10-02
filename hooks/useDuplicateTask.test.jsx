@@ -9,6 +9,11 @@ const toastSuccess = vi.fn();
 
 vi.mock('@/actions/task-actions', () => ({ duplicateTask: (...args) => duplicateTask(...args) }));
 vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+// Counts up so each "new id" is visibly different; `unavailable` mimics a browser without crypto.randomUUID
+const clientIds = vi.hoisted(() => ({ counter: 0, unavailable: false }));
+vi.mock('@/lib/client-id', () => ({
+    createClientId: () => (clientIds.unavailable ? undefined : `client-id-${++clientIds.counter}`),
+}));
 vi.mock('sonner', () => ({
     toast: {
         loading: () => 'toast-id',
@@ -28,7 +33,11 @@ function renderDuplicateHook() {
 }
 
 describe('useDuplicateTask', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => {
+        vi.clearAllMocks();
+        clientIds.counter = 0;
+        clientIds.unavailable = false;
+    });
 
     it('duplicates, refreshes the list and its counts, and confirms with a toast', async () => {
         duplicateTask.mockResolvedValue({ error: null });
@@ -36,7 +45,7 @@ describe('useDuplicateTask', () => {
 
         await act(() => duplicateHook.current.duplicateTaskById('task-1'));
 
-        expect(duplicateTask).toHaveBeenCalledWith('task-1');
+        expect(duplicateTask).toHaveBeenCalledWith('task-1', 'client-id-1');
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['tasks', 'list-1'] });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['lists'] });
         expect(toastSuccess).toHaveBeenCalledWith('Task duplicated', { id: 'toast-id' });
@@ -102,5 +111,48 @@ describe('useDuplicateTask', () => {
         duplicateTask.mockResolvedValue({ error: null });
         await act(() => duplicateHook.current.duplicateTaskById('task-1'));
         expect(duplicateTask).toHaveBeenCalledTimes(2);
+    });
+
+    it('sends the same id for the copy when the user retries after a lost reply', async () => {
+        duplicateTask.mockRejectedValueOnce(new Error('response lost'));
+        duplicateTask.mockResolvedValue({ error: null });
+        const { duplicateHook } = renderDuplicateHook();
+
+        await act(() => duplicateHook.current.duplicateTaskById('task-retry-1'));
+        await act(() => duplicateHook.current.duplicateTaskById('task-retry-1'));
+
+        expect(duplicateTask).toHaveBeenCalledTimes(2);
+        expect(duplicateTask.mock.calls[0][1]).toBeDefined();
+        expect(duplicateTask.mock.calls[1][1]).toBe(duplicateTask.mock.calls[0][1]);
+    });
+
+    it('makes a new id for the next copy once the first one succeeded', async () => {
+        duplicateTask.mockResolvedValue({ error: null });
+        const { duplicateHook } = renderDuplicateHook();
+
+        await act(() => duplicateHook.current.duplicateTaskById('task-twice-1'));
+        await act(() => duplicateHook.current.duplicateTaskById('task-twice-1'));
+
+        expect(duplicateTask.mock.calls[1][1]).not.toBe(duplicateTask.mock.calls[0][1]);
+    });
+
+    it('makes a new id after the server refused, since nothing was copied', async () => {
+        duplicateTask.mockResolvedValue({ error: 'Task limit reached' });
+        const { duplicateHook } = renderDuplicateHook();
+
+        await act(() => duplicateHook.current.duplicateTaskById('task-refused-1'));
+        await act(() => duplicateHook.current.duplicateTaskById('task-refused-1'));
+
+        expect(duplicateTask.mock.calls[1][1]).not.toBe(duplicateTask.mock.calls[0][1]);
+    });
+
+    it('sends no id when the browser cannot make one', async () => {
+        clientIds.unavailable = true;
+        duplicateTask.mockResolvedValue({ error: null });
+        const { duplicateHook } = renderDuplicateHook();
+
+        await act(() => duplicateHook.current.duplicateTaskById('task-no-crypto-1'));
+
+        expect(duplicateTask).toHaveBeenCalledWith('task-no-crypto-1', undefined);
     });
 });

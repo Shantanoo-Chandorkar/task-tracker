@@ -7,6 +7,12 @@ import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
 import { getNextPosition } from '@/lib/position';
 import {
+    readClientId,
+    findOwnRowById,
+    insertRowOnce,
+    isUniqueViolation,
+} from '@/lib/idempotent-create';
+import {
     canMarkTaskDone,
     getDefaultStatusId,
     getDoneStatusId,
@@ -28,6 +34,7 @@ import {
     TASK_DUPLICATE_FAILED,
     TASK_REPARENT_FORBIDDEN_CHILDREN,
     TASK_REPARENT_DELETE_FAILED,
+    TAG_ALREADY_ON_TASK,
 } from '@/lib/error-codes';
 import { sanitizeString, checkMaxLength, checkIsBoolean, sanitizeRichText } from '@/lib/validation';
 import {
@@ -87,6 +94,7 @@ async function blockIfSubtaskCapReached(supabase, parentId) {
  * Appends the task as the last sibling if no position is specified.
  *
  * @param {object} fields
+ * @param {string} [fields.id] - Optional client-made UUID; a retry with the same id returns the first try's row
  * @param {string} fields.title - Required task title
  * @param {string} fields.list_id - Required list this task belongs to
  * @param {string} [fields.description]
@@ -104,6 +112,17 @@ export const createTask = withAuthenticatedAction(
     '[tasks] create',
     'Unexpected error creating task',
     async (user, supabase, fields) => {
+        const clientId = readClientId(fields);
+        if (clientId.failure) return { data: null, ...clientId.failure };
+        const replayedTask = await findOwnRowById(
+            supabase,
+            'tasks',
+            clientId.id,
+            'created_by',
+            user.id,
+        );
+        if (replayedTask) return { data: replayedTask, error: null };
+
         const title = sanitizeString(fields.title, true);
         const description = sanitizeRichText(fields.description);
 
@@ -203,9 +222,10 @@ export const createTask = withAuthenticatedAction(
             next_occurrence = nextDate ? nextDate.toISOString() : null;
         }
 
-        const { data: createdTask, error } = await supabase
-            .from('tasks')
-            .insert({
+        const { data: createdTask, error } = await insertRowOnce(
+            supabase,
+            'tasks',
+            {
                 title,
                 description: description || null,
                 status_id: fields.status_id ?? null,
@@ -220,9 +240,9 @@ export const createTask = withAuthenticatedAction(
                 recurrence_rule: fields.recurrence_rule ?? null,
                 next_occurrence,
                 created_by: user.id,
-            })
-            .select()
-            .single();
+            },
+            { clientId: clientId.id, ownerColumn: 'created_by', userId: user.id },
+        );
 
         if (error) {
             console.error('[tasks] create failed', {
@@ -257,7 +277,10 @@ export async function createTaskWithTags({ tagNames, ...taskFields }) {
     const tagErrors = [];
     for (const name of tagNames ?? []) {
         const tagResult = await addTagToTask({ taskId: taskResult.data.id, name });
-        if (tagResult.error) tagErrors.push(`${name}: ${tagResult.error}`);
+        // A retried create finds its tags already attached, which is the result we want, not a failure
+        if (tagResult.error && tagResult.code !== TAG_ALREADY_ON_TASK) {
+            tagErrors.push(`${name}: ${tagResult.error}`);
+        }
     }
 
     return { data: taskResult.data, error: null, tagErrors };
@@ -650,16 +673,25 @@ function toReparentDeleteFailure(taskId, reparentDeleteError) {
  * Not built on withAuthenticatedAction - its catch also runs toGuestLimitResult on the thrown error.
  *
  * @param {string} taskId - Task to duplicate
+ * @param {string} [newRootId] - Optional client-made UUID for the copy; a retry with it finds the first try's copy
  * @returns {{ error: string|null, code: string|undefined }}
  */
-export async function duplicateTask(taskId) {
+export async function duplicateTask(taskId, newRootId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'You must be logged in', code: NOT_AUTHENTICATED };
 
     if (!taskId) return { error: 'Task ID is required' };
 
+    const clientId = readClientId({ id: newRootId });
+    if (clientId.failure) return clientId.failure;
+
     try {
         const supabase = await createClient();
+
+        // A retry finds the copy the first try made, before any trigger or limit can refuse the repeat
+        if (await findOwnRowById(supabase, 'tasks', clientId.id, 'created_by', user.id)) {
+            return { error: null };
+        }
 
         const { data: task, error: taskError } = await supabase
             .from('tasks')
@@ -723,8 +755,16 @@ export async function duplicateTask(taskId) {
         const { error: duplicateError } = await supabase.rpc('duplicate_task_subtree', {
             p_task_id: taskId,
             p_new_root_position: newPosition,
+            ...(clientId.id && { p_new_root_id: clientId.id }),
         });
-        if (duplicateError) return toDuplicateTaskFailure(taskId, duplicateError);
+        if (duplicateError) {
+            // Two requests with the same id at once: the loser's copy already exists, which is the result wanted
+            const isOwnCopy =
+                isUniqueViolation(duplicateError) &&
+                (await findOwnRowById(supabase, 'tasks', clientId.id, 'created_by', user.id));
+            if (isOwnCopy) return { error: null };
+            return toDuplicateTaskFailure(taskId, duplicateError);
+        }
 
         return { error: null };
     } catch (thrown) {

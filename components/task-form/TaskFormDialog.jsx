@@ -29,6 +29,7 @@ import EditorErrorBoundary from '@/components/ui/EditorErrorBoundary';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
+import { createClientId } from '@/lib/client-id';
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 10000;
@@ -79,6 +80,8 @@ export default function TaskFormDialog({
     const [isRecurring, setIsRecurring] = useState(false);
     const [recurrenceRule, setRecurrenceRule] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    // Made when the dialog opens and kept for retries, so a retry after a lost reply cannot create a second task
+    const [createRequestId, setCreateRequestId] = useState(() => createClientId());
     const [titleError, setTitleError] = useState('');
     const [dueDateError, setDueDateError] = useState('');
     const [formError, setFormError] = useState('');
@@ -109,6 +112,7 @@ export default function TaskFormDialog({
             setDueDateError('');
             setFormError('');
             setSubmitting(false);
+            setCreateRequestId(createClientId());
         }
     }
 
@@ -142,6 +146,7 @@ export default function TaskFormDialog({
             ...(isEditing
                 ? {}
                 : {
+                      ...(createRequestId && { id: createRequestId }),
                       list_id: listId,
                       sublist_id: isRootCreate ? sublistId || null : null,
                       tagNames,

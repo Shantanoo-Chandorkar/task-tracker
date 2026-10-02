@@ -1,6 +1,7 @@
 'use server';
 
 import { getNextPosition } from '@/lib/position';
+import { readClientId, findOwnRowById, insertRowOnce } from '@/lib/idempotent-create';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
@@ -14,6 +15,7 @@ import {
  * Creates a new status. Appends it after the last existing status in its space.
  *
  * @param {object} fields
+ * @param {string} [fields.id] - Optional client-made UUID; a retry with the same id returns the first try's row
  * @param {string} fields.name - Required status name
  * @param {string} fields.space_id - Required space this status belongs to
  * @param {string} [fields.color] - Hex color string, defaults to grey
@@ -23,6 +25,17 @@ export const createStatus = withAuthenticatedAction(
     '[statuses] create',
     'Unexpected error creating status',
     async (user, supabase, fields) => {
+        const clientId = readClientId(fields);
+        if (clientId.failure) return { data: null, ...clientId.failure };
+        const replayedStatus = await findOwnRowById(
+            supabase,
+            'statuses',
+            clientId.id,
+            'created_by',
+            user.id,
+        );
+        if (replayedStatus) return { data: replayedStatus, error: null };
+
         const name = sanitizeString(fields.name, true);
         if (!name) {
             return { data: null, error: 'Status name is required' };
@@ -40,17 +53,18 @@ export const createStatus = withAuthenticatedAction(
 
         const position = await getNextPosition(supabase, 'statuses', { space_id: fields.space_id });
 
-        const { data: createdStatus, error } = await supabase
-            .from('statuses')
-            .insert({
+        const { data: createdStatus, error } = await insertRowOnce(
+            supabase,
+            'statuses',
+            {
                 name,
                 color: fields.color ?? '#6b7280',
                 position,
                 space_id: fields.space_id,
                 created_by: user.id,
-            })
-            .select()
-            .single();
+            },
+            { clientId: clientId.id, ownerColumn: 'created_by', userId: user.id },
+        );
 
         if (error) {
             const guestLimitResult = toGuestLimitResult(error);
