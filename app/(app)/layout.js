@@ -1,9 +1,5 @@
-import { createClient } from '@/lib/supabase/server';
-import { getCurrentUser } from '@/lib/auth/session';
-import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
-import { getCurrentUserProfile } from '@/lib/profile';
-import { attachTaskCounts } from '@/lib/list-task-counts';
-import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
+import { Suspense } from 'react';
+import { loadShellData } from '@/lib/app-shell-data';
 import DesktopSidebar from '@/components/nav/DesktopSidebar';
 import MobileTopBar from '@/components/nav/MobileTopBar';
 import BottomNav from '@/components/nav/BottomNav';
@@ -11,52 +7,82 @@ import QuickCreateFab from '@/components/nav/QuickCreateFab';
 import GlobalSearch from '@/components/nav/GlobalSearch';
 import AuthKeepAlive from '@/components/nav/AuthKeepAlive';
 import GuestBanner from '@/components/guest/GuestBanner';
+import { SidebarSkeleton, TopBarSkeleton, BottomNavSkeleton } from '@/components/nav/NavSkeletons';
+
+/**
+ * Sidebar filled with the shared shell data once it has loaded.
+ */
+async function SidebarWithData() {
+    const { initialSpaces, initialLists, initialProfile } = await loadShellData();
+    return (
+        <DesktopSidebar
+            initialSpaces={initialSpaces}
+            initialLists={initialLists}
+            initialProfile={initialProfile}
+        />
+    );
+}
+
+/**
+ * Guest banner filled with the shared shell data once it has loaded.
+ */
+async function GuestBannerWithData() {
+    const { initialProfile } = await loadShellData();
+    return <GuestBanner initialProfile={initialProfile} />;
+}
+
+/**
+ * Mobile top bar filled with the shared shell data once it has loaded.
+ */
+async function TopBarWithData() {
+    const { initialSpaces, initialLists, initialProfile } = await loadShellData();
+    return (
+        <MobileTopBar
+            initialSpaces={initialSpaces}
+            initialLists={initialLists}
+            initialProfile={initialProfile}
+        />
+    );
+}
+
+/**
+ * Bottom tab bar filled with the shared shell data once it has loaded.
+ */
+async function BottomNavWithData() {
+    const { initialSpaces, initialLists } = await loadShellData();
+    return <BottomNav initialSpaces={initialSpaces} initialLists={initialLists} />;
+}
 
 /**
  * Layout for every authenticated app route -- the nav chrome (auth) pages don't get.
  * Route protection itself happens in proxy.js, not here.
  *
- * Fetches spaces/lists/profile once here so every always-mounted nav component can seed initialData.
+ * Deliberately not async: it must not await anything, or the frame, the skeletons and the page below
+ * cannot stream until the data has loaded. Each nav piece loads the shared data under its own Suspense.
  */
-export default async function AppLayout({ children }) {
-    const supabase = await createClient();
-    const user = await getCurrentUser();
-
-    const [spacesResult, listsResult] = await Promise.all([
-        supabase.from('spaces').select('*').order('position', { ascending: true }),
-        supabase.from('lists').select('*').order('position', { ascending: true }),
-    ]);
-    throwIfQueryFailed('[app-layout]', spacesResult, listsResult);
-    const { data: spaces } = spacesResult;
-    const { data: lists } = listsResult;
-
-    // Must match every page's own shape - whichever seeds the shared ['spaces'] key first wins.
-    const initialSpaces = await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null);
-    const initialLists = await attachTaskCounts(supabase, lists || []);
-    const initialProfile = user ? await getCurrentUserProfile(supabase, user) : null;
-
+export default function AppLayout({ children }) {
     return (
         <>
             <AuthKeepAlive />
             <GlobalSearch />
             <div className="flex">
-                <DesktopSidebar
-                    initialSpaces={initialSpaces}
-                    initialLists={initialLists}
-                    initialProfile={initialProfile}
-                />
+                <Suspense fallback={<SidebarSkeleton />}>
+                    <SidebarWithData />
+                </Suspense>
                 {/* <body> is the real scroller for pull-to-refresh -- sidebar/top bar stay sticky/fixed. */}
                 <div className="flex flex-1 flex-col min-w-0">
-                    <GuestBanner initialProfile={initialProfile} />
-                    <MobileTopBar
-                        initialSpaces={initialSpaces}
-                        initialLists={initialLists}
-                        initialProfile={initialProfile}
-                    />
+                    <Suspense fallback={null}>
+                        <GuestBannerWithData />
+                    </Suspense>
+                    <Suspense fallback={<TopBarSkeleton />}>
+                        <TopBarWithData />
+                    </Suspense>
                     <main className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
                         {children}
                     </main>
-                    <BottomNav initialSpaces={initialSpaces} initialLists={initialLists} />
+                    <Suspense fallback={<BottomNavSkeleton />}>
+                        <BottomNavWithData />
+                    </Suspense>
                 </div>
                 <QuickCreateFab className="hidden lg:flex fixed bottom-10 right-6 z-30 h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg" />
             </div>
