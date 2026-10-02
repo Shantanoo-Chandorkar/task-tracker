@@ -91,3 +91,19 @@ describe('TaskFormDialog client-made id for create', () => {
         expect(createTaskWithTags.mock.calls[0][0]).not.toHaveProperty('id');
     });
 });
+
+describe('TaskFormDialog first mounted already open', () => {
+    it('fills the title from the task being edited, as row dialogs now mount on first open', () => {
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <TaskFormDialog
+                    open
+                    onClose={vi.fn()}
+                    task={{ id: 't1', title: 'Existing title', list_id: 'list-1', status_id: 's1' }}
+                />
+            </QueryClientProvider>,
+        );
+
+        expect(screen.getByPlaceholderText('Task title').value).toBe('Existing title');
+    });
+});

@@ -9,6 +9,9 @@ import { findAncestors, findDescendantIds, flatToTree } from '@/lib/tree';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
+import { useTaskCompletion } from '@/hooks/useTaskCompletion';
+import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
+import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSpaceById } from '@/hooks/useSpaceById';
 import StatusBadge from '@/components/status/StatusBadge';
@@ -45,6 +48,7 @@ export default function TaskDetail({
     // Seeds the shared ['statuses', spaceId] cache so SubtaskTree's checkboxes don't hydrate-mismatch on mount.
     const spaceId = useSpaceIdForList(listId, { initialData: initialLists });
     useStatusesQuery(spaceId, { initialData: initialStatuses });
+    const completion = useTaskCompletion(listId);
     const maxSubtasksPerParent = useSpaceById(spaceId)?.max_subtasks_per_parent ?? null;
 
     const task = flatList.find((task) => task.id === taskId);
@@ -121,7 +125,7 @@ export default function TaskDetail({
                 </h1>
                 <TaskRowActions
                     task={task}
-                    flatList={flatList}
+                    completion={completion}
                     onAddSubtask={() => setAddSubtaskOpen(true)}
                     canAddSubtask={canAddSubtask}
                     listId={listId}
@@ -189,12 +193,19 @@ export default function TaskDetail({
                 )}
             </div>
 
-            <TaskFormDialog
-                open={addSubtaskOpen}
-                onClose={() => setAddSubtaskOpen(false)}
-                parentId={task.id}
-                listId={listId}
-            />
+            <MountOnFirstOpen open={addSubtaskOpen}>
+                <TaskFormDialog
+                    open={addSubtaskOpen}
+                    onClose={() => setAddSubtaskOpen(false)}
+                    parentId={task.id}
+                    listId={listId}
+                />
+            </MountOnFirstOpen>
+
+            {/* Cascade confirmation for the actions menu's Mark as complete */}
+            <MountOnFirstOpen open={completion.completeDialogProps.open}>
+                <CompleteTaskDialog {...completion.completeDialogProps} />
+            </MountOnFirstOpen>
         </div>
     );
 }

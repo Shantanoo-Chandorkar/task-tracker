@@ -1,25 +1,93 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 import { useTaskPriority } from '@/hooks/useTaskPriority';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
+import { useGetTasks, useTasksQuery } from '@/hooks/useTasksQuery';
 import { toast } from 'sonner';
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
 import ModalShell from '@/components/ui/modal-shell';
+import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
 import { deleteTask, deleteTaskAndReparentChildren } from '@/actions/task-actions';
 import { useDuplicateTask } from '@/hooks/useDuplicateTask';
-import { findAncestors, buildMoveTargetTree, hasSelectableMoveTarget } from '@/lib/tree';
+import { buildMoveGroups } from '@/lib/move-groups';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
-import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
+
+/**
+ * Where a task can be moved, worked out only while the menu item or the sheet that needs it is mounted.
+ *
+ * @param {object} task - The task that would move.
+ * @param {string} listId - The list the task belongs to, for its tasks and sublists.
+ * @returns {ReturnType<typeof buildMoveGroups>} Destination groups with something to pick.
+ */
+function useMoveGroups(task, listId) {
+    // Only reads what the list already loaded; opening a menu must not trigger a reload
+    const { data: flatList = [] } = useTasksQuery(listId, { refetchOnMount: false });
+    const { data: sublists = [] } = useSublistsQuery(listId);
+    return useMemo(() => buildMoveGroups({ task, flatList, sublists }), [task, flatList, sublists]);
+}
+
+/**
+ * The "Move to..." menu item, shown only when the task has somewhere to go.
+ *
+ * @param {object} props
+ * @param {object} props.task - The task that would move.
+ * @param {string} props.listId - The list the task belongs to.
+ * @param {boolean} props.isDisabled - True when the caller may not edit this row.
+ * @param {Function} props.onChoose - Opens the destination sheet.
+ */
+function MoveToMenuItem({ task, listId, isDisabled, onChoose }) {
+    const moveGroups = useMoveGroups(task, listId);
+    if (moveGroups.length === 0) return null;
+
+    return (
+        <DropdownMenuItem
+            onClick={onChoose}
+            disabled={isDisabled}
+            className={isDisabled ? 'opacity-40' : ''}
+        >
+            Move to...
+        </DropdownMenuItem>
+    );
+}
+
+/**
+ * Bottom sheet listing the places a task can move to.
+ *
+ * @param {object} props
+ * @param {object} props.task - The task that would move.
+ * @param {string} props.listId - The list the task belongs to.
+ * @param {boolean} props.open - Whether the sheet is open.
+ * @param {Function} props.onClose - Closes the sheet.
+ * @param {(targetId: string) => void} props.onSelectTask - Called with the task to move under.
+ * @param {(sublistId: string|null) => void} props.onSelectSublist - Called with the sublist to move into.
+ */
+function MoveToSheet({ task, listId, open, onClose, onSelectTask, onSelectSublist }) {
+    const moveGroups = useMoveGroups(task, listId);
+
+    return (
+        <ModalShell
+            open={open}
+            onClose={onClose}
+            variant="sheet"
+            title="Move to..."
+            contentClassName="max-h-[70dvh] overflow-y-auto"
+        >
+            <MoveDestinationList
+                groups={moveGroups}
+                onSelect={onSelectTask}
+                onSelectSublist={onSelectSublist}
+            />
+        </ModalShell>
+    );
+}
 
 /**
  * Action bar for a task row - a single, always-visible `···` dropdown with
@@ -28,7 +96,8 @@ import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
  *
  * @param {object} props
  * @param {object} props.task - The task this action bar belongs to
- * @param {object[]} props.flatList - Full flat list for move/promote/delete lookups
+ * @param {ReturnType<typeof import('@/hooks/useTaskCompletion').useTaskCompletion>} props.completion - The row's
+ *   shared completion state; its owner renders the cascade dialog
  * @param {Function} props.onAddSubtask - Called when "Add Subtask" is selected
  * @param {boolean} [props.canAddSubtask] - Whether depth allows a subtask; default true
  * @param {string} props.listId - The list this task belongs to
@@ -40,7 +109,7 @@ import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
  */
 export default function TaskRowActions({
     task,
-    flatList,
+    completion,
     onAddSubtask,
     canAddSubtask = true,
     listId,
@@ -51,63 +120,24 @@ export default function TaskRowActions({
     onMoveTask,
 }) {
     const queryClient = useQueryClient();
+    const getTasks = useGetTasks(listId);
     const { duplicateTaskById } = useDuplicateTask(listId);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const deleteConfirm = useConfirmAction(deleteOpen);
-    const isRootTask = !task.parent_id;
 
     // UX hints only - RLS and the app-layer pre-checks are the real backstop if a control is missed.
     const canCreate = myPermission !== 'read_only';
     const canEditRow =
         canCreate && (myPermission !== 'restricted' || task.created_by === currentUserId);
 
-    const { data: sublists = [] } = useSublistsQuery(listId);
-
-    const { doneStatus, defaultStatus, isDone, setComplete, completeDialogProps } =
-        useTaskCompletion(listId);
+    const { doneStatus, defaultStatus, isDone, setComplete } = completion;
     const taskIsDone = isDone(task);
     const { togglePriority } = useTaskPriority(listId);
 
-    const parent = flatList.find((flatTask) => flatTask.id === task.parent_id);
-    const grandparentId = parent?.parent_id ?? null;
     const canPromote = Boolean(task.parent_id);
-
-    // Only roots carry sublist_id, so the moving task's sublist is its top ancestor's.
-    const movingTaskRoot = findAncestors(task.id, flatList).at(-1) ?? task;
-    const currentSublistId = movingTaskRoot.sublist_id ?? null;
-
-    const maxAllowedDepth = NESTING_MODE === 'finite' ? FINITE_MAX_DEPTH : Infinity;
-    const moveTargetRoots = buildMoveTargetTree(flatList, task, maxAllowedDepth);
-    const knownSublistIds = new Set(sublists.map((sublist) => sublist.id));
-    // A root pointing at a sublist that no longer exists falls back to the Main List group.
-    const getGroupIdForRoot = (root) =>
-        knownSublistIds.has(root.sublist_id) ? root.sublist_id : null;
-
-    const targetGroups = [
-        { id: null, name: 'Main List', color: 'var(--primary)' },
-        ...sublists.map((sublist) => ({
-            id: sublist.id,
-            name: sublist.name,
-            color: sublist.color,
-        })),
-    ].map((group) => ({
-        ...group,
-        roots: moveTargetRoots.filter((root) => getGroupIdForRoot(root) === group.id),
-    }));
-
-    const moveGroups = [
-        targetGroups.find((targetGroup) => targetGroup.id === currentSublistId),
-        ...targetGroups.filter((targetGroup) => targetGroup.id !== currentSublistId),
-    ]
-        .filter(Boolean)
-        .map((group) => ({
-            ...group,
-            canMoveToRoot: isRootTask && group.id !== task.sublist_id,
-        }))
-        .filter((group) => group.canMoveToRoot || hasSelectableMoveTarget(group.roots));
 
     function handleDeleteConfirm(strategy) {
         return deleteConfirm.runConfirmedAction({
@@ -177,6 +207,8 @@ export default function TaskRowActions({
     }
 
     function handlePromote() {
+        const grandparentId =
+            getTasks().find((flatTask) => flatTask.id === task.parent_id)?.parent_id ?? null;
         return performMove(
             { newParentId: grandparentId, afterSiblingId: task.parent_id, listId },
             'Task moved',
@@ -196,7 +228,7 @@ export default function TaskRowActions({
 
     async function handleToggleComplete() {
         setPending(true);
-        await setComplete(task, flatList, listId, !taskIsDone);
+        await setComplete(task, getTasks(), listId, !taskIsDone);
         setPending(false);
     }
 
@@ -277,15 +309,12 @@ export default function TaskRowActions({
                         </DropdownMenuItem>
                     )}
 
-                    {moveGroups.length > 0 && (
-                        <DropdownMenuItem
-                            onClick={() => setMoveSheetOpen(true)}
-                            disabled={!canEditRow}
-                            className={!canEditRow ? 'opacity-40' : ''}
-                        >
-                            Move to...
-                        </DropdownMenuItem>
-                    )}
+                    <MoveToMenuItem
+                        task={task}
+                        listId={listId}
+                        isDisabled={!canEditRow}
+                        onChoose={() => setMoveSheetOpen(true)}
+                    />
 
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -301,33 +330,30 @@ export default function TaskRowActions({
             </div>
 
             {/* Edit dialog */}
-            <TaskFormDialog open={editOpen} onClose={() => setEditOpen(false)} task={task} />
+            <MountOnFirstOpen open={editOpen}>
+                <TaskFormDialog open={editOpen} onClose={() => setEditOpen(false)} task={task} />
+            </MountOnFirstOpen>
 
             {/* Delete confirmation dialog */}
-            <DeleteTaskDialog
-                open={deleteOpen}
-                onClose={() => setDeleteOpen(false)}
-                task={task}
-                flatList={flatList}
-                onConfirm={handleDeleteConfirm}
-                isPending={deleteConfirm.isPending}
-                errorMessage={deleteConfirm.errorMessage}
-            />
-
-            {/* Cascade complete/incomplete confirmation - only shown when descendants would also change */}
-            <CompleteTaskDialog {...completeDialogProps} />
+            <MountOnFirstOpen open={deleteOpen}>
+                <DeleteTaskDialog
+                    open={deleteOpen}
+                    onClose={() => setDeleteOpen(false)}
+                    task={task}
+                    onConfirm={handleDeleteConfirm}
+                    isPending={deleteConfirm.isPending}
+                    errorMessage={deleteConfirm.errorMessage}
+                />
+            </MountOnFirstOpen>
 
             {/* Move-to destination picker - same bottom sheet on every breakpoint */}
-            <ModalShell
-                open={moveSheetOpen}
-                onClose={() => setMoveSheetOpen(false)}
-                variant="sheet"
-                title="Move to..."
-                contentClassName="max-h-[70dvh] overflow-y-auto"
-            >
-                <MoveDestinationList
-                    groups={moveGroups}
-                    onSelect={(targetId) => {
+            <MountOnFirstOpen open={moveSheetOpen}>
+                <MoveToSheet
+                    task={task}
+                    listId={listId}
+                    open={moveSheetOpen}
+                    onClose={() => setMoveSheetOpen(false)}
+                    onSelectTask={(targetId) => {
                         setMoveSheetOpen(false);
                         handleMoveTo(targetId);
                     }}
@@ -336,7 +362,7 @@ export default function TaskRowActions({
                         handleMoveToSublist(sublistId);
                     }}
                 />
-            </ModalShell>
+            </MountOnFirstOpen>
         </>
     );
 }

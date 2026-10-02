@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTasksQuery } from '@/hooks/useTasksQuery';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,6 @@ import { Loader } from '@/components/ui/loader';
  * @param {boolean} props.open - Whether the dialog is visible
  * @param {Function} props.onClose - Called when the dialog is dismissed without action
  * @param {object} props.task - The task being deleted
- * @param {object[]} props.flatList - Full flat task list, used to detect direct children
  * @param {Function} props.onConfirm - Called with 'cascade' or 'reparent' strategy
  * @param {boolean} [props.isPending] - While true the popup is locked and the chosen button spins
  * @param {string} [props.errorMessage] - Failure text shown inside the popup, which stays open
@@ -22,12 +22,15 @@ export default function DeleteTaskDialog({
     open,
     onClose,
     task,
-    flatList,
     onConfirm,
     isPending = false,
     errorMessage,
 }) {
     const [chosenStrategy, setChosenStrategy] = useState(null);
+    const { data: flatList = [] } = useTasksQuery(task?.list_id, {
+        enabled: Boolean(task),
+        refetchOnMount: false,
+    });
     if (!task) return null;
 
     function confirmWith(strategy) {

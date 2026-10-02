@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJson } from '@/lib/fetch-json';
 
 /**
@@ -16,4 +17,18 @@ export function useTasksQuery(listId, options = {}) {
         queryFn: ({ signal }) => fetchJson(`/api/tasks?list_id=${listId}`, { signal }),
         ...options,
     });
+}
+
+/**
+ * A stable getter for the list's tasks right now, so rows need no list prop that changes on every edit.
+ *
+ * @param {string} listId - List whose tasks to read.
+ * @returns {() => object[]} Returns the cached flat task rows, or an empty array before they load.
+ */
+export function useGetTasks(listId) {
+    const queryClient = useQueryClient();
+    return useCallback(
+        () => queryClient.getQueryData(['tasks', listId]) ?? [],
+        [queryClient, listId],
+    );
 }

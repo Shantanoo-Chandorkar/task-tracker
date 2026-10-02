@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, memo, useState } from 'react';
+import { Fragment, memo, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -12,11 +12,13 @@ import TaskRowRecurrence from './TaskRowRecurrence';
 import TaskRowActions from './TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import CompleteTaskDialog from './CompleteTaskDialog';
+import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
 import LimitWarning from './LimitWarning';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 import { useTaskPriority } from '@/hooks/useTaskPriority';
+import { useGetTasks } from '@/hooks/useTasksQuery';
 import { isStartOfUnprioritisedTier } from '@/lib/tree';
 import { getMoveTargets } from '@/lib/move-targets';
 
@@ -57,7 +59,6 @@ export function PriorityLine() {
  * @param {object} props
  * @param {object} props.task - Task node with a populated `.children` array
  * @param {number} props.depth - Current depth (0 = root)
- * @param {object[]} props.flatList - Full flat task list passed through for rearrange operations
  * @param {string} props.listId - The list this task tree belongs to
  * @param {string|null} [props.currentUserId] - Caller's user id, for row-level ownership checks
  * @param {'owner'|'full'|'restricted'|'read_only'|null} [props.myPermission] - Caller's tier for this space
@@ -68,7 +69,6 @@ export function PriorityLine() {
 function TaskRow({
     task,
     depth,
-    flatList,
     listId,
     currentUserId,
     myPermission,
@@ -104,6 +104,8 @@ function TaskRow({
           )
         : null;
 
+    // A new array each render would make SortableContext re-render every child on any change
+    const childIds = useMemo(() => task.children.map((child) => child.id), [task.children]);
     const hasChildren = task.children && task.children.length > 0;
     const directChildCount = task.children?.length ?? 0;
     const isSubtaskCapReached =
@@ -114,15 +116,16 @@ function TaskRow({
     const canAddSubtask =
         !(NESTING_MODE === 'finite' && depth >= FINITE_MAX_DEPTH) && !isSubtaskCapReached;
 
-    const { doneStatus, defaultStatus, isDone, setComplete, completeDialogProps } =
-        useTaskCompletion(listId);
+    const getTasks = useGetTasks(listId);
+    const completion = useTaskCompletion(listId);
+    const { doneStatus, defaultStatus, isDone, setComplete, completeDialogProps } = completion;
     const taskIsDone = isDone(task);
     const { togglePriority } = useTaskPriority(listId);
     const canToggleComplete = Boolean(doneStatus && defaultStatus);
 
     function handleToggleComplete(clickEvent) {
         clickEvent.stopPropagation();
-        setComplete(task, flatList, listId, !taskIsDone);
+        setComplete(task, getTasks(), listId, !taskIsDone);
     }
 
     // Only clicks on data-row-space wrappers toggle expand; portalled menu clicks bubble here but lack it.
@@ -246,7 +249,7 @@ function TaskRow({
                         {/* Hover action bar */}
                         <TaskRowActions
                             task={task}
-                            flatList={flatList}
+                            completion={completion}
                             onAddSubtask={() => {
                                 setFlag(expandKey, true);
                                 setAddSubtaskOpen(true);
@@ -273,7 +276,7 @@ function TaskRow({
                             <TaskRowTags tags={task.tags} />
                         </div>
                         <div className="ml-auto flex-shrink-0">
-                            <StatusPicker task={task} flatList={flatList} />
+                            <StatusPicker task={task} completion={completion} />
                         </div>
                     </div>
                 </div>
@@ -289,15 +292,19 @@ function TaskRow({
             )}
 
             {/* A subtask is just a task, so it reuses the same create dialog as "New Task". */}
-            <TaskFormDialog
-                open={addSubtaskOpen}
-                onClose={() => setAddSubtaskOpen(false)}
-                parentId={task.id}
-                listId={listId}
-            />
+            <MountOnFirstOpen open={addSubtaskOpen}>
+                <TaskFormDialog
+                    open={addSubtaskOpen}
+                    onClose={() => setAddSubtaskOpen(false)}
+                    parentId={task.id}
+                    listId={listId}
+                />
+            </MountOnFirstOpen>
 
             {/* Cascade complete/incomplete confirmation for the row checkbox */}
-            <CompleteTaskDialog {...completeDialogProps} />
+            <MountOnFirstOpen open={completeDialogProps.open}>
+                <CompleteTaskDialog {...completeDialogProps} />
+            </MountOnFirstOpen>
 
             {/* Children container with connecting line */}
             {hasChildren && isExpanded && (
@@ -314,10 +321,7 @@ function TaskRow({
                         />
                     )}
 
-                    <SortableContext
-                        items={task.children.map((child) => child.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
+                    <SortableContext items={childIds} strategy={verticalListSortingStrategy}>
                         {task.children.map((child, childIndex) => (
                             <Fragment key={child.id}>
                                 {isStartOfUnprioritisedTier(task.children, childIndex) && (
@@ -326,7 +330,6 @@ function TaskRow({
                                 <TaskRow
                                     task={child}
                                     depth={depth + 1}
-                                    flatList={flatList}
                                     listId={listId}
                                     currentUserId={currentUserId}
                                     myPermission={myPermission}
@@ -343,4 +346,39 @@ function TaskRow({
     );
 }
 
-export default memo(TaskRow);
+/**
+ * Tells whether two sibling lists order and tier their rows the same, which is all Move up and Move down read.
+ *
+ * @param {object[]} [previousSiblings]
+ * @param {object[]} [nextSiblings]
+ * @returns {boolean}
+ */
+function haveSameSiblingOrder(previousSiblings = [], nextSiblings = []) {
+    return (
+        previousSiblings.length === nextSiblings.length &&
+        previousSiblings.every(
+            (sibling, siblingIndex) =>
+                sibling.id === nextSiblings[siblingIndex].id &&
+                Boolean(sibling.is_prioritised) ===
+                    Boolean(nextSiblings[siblingIndex].is_prioritised),
+        )
+    );
+}
+
+/**
+ * Lets memo skip a row unless something it shows changed, comparing siblings by order only.
+ *
+ * @param {object} previousProps
+ * @param {object} nextProps
+ * @returns {boolean} True when the row can keep its last render.
+ */
+function hasSameRowProps(previousProps, nextProps) {
+    const propNames = new Set([...Object.keys(previousProps), ...Object.keys(nextProps)]);
+    for (const propName of propNames) {
+        if (propName === 'siblingTasks') continue;
+        if (!Object.is(previousProps[propName], nextProps[propName])) return false;
+    }
+    return haveSameSiblingOrder(previousProps.siblingTasks, nextProps.siblingTasks);
+}
+
+export default memo(TaskRow, hasSameRowProps);

@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useId, useState, useEffect, useMemo } from 'react';
+import { Fragment, useCallback, useId, useRef, useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
@@ -25,12 +25,13 @@ import { toast } from 'sonner';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
 import {
-    flatToTree,
+    createStableIdsReader,
+    createStableTreeBuilder,
     findDescendantIds,
     isStartOfUnprioritisedTier,
     countSublistTasks,
 } from '@/lib/tree';
-import { useUIState } from '@/providers/UIStateProvider';
+import { toggleFlag as toggleGroup, useUIFlags } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
@@ -104,7 +105,6 @@ function siblingScopedCollisionDetection(args) {
  * @param {number} [props.count] - Displayed count including subtasks (`tasks.length` is root-only)
  * @param {boolean} props.isCollapsed
  * @param {Function} props.onToggle
- * @param {object[]} props.flatList
  * @param {string} props.listId
  * @param {Function} props.onAddTask - Called to open task creation for this status
  * @param {Function} props.onFocusTask - Called with a task's id when its row is clicked
@@ -121,7 +121,6 @@ function StatusGroup({
     count,
     isCollapsed,
     onToggle,
-    flatList,
     listId,
     onAddTask,
     onFocusTask,
@@ -133,6 +132,9 @@ function StatusGroup({
     isInSublist = false,
 }) {
     const headingId = useId();
+    // Same array while the ids are unchanged, or SortableContext re-renders every row on each list render
+    const [readStableIds] = useState(createStableIdsReader);
+    const taskIds = readStableIds(tasks);
     if (tasks.length === 0) return null;
     const Heading = isInSublist ? 'h3' : 'h2';
 
@@ -177,10 +179,7 @@ function StatusGroup({
 
             {!isCollapsed && (
                 <>
-                    <SortableContext
-                        items={tasks.map((task) => task.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
+                    <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
                         {tasks.map((task, taskIndex) => (
                             <Fragment key={task.id}>
                                 {isStartOfUnprioritisedTier(tasks, taskIndex) && (
@@ -190,7 +189,6 @@ function StatusGroup({
                                     <TaskRow
                                         task={task}
                                         depth={0}
-                                        flatList={flatList}
                                         listId={listId}
                                         currentUserId={currentUserId}
                                         myPermission={myPermission}
@@ -379,7 +377,6 @@ export default function TaskList({
         parentId: null,
         sublistId: null,
     });
-    const { flags: collapsedGroups, toggleFlag: toggleGroup } = useUIState();
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [sublistDialog, setSublistDialog] = useState({ open: false, sublist: null });
     const {
@@ -402,8 +399,9 @@ export default function TaskList({
     const maxSubtasksPerParent =
         useSpaceById(spaceId, { initialData: initialSpaces })?.max_subtasks_per_parent ?? null;
 
-    const tree = useMemo(() => flatToTree(flatList), [flatList]);
-    const rootTasks = tree; // flatToTree already returns only root nodes
+    // Reuses nodes whose task did not change, so memoized rows are skipped when another task is edited
+    const [buildStableTree] = useState(createStableTreeBuilder);
+    const rootTasks = useMemo(() => buildStableTree(flatList), [buildStableTree, flatList]);
 
     // Counts include every depth, not just root tasks - a subtask's status can differ from its parent's.
     const countsByStatusId = useMemo(() => {
@@ -495,6 +493,18 @@ export default function TaskList({
             }),
         ];
     }, [rootTasks, sublists, flatList, doneStatus, activeCount, filters]);
+
+    // Only the group headers' flags, so expanding one task row does not re-render the whole list
+    const groupFlagKeys = useMemo(
+        () =>
+            buckets.flatMap((bucket) => [
+                ...(bucket.sublist ? [`sublist:${bucket.sublist.id}`] : []),
+                ...statuses.map((status) => `${bucket.key}:${status.id}`),
+                `${bucket.key}:none`,
+            ]),
+        [buckets, statuses],
+    );
+    const collapsedGroups = useUIFlags(groupFlagKeys);
 
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
@@ -635,6 +645,16 @@ export default function TaskList({
     function moveTaskNextTo(taskId, neighbourId) {
         return handleTaskDragEnd({ active: { id: taskId }, over: { id: neighbourId } });
     }
+
+    // A stable wrapper, since a new handler on every list change would re-render every memoized row
+    const moveTaskNextToRef = useRef(moveTaskNextTo);
+    useEffect(() => {
+        moveTaskNextToRef.current = moveTaskNextTo;
+    });
+    const onMoveTask = useCallback(
+        (taskId, neighbourId) => moveTaskNextToRef.current(taskId, neighbourId),
+        [],
+    );
 
     function moveSublistNextTo(sublistId, neighbourId) {
         return handleSublistDragEnd({ active: { id: sublistId }, over: { id: neighbourId } });
@@ -889,7 +909,6 @@ export default function TaskList({
                                                 onToggle={() =>
                                                     toggleGroup(`${bucket.key}:${status.id}`)
                                                 }
-                                                flatList={flatList}
                                                 listId={listId}
                                                 onFocusTask={setFocusedTaskId}
                                                 onAddTask={() =>
@@ -904,7 +923,7 @@ export default function TaskList({
                                                 currentUserId={currentUserId}
                                                 myPermission={myPermission}
                                                 maxSubtasksPerParent={maxSubtasksPerParent}
-                                                onMoveTask={moveTaskNextTo}
+                                                onMoveTask={onMoveTask}
                                             />
                                         ))}
                                         <StatusGroup
@@ -914,7 +933,6 @@ export default function TaskList({
                                             count={bucket.allDepthCountsByStatusId.get('none') ?? 0}
                                             isCollapsed={collapsedGroups[`${bucket.key}:none`]}
                                             onToggle={() => toggleGroup(`${bucket.key}:none`)}
-                                            flatList={flatList}
                                             listId={listId}
                                             onFocusTask={setFocusedTaskId}
                                             onAddTask={() =>
@@ -928,7 +946,7 @@ export default function TaskList({
                                             currentUserId={currentUserId}
                                             myPermission={myPermission}
                                             maxSubtasksPerParent={maxSubtasksPerParent}
-                                            onMoveTask={moveTaskNextTo}
+                                            onMoveTask={onMoveTask}
                                         />
                                     </>
                                 )}

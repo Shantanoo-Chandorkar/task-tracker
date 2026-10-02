@@ -95,7 +95,8 @@ export default function TaskFormDialog({
     const resetKey = open
         ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}:${defaultSublistId ?? ''}`
         : null;
-    const [lastResetKey, setLastResetKey] = useState(resetKey);
+    // Starts null so a dialog first mounted already open still fills its fields from `task`
+    const [lastResetKey, setLastResetKey] = useState(null);
     if (resetKey !== lastResetKey) {
         setLastResetKey(resetKey);
         if (open) {

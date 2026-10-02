@@ -23,6 +23,8 @@ import { useConfirmAction } from '@/hooks/useConfirmAction';
  *
  * @param {string} listId - The list this completion state applies to (resolves its space's statuses)
  * @returns {{
+ *   statuses: object[],
+ *   isResolvingStatuses: boolean,
  *   doneStatus: object|undefined,
  *   defaultStatus: object|undefined,
  *   isDone: (task: object) => boolean,
@@ -38,7 +40,7 @@ import { useConfirmAction } from '@/hooks/useConfirmAction';
 export function useTaskCompletion(listId) {
     const queryClient = useQueryClient();
     const spaceId = useSpaceIdForList(listId);
-    const { data: statuses = [] } = useStatusesQuery(spaceId);
+    const { data: statuses = [], isLoading: isStatusesLoading } = useStatusesQuery(spaceId);
     const [confirmState, setConfirmState] = useState(null);
 
     const doneStatus = statuses.find((status) => status.code === 'done');
@@ -171,6 +173,9 @@ export function useTaskCompletion(listId) {
     };
 
     return {
+        statuses,
+        // Separates "not resolved yet" from "confirmed no status" to avoid an SSR hydration flash
+        isResolvingStatuses: !spaceId || isStatusesLoading,
         doneStatus,
         defaultStatus,
         isDone,
