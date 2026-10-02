@@ -93,7 +93,7 @@ export default function MoveDestinationList({ groups, onSelect, onSelectSublist 
                                 className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                                 style={{ backgroundColor: group.color || 'var(--primary)' }}
                             />
-                            {group.name}
+                            <span className="min-w-0 break-words">{group.name}</span>
                         </div>
 
                         {group.canMoveToRoot && (
@@ -103,7 +103,7 @@ export default function MoveDestinationList({ groups, onSelect, onSelectSublist 
                                 className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-3 text-left text-sm text-muted-foreground hover:bg-accent active:bg-accent"
                             >
                                 <CornerDownRight className="h-3.5 w-3.5 shrink-0" />
-                                {`Move to ${group.name}`}
+                                <span className="min-w-0 break-words">{`Move to ${group.name}`}</span>
                             </button>
                         )}
 

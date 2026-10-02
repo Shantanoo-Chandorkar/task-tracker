@@ -66,8 +66,12 @@ export default function TagComboboxField({
     return (
         <div className="flex flex-wrap items-center gap-1.5">
             {tags.map((tag) => (
-                <Badge key={tag.key} variant="tag" className={`gap-1 pr-1 ${badgeSizeClass}`}>
-                    {tag.name}
+                <Badge
+                    key={tag.key}
+                    variant="tag"
+                    className={`max-w-full gap-1 pr-1 ${badgeSizeClass}`}
+                >
+                    <span className="min-w-0 truncate">{tag.name}</span>
                     <button
                         type="button"
                         onClick={() => onRemove(tag.key)}

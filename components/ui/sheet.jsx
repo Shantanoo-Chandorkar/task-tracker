@@ -37,7 +37,7 @@ function SheetOverlay({ className, ...props }) {
 }
 
 const sheetContentVariants = cva(
-    'fixed z-50 flex flex-col gap-4 bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none data-open:animate-in data-closed:animate-out',
+    'fixed z-50 flex flex-col [&>*]:min-w-0 gap-4 bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none data-open:animate-in data-closed:animate-out',
     {
         variants: {
             side: {
@@ -79,7 +79,7 @@ function SheetHeader({ className, ...props }) {
     return (
         <div
             data-slot="sheet-header"
-            className={cn('flex flex-col gap-1.5 p-4', className)}
+            className={cn('flex min-w-0 flex-col gap-1.5 p-4', className)}
             {...props}
         />
     );
@@ -99,7 +99,10 @@ function SheetTitle({ className, ...props }) {
     return (
         <SheetPrimitive.Title
             data-slot="sheet-title"
-            className={cn('font-heading text-base font-medium text-foreground', className)}
+            className={cn(
+                'font-heading text-base font-medium text-foreground min-w-0 [overflow-wrap:anywhere]',
+                className,
+            )}
             {...props}
         />
     );
@@ -109,7 +112,10 @@ function SheetDescription({ className, ...props }) {
     return (
         <SheetPrimitive.Description
             data-slot="sheet-description"
-            className={cn('text-sm text-muted-foreground', className)}
+            className={cn(
+                'text-sm text-muted-foreground min-w-0 [overflow-wrap:anywhere]',
+                className,
+            )}
             {...props}
         />
     );
