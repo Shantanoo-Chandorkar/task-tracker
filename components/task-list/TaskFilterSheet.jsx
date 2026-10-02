@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import ModalShell from '@/components/ui/modal-shell';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -54,21 +54,28 @@ function FilterCheckboxRow({ label, checked, onCheckedChange, dotColor, count })
  * @param {import('react').ReactNode} props.children - The section's checkbox rows
  */
 function FilterSection({ title, isOpen, onToggle, loading, children }) {
+    const panelId = useId();
     return (
         <div className="border-t border-border first:border-t-0 py-1">
             <button
                 type="button"
                 onClick={onToggle}
+                aria-expanded={isOpen}
+                aria-controls={panelId}
                 className="flex w-full items-center justify-between py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
             >
                 {title}
                 {isOpen ? (
-                    <ChevronDown className="h-3.5 w-3.5" />
+                    <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
                 ) : (
-                    <ChevronRight className="h-3.5 w-3.5" />
+                    <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
                 )}
             </button>
-            {isOpen && <div className="pb-2">{loading ?? children}</div>}
+            {isOpen && (
+                <div id={panelId} className="pb-2">
+                    {loading ?? children}
+                </div>
+            )}
         </div>
     );
 }

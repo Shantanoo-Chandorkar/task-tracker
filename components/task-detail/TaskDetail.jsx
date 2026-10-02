@@ -97,26 +97,30 @@ export default function TaskDetail({
     return (
         <div className="space-y-6">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
-                <Link
-                    href={`/lists/${listId}`}
-                    className="hover:text-foreground flex items-center gap-1"
-                >
-                    <ArrowLeft className="h-3 w-3" />
-                    List
-                </Link>
-                {ancestors.map((ancestor) => (
-                    <span key={ancestor.id} className="flex items-center gap-1">
-                        <span>/</span>
+            <nav aria-label="Breadcrumb">
+                <ol className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
+                    <li>
                         <Link
-                            href={`/lists/${listId}/tasks/${ancestor.id}`}
-                            className="hover:text-foreground truncate max-w-40"
+                            href={`/lists/${listId}`}
+                            className="hover:text-foreground flex items-center gap-1"
                         >
-                            {ancestor.title}
+                            <ArrowLeft aria-hidden="true" className="h-3 w-3" />
+                            List
                         </Link>
-                    </span>
-                ))}
-            </div>
+                    </li>
+                    {ancestors.map((ancestor) => (
+                        <li key={ancestor.id} className="flex items-center gap-1">
+                            <span aria-hidden="true">/</span>
+                            <Link
+                                href={`/lists/${listId}/tasks/${ancestor.id}`}
+                                className="hover:text-foreground truncate max-w-40"
+                            >
+                                {ancestor.title}
+                            </Link>
+                        </li>
+                    ))}
+                </ol>
+            </nav>
 
             {/* Header */}
             <div className="flex items-start justify-between gap-2">

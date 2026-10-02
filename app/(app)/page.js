@@ -9,6 +9,8 @@ import HomeView from '@/components/home/HomeView';
 import HomeSkeleton from '@/components/home/HomeSkeleton';
 import { loadHomeSummary } from '@/lib/home/build-home-summary';
 
+export const metadata = { title: 'Home' };
+
 /**
  * The Home content once its data has loaded. Shows the Home dashboard when the user has a list; with no
  * lists yet, shows the Space/List manager inline so a first-time user can create one without onboarding.

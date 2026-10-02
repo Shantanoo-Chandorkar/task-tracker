@@ -47,11 +47,7 @@ export default function NavigationProgressBar() {
 
     return (
         <div
-            role="progressbar"
-            aria-valuenow={Math.round(progress)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-hidden={isHidden}
+            aria-hidden="true"
             className="fixed top-0 left-0 w-full h-[3px] z-50 pointer-events-none"
         >
             <div

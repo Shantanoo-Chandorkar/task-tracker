@@ -1,7 +1,7 @@
 import SignupForm from '@/components/auth/SignupForm';
 import { sanitizeRedirectPath } from '@/lib/validation';
 
-export const metadata = { title: 'Sign up - Task Tracker' };
+export const metadata = { title: 'Sign up' };
 
 /**
  * Signup page. `?next=` (e.g. from an invite-accept link) is sanitized here, server-side,

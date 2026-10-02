@@ -113,6 +113,17 @@ export default function GlobalSearch() {
         displayResults.lists.length > 0 ||
         displayResults.spaces.length > 0;
 
+    const resultCount =
+        displayResults.tasks.length + displayResults.lists.length + displayResults.spaces.length;
+    // Screen-reader twin of the visible result list, spoken once per change
+    const statusMessage = !trimmedQuery
+        ? ''
+        : isLoading
+          ? 'Searching'
+          : hasResults
+            ? `${resultCount} ${resultCount === 1 ? 'result' : 'results'}`
+            : 'No results';
+
     return (
         <CommandDialog
             open={open}
@@ -120,12 +131,16 @@ export default function GlobalSearch() {
             title="Search"
             description="Search tasks, lists, and spaces"
         >
-            <Command shouldFilter={false}>
+            {/* cmdk names the input from this label; an aria-label on the input is ignored */}
+            <Command shouldFilter={false} label="Search tasks, lists, spaces">
                 <CommandInput
                     placeholder="Search tasks, lists, spaces"
                     value={query}
                     onValueChange={setQuery}
                 />
+                <div role="status" className="sr-only">
+                    {statusMessage}
+                </div>
                 <CommandList>
                     {!hasResults && isLoading && (
                         <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">

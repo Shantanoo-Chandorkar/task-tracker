@@ -11,6 +11,14 @@ describe('app layout', () => {
         expect(layoutSource).not.toMatch(/export default async function/);
     });
 
+    it('starts with a skip link that targets the main landmark', () => {
+        expect(layoutSource).toMatch(/<a\s+href="#main-content"/);
+        expect(layoutSource).toMatch(/<main\s+id="main-content"\s+tabIndex=\{-1\}/);
+        expect(layoutSource.indexOf('href="#main-content"')).toBeLessThan(
+            layoutSource.indexOf('<AuthKeepAlive'),
+        );
+    });
+
     it('awaits data only inside the small per-piece components under Suspense', () => {
         const layoutBody = layoutSource.slice(
             layoutSource.indexOf('export default function AppLayout'),
@@ -18,5 +26,17 @@ describe('app layout', () => {
 
         expect(layoutBody).not.toContain('await');
         expect(layoutBody).toContain('<Suspense');
+    });
+});
+
+describe('layouts without the app chrome', () => {
+    it.each([
+        ['auth', '../(auth)/layout.js'],
+        ['invites', '../invites/layout.js'],
+    ])('the %s layout wraps its card in a main landmark', (_name, relativePath) => {
+        const source = readFileSync(resolve(__dirname, relativePath), 'utf8');
+
+        expect(source).toContain('<main');
+        expect(source).toContain('</main>');
     });
 });

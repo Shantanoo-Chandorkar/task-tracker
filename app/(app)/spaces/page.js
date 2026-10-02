@@ -5,6 +5,8 @@ import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
 import { getCurrentUserProfile } from '@/lib/profile';
 import SpaceListManager from '@/components/space/SpaceListManager';
 
+export const metadata = { title: 'Spaces' };
+
 /**
  * Spaces page - Server Component.
  * Fetches spaces and lists server-side to pass as initialData to

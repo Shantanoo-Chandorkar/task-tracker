@@ -3,6 +3,20 @@ import { createClient } from '@/lib/supabase/server';
 import { isUuid } from '@/lib/validation';
 import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 import TaskDetail from '@/components/task-detail/TaskDetail';
+import { loadListName } from '@/lib/page-titles';
+
+/**
+ * Tab title: "Task in <list name>"; the task's own title would need an extra query, so it is not used.
+ *
+ * @param {object} props
+ * @param {Promise<{ listId: string }>} props.params - Route params.
+ * @returns {Promise<{ title: string }>} Page metadata.
+ */
+export async function generateMetadata({ params }) {
+    const { listId } = await params;
+    const listName = isUuid(listId) ? await loadListName(listId) : null;
+    return { title: listName ? `Task in ${listName}` : 'Task' };
+}
 
 /**
  * Task detail page - Server Component. Fetches the task list SSR to hydrate TaskDetail's query.

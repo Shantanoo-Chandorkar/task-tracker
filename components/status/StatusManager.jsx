@@ -62,10 +62,11 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
         <div
             ref={setNodeRef}
             style={style}
-            {...attributes}
             className="flex items-center gap-3 py-2.5 px-3 border-b border-border last:border-b-0"
         >
+            {/* dnd attributes on the row made a focusable box around other buttons, so they live on the handle */}
             <button
+                {...attributes}
                 {...listeners}
                 className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
                 aria-label="Drag to reorder"

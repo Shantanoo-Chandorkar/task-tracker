@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useEffect, useMemo } from 'react';
+import { Fragment, useId, useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
@@ -114,6 +114,7 @@ function siblingScopedCollisionDetection(args) {
  * @param {string|null} props.currentUserId - Caller's user id, for row-level ownership checks
  * @param {'owner'|'full'|'restricted'|'read_only'|null} props.myPermission - Caller's tier for this space
  * @param {number|null} [props.maxSubtasksPerParent] - Space's direct-subtask cap, or null for no limit
+ * @param {boolean} [props.isInSublist] - True when a sublist heading sits above, so this heading is one level lower
  */
 function StatusGroup({
     status,
@@ -129,31 +130,48 @@ function StatusGroup({
     currentUserId,
     myPermission,
     maxSubtasksPerParent,
+    isInSublist = false,
 }) {
+    const headingId = useId();
     if (tasks.length === 0) return null;
+    const Heading = isInSublist ? 'h3' : 'h2';
 
     return (
-        <section className="space-y-0.5 pl-4 md:pl-8 [--row-indent:8px] md:[--row-indent:24px]">
-            <button
-                className="flex items-center gap-2 w-full py-2 text-left group/header"
-                onClick={onToggle}
-            >
-                {isCollapsed ? (
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-                {status && (
-                    <span
-                        className="h-2 w-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: status.color }}
-                    />
-                )}
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {status ? status.name : 'No Status'}
-                </span>
-                <span className="text-xs text-muted-foreground/60">({count ?? tasks.length})</span>
-            </button>
+        <section
+            aria-labelledby={headingId}
+            className="space-y-0.5 pl-4 md:pl-8 [--row-indent:8px] md:[--row-indent:24px]"
+        >
+            <Heading id={headingId}>
+                <button
+                    className="flex items-center gap-2 w-full py-2 text-left group/header"
+                    onClick={onToggle}
+                    aria-expanded={!isCollapsed}
+                >
+                    {isCollapsed ? (
+                        <ChevronRight
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    ) : (
+                        <ChevronDown
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    )}
+                    {status && (
+                        <span
+                            className="h-2 w-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: status.color }}
+                        />
+                    )}
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {status ? status.name : 'No Status'}
+                    </span>
+                    <span className="text-xs text-muted-foreground/60">
+                        ({count ?? tasks.length})
+                    </span>
+                </button>
+            </Heading>
 
             <div className="border-b border-border/50 mb-2" />
 
@@ -261,23 +279,35 @@ function SublistHeader({
             >
                 <GripVertical className="h-3.5 w-3.5" />
             </button>
-            <button className="flex items-center gap-2 flex-1 min-w-0 text-left" onClick={onToggle}>
-                {isCollapsed ? (
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-                <span
-                    className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: sublist.color }}
-                />
-                <span className="text-sm font-semibold text-foreground truncate">
-                    {sublist.name}
-                </span>
-                <span className="text-xs text-muted-foreground/60 flex-shrink-0">
-                    ({taskCount})
-                </span>
-            </button>
+            <h2 className="flex min-w-0 flex-1">
+                <button
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    onClick={onToggle}
+                    aria-expanded={!isCollapsed}
+                >
+                    {isCollapsed ? (
+                        <ChevronRight
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    ) : (
+                        <ChevronDown
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    )}
+                    <span
+                        className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: sublist.color }}
+                    />
+                    <span className="text-sm font-semibold text-foreground truncate">
+                        {sublist.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground/60 flex-shrink-0">
+                        ({taskCount})
+                    </span>
+                </button>
+            </h2>
 
             {breakdownText && (
                 <span className="hidden sm:block flex-shrink-0 text-xs text-muted-foreground">
@@ -835,6 +865,7 @@ export default function TaskList({
                                         {statuses.map((status) => (
                                             <StatusGroup
                                                 key={status.id}
+                                                isInSublist={Boolean(bucket.sublist)}
                                                 status={status}
                                                 tasks={bucket.tasksByStatusId.get(status.id) ?? []}
                                                 count={
@@ -866,6 +897,7 @@ export default function TaskList({
                                             />
                                         ))}
                                         <StatusGroup
+                                            isInSublist={Boolean(bucket.sublist)}
                                             status={null}
                                             tasks={bucket.tasksByStatusId.get('none') ?? []}
                                             count={bucket.allDepthCountsByStatusId.get('none') ?? 0}

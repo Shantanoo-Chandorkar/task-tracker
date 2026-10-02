@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
@@ -146,6 +146,7 @@ function SpaceSection({
 }) {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [sharingOpen, setSharingOpen] = useState(false);
+    const sharingPanelId = useId();
     const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
     // Guests cannot share; the button stays hidden until the profile confirms a registered user
     const canShareSpace = isOwner && profile?.is_guest === false;
@@ -258,13 +259,15 @@ function SpaceSection({
                     <button
                         type="button"
                         onClick={() => setSharingOpen((open) => !open)}
+                        aria-expanded={sharingOpen}
+                        aria-controls={sharingPanelId}
                         className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
                     >
                         Share this space
                         {sharingOpen ? (
-                            <ChevronUp className="h-3 w-3" />
+                            <ChevronUp aria-hidden="true" className="h-3 w-3" />
                         ) : (
-                            <ChevronDown className="h-3 w-3" />
+                            <ChevronDown aria-hidden="true" className="h-3 w-3" />
                         )}
                     </button>
                 )}
@@ -288,7 +291,7 @@ function SpaceSection({
             />
 
             {canShareSpace && sharingOpen && (
-                <div className="border-t border-border px-3 py-3">
+                <div id={sharingPanelId} className="border-t border-border px-3 py-3">
                     <SpaceSharingSection space={space} />
                 </div>
             )}
@@ -508,7 +511,7 @@ export default function SpaceListManager({
     return (
         <div className="space-y-6 max-w-lg">
             <div>
-                <h2 className="text-base font-semibold mb-1">Spaces</h2>
+                <h2 className="text-base font-semibold mb-1">Your spaces</h2>
                 <p className="text-sm text-muted-foreground">
                     Spaces group your lists. Each list holds its own tasks. Drag to reorder.
                 </p>

@@ -7,6 +7,20 @@ import TaskList from '@/components/task-list/TaskList';
 import { attachTaskCounts } from '@/lib/list-task-counts';
 import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
 import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
+import { loadListName } from '@/lib/page-titles';
+
+/**
+ * Tab title: the list's name, or a generic one when the id is malformed or the list is not visible.
+ *
+ * @param {object} props
+ * @param {Promise<{ listId: string }>} props.params - Route params.
+ * @returns {Promise<{ title: string }>} Page metadata.
+ */
+export async function generateMetadata({ params }) {
+    const { listId } = await params;
+    const listName = isUuid(listId) ? await loadListName(listId) : null;
+    return { title: listName ?? 'List' };
+}
 
 /**
  * List task-tree page (Server Component) - fetches everything server-side for zero-waterfall hydration.

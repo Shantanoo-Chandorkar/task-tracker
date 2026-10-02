@@ -20,7 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-    title: 'Task Tracker',
+    // Pages set only their own name; the template adds the app name so every tab title is distinct
+    title: { default: 'Task Tracker', template: '%s - Task Tracker' },
     description: 'Nested task management',
     // 'default' keeps the iOS status bar solid, so no content ever sits under it.
     appleWebApp: { capable: true, title: 'Task Tracker', statusBarStyle: 'default' },

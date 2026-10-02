@@ -1,7 +1,7 @@
 import LoginForm from '@/components/auth/LoginForm';
 import { sanitizeRedirectPath } from '@/lib/validation';
 
-export const metadata = { title: 'Log in - Task Tracker' };
+export const metadata = { title: 'Log in' };
 
 /**
  * Login page. `?reason=guest-expired` is set when a guest session ends, so the form can explain

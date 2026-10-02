@@ -38,22 +38,27 @@ export default function BottomNav({ initialSpaces, initialLists }) {
 
     return (
         // Spacer matches the FAB's width so it centers at true 50%, not an uneven flex gap.
-        <nav className="lg:hidden translucent-bar fixed bottom-0 inset-x-0 z-20 border-t pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <nav
+            aria-label="Primary"
+            className="lg:hidden translucent-bar fixed bottom-0 inset-x-0 z-20 border-t pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+        >
             <div className="relative flex items-center">
                 <div className="flex-1 flex">
                     <Link
                         href="/"
+                        aria-current={isHome ? 'page' : undefined}
                         className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
                     >
-                        <Home className="h-5 w-5" />
+                        <Home aria-hidden="true" className="h-5 w-5" />
                         Home
                     </Link>
 
                     <Link
                         href={tasksHref}
+                        aria-current={isTasks ? 'page' : undefined}
                         className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}
                     >
-                        <ListChecks className="h-5 w-5" />
+                        <ListChecks aria-hidden="true" className="h-5 w-5" />
                         Tasks
                     </Link>
                 </div>
@@ -63,17 +68,19 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                 <div className="flex-1 flex">
                     <Link
                         href="/spaces"
+                        aria-current={isSpaces ? 'page' : undefined}
                         className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSpaces ? 'text-primary' : 'text-muted-foreground'}`}
                     >
-                        <LayoutGrid className="h-5 w-5" />
+                        <LayoutGrid aria-hidden="true" className="h-5 w-5" />
                         Spaces
                     </Link>
 
                     <Link
                         href="/settings"
+                        aria-current={isSettings ? 'page' : undefined}
                         className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
                     >
-                        <Settings className="h-5 w-5" />
+                        <Settings aria-hidden="true" className="h-5 w-5" />
                         Settings
                     </Link>
                 </div>
