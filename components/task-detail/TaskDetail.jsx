@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
@@ -18,7 +18,7 @@ import StatusBadge from '@/components/status/StatusBadge';
 import TaskTagPicker from './TaskTagPicker';
 import TaskRowActions from '@/components/task-list/TaskRowActions';
 import LimitWarning from '@/components/task-list/LimitWarning';
-import TaskFormDialog from '@/components/task-form/TaskFormDialog';
+import TaskFormDialog, { scheduleEditorPrefetch } from '@/components/task-form/TaskFormDialog';
 import SubtaskTree from './SubtaskTree';
 import { Button } from '@/components/ui/button';
 import RichTextRenderer from '@/components/ui/RichTextRenderer';
@@ -42,6 +42,8 @@ export default function TaskDetail({
 }) {
     const router = useRouter();
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
+
+    useEffect(() => scheduleEditorPrefetch(), []);
 
     const { data: flatList = [] } = useTasksQuery(listId, { initialData: initialTasks });
 

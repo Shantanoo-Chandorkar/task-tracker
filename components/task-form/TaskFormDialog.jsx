@@ -45,6 +45,29 @@ const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor'), {
     ),
 });
 
+const IDLE_FALLBACK_DELAY_MS = 2000;
+
+/**
+ * Fetches the editor's code in the background once the browser is idle, so the first New or Edit open has no wait.
+ * Skipped when Data Saver is on.
+ *
+ * @returns {() => void} Cancels the pending prefetch, for use as an effect cleanup.
+ */
+export function scheduleEditorPrefetch() {
+    if (typeof window === 'undefined' || navigator.connection?.saveData) return () => {};
+
+    // A failed warm-up is harmless: the dialog loads the editor itself when it opens
+    const prefetchEditor = () => import('@/components/ui/RichTextEditor').catch(() => {});
+
+    if (window.requestIdleCallback) {
+        const idleHandle = window.requestIdleCallback(prefetchEditor);
+        return () => window.cancelIdleCallback(idleHandle);
+    }
+    // Safari has no requestIdleCallback
+    const timerId = window.setTimeout(prefetchEditor, IDLE_FALLBACK_DELAY_MS);
+    return () => window.clearTimeout(timerId);
+}
+
 /**
  * Modal for creating or editing a task, via the shared ModalShell container.
  *

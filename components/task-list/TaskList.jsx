@@ -27,7 +27,7 @@ import ModalShell from '@/components/ui/modal-shell';
 import {
     createStableIdsReader,
     createStableTreeBuilder,
-    findDescendantIds,
+    buildDescendantIdsByTaskId,
     isStartOfUnprioritisedTier,
     countSublistTasks,
 } from '@/lib/tree';
@@ -45,7 +45,7 @@ import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announ
 import { useDuplicateTask } from '@/hooks/useDuplicateTask';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
-import TaskFormDialog from '@/components/task-form/TaskFormDialog';
+import TaskFormDialog, { scheduleEditorPrefetch } from '@/components/task-form/TaskFormDialog';
 import SublistFormDialog from '@/components/space/SublistFormDialog';
 import TaskFilterSheet from './TaskFilterSheet';
 import TaskFilterBar from './TaskFilterBar';
@@ -377,6 +377,8 @@ export default function TaskList({
         parentId: null,
         sublistId: null,
     });
+    useEffect(() => scheduleEditorPrefetch(), []);
+
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [sublistDialog, setSublistDialog] = useState({ open: false, sublist: null });
     const {
@@ -422,15 +424,18 @@ export default function TaskList({
     // Grouped via a single Map pass per bucket instead of a filter-per-status - O(n), not O(n·statuses).
     const buckets = useMemo(() => {
         const hasActiveFilters = activeCount > 0;
+        // Built once, so each root looks its subtree up instead of rescanning the whole list
+        const descendantIdsByTaskId = buildDescendantIdsByTaskId(flatList);
+        const tasksById = new Map(flatList.map((task) => [task.id, task]));
 
         function rootMatchesFilters(rootTask) {
             if (!hasActiveFilters) return true;
             const context = { doneStatusId: doneStatus?.id ?? null };
             if (taskMatchesFilters(rootTask, filters, context)) return true;
-            const descendantIds = findDescendantIds(rootTask.id, flatList);
-            return flatList.some(
-                (task) => descendantIds.has(task.id) && taskMatchesFilters(task, filters, context),
-            );
+            for (const descendantId of descendantIdsByTaskId.get(rootTask.id)) {
+                if (taskMatchesFilters(tasksById.get(descendantId), filters, context)) return true;
+            }
+            return false;
         }
 
         function groupByStatus(tasks) {
@@ -453,11 +458,9 @@ export default function TaskList({
             }
             for (const rootTask of rootTasksInBucket) {
                 tally(rootTask);
-                const descendantIds = findDescendantIds(rootTask.id, flatList);
+                const descendantIds = descendantIdsByTaskId.get(rootTask.id);
                 total += descendantIds.size;
-                for (const task of flatList) {
-                    if (descendantIds.has(task.id)) tally(task);
-                }
+                for (const descendantId of descendantIds) tally(tasksById.get(descendantId));
             }
             return { total, countsByStatusId };
         }

@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import TaskFormDialog from './TaskFormDialog';
+import TaskFormDialog, { scheduleEditorPrefetch } from './TaskFormDialog';
 
 const createTaskWithTags = vi.fn();
 const updateTask = vi.fn();
@@ -15,7 +15,13 @@ vi.mock('@/actions/task-actions', () => ({
     createTaskWithTags: (...args) => createTaskWithTags(...args),
     updateTask: (...args) => updateTask(...args),
 }));
+const editorLoadTracker = vi.hoisted(() => ({ loadCount: 0 }));
+
 vi.mock('next/dynamic', () => ({ default: () => () => null }));
+vi.mock('@/components/ui/RichTextEditor', () => {
+    editorLoadTracker.loadCount += 1;
+    return { default: () => null };
+});
 vi.mock('@/hooks/useStatusesQuery', () => ({ useStatusesQuery: () => ({ data: [] }) }));
 vi.mock('@/hooks/useSublistsQuery', () => ({ useSublistsQuery: () => ({ data: [] }) }));
 vi.mock('@/hooks/useSpaceIdForList', () => ({ useSpaceIdForList: () => 'space-1' }));
@@ -105,5 +111,64 @@ describe('TaskFormDialog first mounted already open', () => {
         );
 
         expect(screen.getByPlaceholderText('Task title').value).toBe('Existing title');
+    });
+});
+
+describe('scheduleEditorPrefetch', () => {
+    afterEach(() => {
+        delete window.requestIdleCallback;
+        delete window.cancelIdleCallback;
+        Object.defineProperty(navigator, 'connection', { value: undefined, configurable: true });
+        vi.restoreAllMocks();
+    });
+
+    it('loads the editor only when the browser goes idle', async () => {
+        let runWhenIdle;
+        window.requestIdleCallback = vi.fn((callback) => {
+            runWhenIdle = callback;
+            return 7;
+        });
+        window.cancelIdleCallback = vi.fn();
+        const loadsBefore = editorLoadTracker.loadCount;
+
+        scheduleEditorPrefetch();
+        expect(window.requestIdleCallback).toHaveBeenCalledTimes(1);
+        expect(editorLoadTracker.loadCount).toBe(loadsBefore);
+
+        await runWhenIdle();
+        expect(editorLoadTracker.loadCount).toBe(loadsBefore + 1);
+    });
+
+    it('cancels the pending idle callback when its cleanup runs', () => {
+        window.requestIdleCallback = vi.fn(() => 7);
+        window.cancelIdleCallback = vi.fn();
+
+        const cancelPrefetch = scheduleEditorPrefetch();
+        cancelPrefetch();
+
+        expect(window.cancelIdleCallback).toHaveBeenCalledWith(7);
+    });
+
+    it('does nothing when Data Saver is on', () => {
+        window.requestIdleCallback = vi.fn();
+        Object.defineProperty(navigator, 'connection', {
+            value: { saveData: true },
+            configurable: true,
+        });
+
+        scheduleEditorPrefetch();
+
+        expect(window.requestIdleCallback).not.toHaveBeenCalled();
+    });
+
+    it('falls back to a two second timer where requestIdleCallback does not exist, as in Safari', () => {
+        const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+        const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+
+        const cancelPrefetch = scheduleEditorPrefetch();
+        expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
+
+        cancelPrefetch();
+        expect(clearTimeoutSpy).toHaveBeenCalled();
     });
 });

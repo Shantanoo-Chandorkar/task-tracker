@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
     parseTaskFilters,
     filtersToSearchString,
@@ -15,7 +15,6 @@ import {
  * @returns {{filters: object, toggleFilter: Function, applyFilters: Function, clearAll: Function, activeCount: number}}
  */
 export function useTaskFilters() {
-    const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
     // Rebuilt from the string, not searchParams itself, so filters stays referentially stable per URL.
@@ -28,9 +27,10 @@ export function useTaskFilters() {
     const applyFilters = useCallback(
         (nextFilters) => {
             const search = filtersToSearchString(nextFilters);
-            router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
+            // Not router.replace: that re-runs the whole server page on every apply, though filtering is client-side
+            window.history.replaceState(null, '', search ? `${pathname}?${search}` : pathname);
         },
-        [router, pathname],
+        [pathname],
     );
 
     const toggleFilter = useCallback(
