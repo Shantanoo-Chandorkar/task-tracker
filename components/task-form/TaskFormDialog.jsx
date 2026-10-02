@@ -28,6 +28,7 @@ import { Loader } from '@/components/ui/loader';
 import EditorErrorBoundary from '@/components/ui/EditorErrorBoundary';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 10000;
@@ -107,6 +108,7 @@ export default function TaskFormDialog({
             setTitleError('');
             setDueDateError('');
             setFormError('');
+            setSubmitting(false);
         }
     }
 
@@ -116,6 +118,7 @@ export default function TaskFormDialog({
 
     async function handleSubmit(event) {
         event.preventDefault();
+        if (submitting) return;
 
         if (!title.trim()) {
             setTitleError('Title is required');
@@ -149,9 +152,12 @@ export default function TaskFormDialog({
         };
 
         try {
-            const { error, code, tagErrors } = isEditing
-                ? await updateTask(task.id, fields)
-                : await createTaskWithTags(fields);
+            const {
+                data: savedTask,
+                error,
+                code,
+                tagErrors,
+            } = isEditing ? await updateTask(task.id, fields) : await createTaskWithTags(fields);
 
             if (error) {
                 if (code === TASK_DUE_DATE_REQUIRED) {
@@ -160,6 +166,7 @@ export default function TaskFormDialog({
                     setFormError(error);
                 }
                 toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
+                setSubmitting(false);
                 return;
             }
 
@@ -167,9 +174,18 @@ export default function TaskFormDialog({
             if (tagErrors?.length) {
                 toast.info(`Task saved, but couldn't add: ${tagErrors.join(', ')}`);
             }
+            // No unlock on success: the dialog stays on screen while it animates out, and the next open resets it.
             onClose();
+            const taskListId = listId ?? task?.list_id;
+            if (savedTask) {
+                queryClient.setQueryData(['tasks', taskListId], (cachedTasks) =>
+                    withSavedRow(cachedTasks, withStatusDisplay(savedTask, statuses), isEditing, {
+                        tags: [],
+                    }),
+                );
+            }
             // Not awaited - the dialog closes immediately instead of blocking on this refetch.
-            queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
+            queryClient.invalidateQueries({ queryKey: ['tasks', taskListId] });
             // A new task changes the list's total count - the sidebar's ['lists'] query needs telling.
             if (!isEditing) queryClient.invalidateQueries({ queryKey: ['lists'] });
             bustPageCache({ urls: [`/lists/${listId ?? task?.list_id}`] });
@@ -178,7 +194,6 @@ export default function TaskFormDialog({
             const message = 'Could not save. Check your connection and try again.';
             setFormError(message);
             toast.error(message);
-        } finally {
             setSubmitting(false);
         }
     }
@@ -187,6 +202,7 @@ export default function TaskFormDialog({
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit Task' : 'New Task'}
             contentClassName="sm:max-w-3xl"
             footer={
@@ -201,7 +217,13 @@ export default function TaskFormDialog({
                 </>
             }
         >
-            <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2 min-w-0">
+            {/* inert locks every field at once while saving, so nothing can be edited under an in-flight write */}
+            <form
+                id={formId}
+                onSubmit={handleSubmit}
+                inert={submitting}
+                className="space-y-4 mt-2 min-w-0"
+            >
                 {/* Title */}
                 <CharLimitField
                     label="Task title"

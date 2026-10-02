@@ -30,6 +30,7 @@ export default function StatusFormDialog({ open, onClose, status = null, spaceId
             update: updateStatus,
             buildFields: () => ({ space_id: spaceId }),
             invalidateQueryKey: ['statuses', spaceId],
+            createdRowDefaults: {},
             bustCache: () => ({ prefixes: ['/lists/'] }),
             onClose,
         });
@@ -38,6 +39,7 @@ export default function StatusFormDialog({ open, onClose, status = null, spaceId
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit Status' : 'New Status'}
             footer={
                 <>

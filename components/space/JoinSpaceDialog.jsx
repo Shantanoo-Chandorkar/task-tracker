@@ -31,11 +31,13 @@ export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) 
         if (open) {
             setSpaceId(initialSpaceId);
             setError('');
+            setSubmitting(false);
         }
     }
 
     async function handleSubmit(event) {
         event.preventDefault();
+        if (submitting) return;
         setSubmitting(true);
         setError('');
 
@@ -47,13 +49,14 @@ export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) 
             setError('Could not reach the server. Check your connection and try again.');
             return;
         }
-        setSubmitting(false);
 
         if (joinResult.error) {
+            setSubmitting(false);
             setError(joinResult.error);
             return;
         }
 
+        // No unlock on success: the dialog stays on screen while it animates out, and the next open resets it.
         toast.success('Request sent - the owner will be notified.');
         onClose();
     }
@@ -62,6 +65,7 @@ export default function JoinSpaceDialog({ open, onClose, initialSpaceId = '' }) 
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title="Join a space"
             footer={
                 <>

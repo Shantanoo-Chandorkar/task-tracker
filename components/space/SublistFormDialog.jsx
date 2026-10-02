@@ -53,6 +53,7 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
             update: updateSublist,
             buildFields: () => ({ list_id: targetListId }),
             invalidateQueryKey: ['sublists', targetListId],
+            createdRowDefaults: { task_count: 0 },
             bustCache: () => ({ urls: [`/lists/${targetListId}`] }),
             onReset: () => setSelectedListId(''),
             onClose,
@@ -62,6 +63,7 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit Sublist' : 'New Sublist'}
             footer={
                 <>

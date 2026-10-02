@@ -44,6 +44,7 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
             update: updateList,
             buildFields: () => ({ space_id: spaceId }),
             invalidateQueryKey: ['lists'],
+            createdRowDefaults: { task_count: 0 },
             bustCache: () => ({ urls: ['/spaces', ...(list ? [`/lists/${list.id}`] : [])] }),
             onClose,
         });
@@ -52,6 +53,7 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit List' : 'New List'}
             footer={
                 <>

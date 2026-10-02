@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { withSavedRow } from '@/lib/query-cache';
 
 /**
  * Shared name/color create-or-edit form state for the near-identical Space/List/Sublist/Status dialogs.
@@ -15,7 +16,8 @@ import { bustPageCache } from '@/lib/service-worker-cache';
  * @param {Function} config.create - async (fields) => { error } - called in create mode
  * @param {Function} config.update - async (id, fields) => { error } - called in edit mode
  * @param {Function} [config.buildFields] - () => object, extra fields merged in on submit
- * @param {string[]} config.invalidateQueryKey - Query key to invalidate on success
+ * @param {string[]} config.invalidateQueryKey - Query key whose cached rows are updated, then refetched later
+ * @param {object} [config.createdRowDefaults] - Cache-only fields a new row needs (e.g. task_count); omit to skip
  * @param {Function} [config.bustCache] - () => {urls?, prefixes?} of pages to evict on success
  * @param {Function} config.onClose - Called after a successful submit
  * @returns {{
@@ -35,11 +37,14 @@ export function useColorNameForm({
     update,
     buildFields = () => ({}),
     invalidateQueryKey,
+    createdRowDefaults,
     bustCache,
     onClose,
 }) {
     const queryClient = useQueryClient();
-    const isEditing = Boolean(entity);
+    // Parents clear `entity` the moment they close, while the dialog is still fading out, so mode is fixed at open.
+    const [openedEntity, setOpenedEntity] = useState(entity);
+    const isEditing = Boolean(openedEntity);
 
     const [name, setName] = useState('');
     const [color, setColor] = useState('#6b7280');
@@ -51,6 +56,8 @@ export function useColorNameForm({
     if (resetKey !== lastResetKey) {
         setLastResetKey(resetKey);
         if (open) {
+            setOpenedEntity(entity);
+            setSubmitting(false);
             setName(entity?.name ?? '');
             setColor(entity?.color ?? '#6b7280');
             setError('');
@@ -67,7 +74,7 @@ export function useColorNameForm({
         setSubmitting(true);
         let submitResult;
         try {
-            submitResult = isEditing ? await update(entity.id, fields) : await create(fields);
+            submitResult = isEditing ? await update(openedEntity.id, fields) : await create(fields);
         } catch {
             setSubmitting(false);
             setError('Could not reach the server. Check your connection and try again.');
@@ -80,11 +87,17 @@ export function useColorNameForm({
             return;
         }
 
-        // Stays locked through the refetch, or a second click in that window would create a duplicate.
-        await queryClient.invalidateQueries({ queryKey: invalidateQueryKey });
+        // No unlock on success: the dialog stays on screen while it animates out, and the next open resets the form.
+        const savedRow = submitResult.data;
+        if (savedRow) {
+            queryClient.setQueryData(invalidateQueryKey, (cachedRows) =>
+                withSavedRow(cachedRows, savedRow, isEditing, createdRowDefaults),
+            );
+        }
+        // Not awaited: the server already confirmed, so the dialog must not wait for a refetch round trip.
+        queryClient.invalidateQueries({ queryKey: invalidateQueryKey });
         if (bustCache) bustPageCache(bustCache());
         onClose();
-        setSubmitting(false);
     }
 
     return { isEditing, name, setName, color, setColor, submitting, error, handleSubmit };

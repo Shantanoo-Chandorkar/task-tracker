@@ -28,6 +28,7 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
             create: createSpace,
             update: updateSpace,
             invalidateQueryKey: ['spaces'],
+            createdRowDefaults: { my_permission_level: 'owner' },
             bustCache: () => ({ urls: ['/spaces'], prefixes: ['/lists/'] }),
             onClose,
         });
@@ -36,6 +37,7 @@ export default function SpaceFormDialog({ open, onClose, space = null }) {
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit Space' : 'New Space'}
             footer={
                 <>
