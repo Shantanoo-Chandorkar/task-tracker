@@ -31,8 +31,7 @@ vi.mock('sonner', () => ({
     },
 }));
 
-function renderCompletionHook() {
-    const queryClient = new QueryClient();
+function renderCompletionHook(queryClient = new QueryClient()) {
     vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue();
     const wrapper = ({ children }) => (
         <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -113,5 +112,22 @@ describe('useTaskCompletion', () => {
             'You cannot complete these',
         );
         expect(completionHook.current.completeDialogProps.isPending).toBe(false);
+    });
+
+    it('shows the new status as soon as the server confirms, without waiting for the reload', async () => {
+        const queryClient = new QueryClient();
+        const task = { id: 'task-patch-1', status_id: 'todo', title: 'Write' };
+        queryClient.setQueryData(['tasks', 'list-1'], [task]);
+        const completionHook = renderCompletionHook(queryClient);
+        queryClient.invalidateQueries.mockReturnValue(new Promise(() => {}));
+        updateTask.mockResolvedValue({
+            data: { id: 'task-patch-1', status_id: 'done' },
+            error: null,
+        });
+
+        await act(() => completionHook.current.setComplete(task, [task], 'list-1', true));
+
+        const cachedTask = queryClient.getQueryData(['tasks', 'list-1'])[0];
+        expect(cachedTask).toMatchObject({ id: 'task-patch-1', status_id: 'done', title: 'Write' });
     });
 });

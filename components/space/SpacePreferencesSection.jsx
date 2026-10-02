@@ -50,6 +50,11 @@ export default function SpacePreferencesSection({ spaceId, isOwner }) {
         }
     }
 
+    function restoreCapFromServer() {
+        setCapEnabled(currentCap !== null);
+        setCapValue(currentCap?.toString() ?? '');
+    }
+
     async function commitCap(nextMaxSubtasks) {
         setCapPending(true);
         try {
@@ -57,6 +62,7 @@ export default function SpacePreferencesSection({ spaceId, isOwner }) {
                 max_subtasks_per_parent: nextMaxSubtasks,
             });
             if (result.error) {
+                restoreCapFromServer();
                 toast.error(result.error);
                 return;
             }
@@ -67,6 +73,7 @@ export default function SpacePreferencesSection({ spaceId, isOwner }) {
                     : 'Subtask limit removed',
             );
         } catch {
+            restoreCapFromServer();
             toast.error('Could not reach the server. Try again.');
         } finally {
             setCapPending(false);

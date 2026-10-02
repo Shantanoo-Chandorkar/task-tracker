@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { toast } from 'sonner';
+import { runExclusively } from '@/lib/in-flight-entities';
 import { retryWebhookDelivery } from '@/actions/webhook-actions';
 import { useWebhookDeliveriesQuery } from '@/hooks/useWebhookDeliveriesQuery';
 import { Badge } from '@/components/ui/badge';
@@ -84,24 +85,32 @@ function DeliveryRow({ delivery, onRetry, isRetrying }) {
  */
 export default function WebhookDeliveryLog({ endpointId }) {
     const queryClient = useQueryClient();
-    const [retryingDeliveryId, setRetryingDeliveryId] = useState(null);
+    const [retryingDeliveryIds, setRetryingDeliveryIds] = useState(() => new Set());
     const { data: deliveries = [], isLoading, isError } = useWebhookDeliveriesQuery(endpointId);
 
-    async function handleRetry(deliveryId) {
-        setRetryingDeliveryId(deliveryId);
-        try {
-            const retryResult = await retryWebhookDelivery(deliveryId);
-            if (retryResult.error) {
-                toast.error(retryResult.error);
-                return;
+    function handleRetry(deliveryId) {
+        return runExclusively(`webhook-retry:${deliveryId}`, async () => {
+            setRetryingDeliveryIds((current) => new Set(current).add(deliveryId));
+            try {
+                const retryResult = await retryWebhookDelivery(deliveryId);
+                if (retryResult.error) {
+                    toast.error(retryResult.error);
+                    return;
+                }
+                toast.success('Queued for another try');
+                await queryClient.invalidateQueries({
+                    queryKey: ['webhook-deliveries', endpointId],
+                });
+            } catch {
+                toast.error('Could not reach the server. Try again.');
+            } finally {
+                setRetryingDeliveryIds((current) => {
+                    const remaining = new Set(current);
+                    remaining.delete(deliveryId);
+                    return remaining;
+                });
             }
-            toast.success('Queued for another try');
-            await queryClient.invalidateQueries({ queryKey: ['webhook-deliveries', endpointId] });
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-        } finally {
-            setRetryingDeliveryId(null);
-        }
+        });
     }
 
     if (isLoading)
@@ -131,7 +140,7 @@ export default function WebhookDeliveryLog({ endpointId }) {
                     key={delivery.id}
                     delivery={delivery}
                     onRetry={handleRetry}
-                    isRetrying={retryingDeliveryId === delivery.id}
+                    isRetrying={retryingDeliveryIds.has(delivery.id)}
                 />
             ))}
         </ul>

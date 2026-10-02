@@ -13,6 +13,7 @@ import {
 } from '@/actions/task-actions';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
+import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 /**
@@ -81,9 +82,9 @@ export function useTaskCompletion(listId) {
             );
 
             try {
-                let error;
+                let saveResult;
                 try {
-                    ({ error } = await updateTask(task.id, { status_id: targetStatus.id }));
+                    saveResult = await updateTask(task.id, { status_id: targetStatus.id });
                 } catch {
                     toast.error(
                         'Could not reach the server. Check your connection and try again.',
@@ -92,19 +93,36 @@ export function useTaskCompletion(listId) {
                     return;
                 }
 
-                if (error) {
-                    toast.error(error, { id: toastId });
+                if (saveResult.error) {
+                    toast.error(saveResult.error, { id: toastId });
                     return;
                 }
 
-                await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                // The checkbox flips as soon as the server confirms; the reload only reconciles in the background.
+                if (saveResult.data) {
+                    queryClient.setQueryData(['tasks', listId], (cachedTasks) =>
+                        withSavedRow(
+                            cachedTasks,
+                            withStatusDisplay(saveResult.data, statuses),
+                            true,
+                        ),
+                    );
+                }
+                queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
                 bustPageCache({ urls: [`/lists/${listId}`] });
                 toast.dismiss(toastId);
             } finally {
                 releaseInFlight();
             }
         },
-        [doneStatus, defaultStatus, getIncompleteDescendants, getCompletedDescendants, queryClient],
+        [
+            doneStatus,
+            defaultStatus,
+            statuses,
+            getIncompleteDescendants,
+            getCompletedDescendants,
+            queryClient,
+        ],
     );
 
     const closeConfirm = useCallback(() => setConfirmState(null), []);
