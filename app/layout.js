@@ -74,8 +74,11 @@ export default async function RootLayout({ children }) {
                     <UIStateProvider>{children}</UIStateProvider>
                 </QueryProvider>
                 {/* Mobile offset matches the app layout's 5rem bottom padding, so toasts clear the nav and FAB. */}
+                {/* Errors are often the only failure feedback, so toasts outlive the 4s default; hover pauses them */}
                 <Toaster
                     richColors
+                    duration={10000}
+                    closeButton
                     position="bottom-right"
                     mobileOffset={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
                 />

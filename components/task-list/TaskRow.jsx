@@ -20,12 +20,32 @@ import { useTaskPriority } from '@/hooks/useTaskPriority';
 import { isStartOfUnprioritisedTier } from '@/lib/tree';
 
 /**
- * Plain line between the prioritised and unprioritised tier; the star icons carry the meaning, so no label.
+ * Plain line between the prioritised and unprioritised tier, named so it is not an anonymous separator.
  *
  * @returns {JSX.Element}
  */
 export function PriorityTierDivider() {
-    return <div role="separator" className="my-1.5 h-px bg-foreground/20" />;
+    return (
+        <div
+            role="separator"
+            aria-label="Prioritised tasks above, other tasks below"
+            className="my-1.5 h-px bg-foreground/20"
+        />
+    );
+}
+
+/**
+ * Short amber bar beside the title of a prioritised row below `lg`, where the star button is hidden.
+ * Sits in the gap before the title column, so it shifts nothing; desktop keeps the star.
+ *
+ * @returns {JSX.Element}
+ */
+export function PriorityLine() {
+    return (
+        <div className="pointer-events-none absolute -left-1.5 top-1 h-4 w-[3px] rounded-full bg-amber-400 lg:hidden">
+            <span className="sr-only">Prioritised</span>
+        </div>
+    );
 }
 
 /**
@@ -144,12 +164,21 @@ function TaskRow({
                     >
                         {hasChildren ? (
                             isExpanded ? (
-                                <ChevronDown className="h-3 w-3 motion-safe:transition-transform duration-200" />
+                                <ChevronDown
+                                    aria-hidden="true"
+                                    className="h-3 w-3 motion-safe:transition-transform duration-200"
+                                />
                             ) : (
-                                <ChevronRight className="h-3 w-3 motion-safe:transition-transform duration-200" />
+                                <ChevronRight
+                                    aria-hidden="true"
+                                    className="h-3 w-3 motion-safe:transition-transform duration-200"
+                                />
                             )
                         ) : (
-                            <Circle className="h-1.5 w-1.5 text-muted-foreground/40" />
+                            <Circle
+                                aria-hidden="true"
+                                className="h-1.5 w-1.5 text-muted-foreground/40"
+                            />
                         )}
                     </button>
 
@@ -176,7 +205,8 @@ function TaskRow({
                 </div>
 
                 {/* Two lines: title + actions, then metadata - so pills can never squeeze the title */}
-                <div data-row-space className="flex min-w-0 flex-1 flex-col gap-1">
+                <div data-row-space className="relative flex min-w-0 flex-1 flex-col gap-1">
+                    {task.is_prioritised && <PriorityLine />}
                     <div data-row-space className="flex items-center gap-1.5">
                         {/* No onClick here: the row's handler already toggles, a second one would cancel it out */}
                         <span
