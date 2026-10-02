@@ -60,6 +60,25 @@ describe('useDuplicateTask', () => {
         });
     });
 
+    it('ignores a repeat coming from a different hook instance, like menu then shortcut', async () => {
+        let finishDuplicate;
+        duplicateTask.mockReturnValue(new Promise((resolve) => (finishDuplicate = resolve)));
+        const { duplicateHook: menuHook } = renderDuplicateHook();
+        const { duplicateHook: shortcutHook } = renderDuplicateHook();
+
+        let firstCall;
+        act(() => {
+            firstCall = menuHook.current.duplicateTaskById('task-1');
+            shortcutHook.current.duplicateTaskById('task-1');
+        });
+        expect(duplicateTask).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            finishDuplicate({ error: null });
+            await firstCall;
+        });
+    });
+
     it('shows the server error and refreshes nothing', async () => {
         duplicateTask.mockResolvedValue({ error: 'Task limit reached' });
         const { duplicateHook, invalidateQueries } = renderDuplicateHook();

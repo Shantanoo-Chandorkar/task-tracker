@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { duplicateTask } from '@/actions/task-actions';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { claimInFlight } from '@/lib/in-flight-entities';
 
 /**
  * Duplicates a task with toast feedback, for both the row menu and the Ctrl/Cmd+D shortcut.
@@ -14,13 +15,11 @@ import { bustPageCache } from '@/lib/service-worker-cache';
  */
 export function useDuplicateTask(listId) {
     const queryClient = useQueryClient();
-    // Blocks a repeat while a copy is in flight, so mashing the shortcut cannot create several copies
-    const duplicatingTaskIds = useRef(new Set());
-
     const duplicateTaskById = useCallback(
         async (taskId) => {
-            if (duplicatingTaskIds.current.has(taskId)) return;
-            duplicatingTaskIds.current.add(taskId);
+            // Shared across menu and shortcut instances, so mashing either cannot create several copies
+            const releaseInFlight = claimInFlight(`task-duplicate:${taskId}`);
+            if (!releaseInFlight) return;
             const toastId = toast.loading('Duplicating task...');
 
             try {
@@ -49,7 +48,7 @@ export function useDuplicateTask(listId) {
                 bustPageCache({ urls: [`/lists/${listId}`] });
                 toast.success('Task duplicated', { id: toastId });
             } finally {
-                duplicatingTaskIds.current.delete(taskId);
+                releaseInFlight();
             }
         },
         [queryClient, listId],
