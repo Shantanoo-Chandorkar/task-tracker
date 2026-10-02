@@ -9,6 +9,9 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { claimForDuration } from '@/lib/in-flight-entities';
+
+const EXPORT_COOLDOWN_MS = 10000;
 
 /**
  * Reusable export trigger - drop anywhere with a `scope` describing what to export, and it
@@ -24,7 +27,12 @@ import { toast } from 'sonner';
  *   'menu-items': bare items to compose inside an existing DropdownMenuContent.
  */
 export default function ExportMenu({ scope, variant = 'icon' }) {
-    const handleExportClick = () => {
+    const handleExportClick = (clickEvent, format) => {
+        // A repeat click would start the same heavy download again
+        if (!claimForDuration(`export:${scope.type}:${scope.id}:${format}`, EXPORT_COOLDOWN_MS)) {
+            clickEvent.preventDefault();
+            return;
+        }
         toast.success('Export downloading in the background, you can keep browsing.');
     };
 
@@ -34,7 +42,7 @@ export default function ExportMenu({ scope, variant = 'icon' }) {
                 <a
                     href={`/api/export?type=${scope.type}&id=${scope.id}&format=csv`}
                     download
-                    onClick={handleExportClick}
+                    onClick={(clickEvent) => handleExportClick(clickEvent, 'csv')}
                 >
                     Export as CSV
                 </a>
@@ -43,7 +51,7 @@ export default function ExportMenu({ scope, variant = 'icon' }) {
                 <a
                     href={`/api/export?type=${scope.type}&id=${scope.id}&format=json`}
                     download
-                    onClick={handleExportClick}
+                    onClick={(clickEvent) => handleExportClick(clickEvent, 'json')}
                 >
                     Export as JSON
                 </a>

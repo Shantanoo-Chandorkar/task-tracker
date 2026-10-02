@@ -42,6 +42,7 @@ import SpaceSettingsSheet from './SpaceSettingsSheet';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { removeRowFromCache } from '@/lib/query-cache';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
+import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { countSpaceContents } from '@/lib/delete-counts';
 
@@ -387,40 +388,51 @@ export default function SpaceListManager({
     async function handleDragEnd({ active, over }) {
         if (!over || active.id === over.id) return;
         const type = active.data.current?.type;
-        const toastId = toast.loading('Saving order...');
-        let persistError;
+        return runExclusively(
+            'reorder:spaces-and-lists',
+            async () => {
+                // A reload still in flight would overwrite the new order, so stop it first
+                await queryClient.cancelQueries({ queryKey: ['spaces'] });
+                await queryClient.cancelQueries({ queryKey: ['lists'] });
+                const toastId = toast.loading('Saving order...');
+                let persistError;
 
-        if (type === 'space') {
-            const oldIndex = ownedSpaces.findIndex((space) => space.id === active.id);
-            const newIndex = ownedSpaces.findIndex((space) => space.id === over.id);
-            if (oldIndex === -1 || newIndex === -1) {
-                toast.dismiss(toastId);
-                return;
-            }
+                if (type === 'space') {
+                    const oldIndex = ownedSpaces.findIndex((space) => space.id === active.id);
+                    const newIndex = ownedSpaces.findIndex((space) => space.id === over.id);
+                    if (oldIndex === -1 || newIndex === -1) {
+                        toast.dismiss(toastId);
+                        return;
+                    }
 
-            const reorderedOwned = arrayMove(ownedSpaces, oldIndex, newIndex);
-            queryClient.setQueryData(['spaces'], [...reorderedOwned, ...sharedSpaces]);
-            persistError = await persistPositions(reorderedOwned, updateSpace);
-        } else if (type === 'list') {
-            const spaceId = active.data.current.spaceId;
-            const spaceLists = lists.filter((list) => list.space_id === spaceId);
-            const oldIndex = spaceLists.findIndex((list) => list.id === active.id);
-            const newIndex = spaceLists.findIndex((list) => list.id === over.id);
-            if (oldIndex === -1 || newIndex === -1) {
-                toast.dismiss(toastId);
-                return;
-            }
+                    const reorderedOwned = arrayMove(ownedSpaces, oldIndex, newIndex);
+                    queryClient.setQueryData(['spaces'], [...reorderedOwned, ...sharedSpaces]);
+                    persistError = await persistPositions(reorderedOwned, updateSpace);
+                } else if (type === 'list') {
+                    const spaceId = active.data.current.spaceId;
+                    const spaceLists = lists.filter((list) => list.space_id === spaceId);
+                    const oldIndex = spaceLists.findIndex((list) => list.id === active.id);
+                    const newIndex = spaceLists.findIndex((list) => list.id === over.id);
+                    if (oldIndex === -1 || newIndex === -1) {
+                        toast.dismiss(toastId);
+                        return;
+                    }
 
-            const reorderedSpaceLists = arrayMove(spaceLists, oldIndex, newIndex);
-            const otherLists = lists.filter((list) => list.space_id !== spaceId);
-            queryClient.setQueryData(['lists'], [...otherLists, ...reorderedSpaceLists]);
-            persistError = await persistPositions(reorderedSpaceLists, updateList);
-        } else {
-            toast.dismiss(toastId);
-            return;
-        }
+                    const reorderedSpaceLists = arrayMove(spaceLists, oldIndex, newIndex);
+                    const otherLists = lists.filter((list) => list.space_id !== spaceId);
+                    queryClient.setQueryData(['lists'], [...otherLists, ...reorderedSpaceLists]);
+                    persistError = await persistPositions(reorderedSpaceLists, updateList);
+                } else {
+                    toast.dismiss(toastId);
+                    return;
+                }
 
-        toast[persistError ? 'error' : 'success'](persistError ?? 'Order saved', { id: toastId });
+                toast[persistError ? 'error' : 'success'](persistError ?? 'Order saved', {
+                    id: toastId,
+                });
+            },
+            () => toast.info(REORDER_BUSY_MESSAGE),
+        );
     }
 
     function requestDeleteSpace(space) {

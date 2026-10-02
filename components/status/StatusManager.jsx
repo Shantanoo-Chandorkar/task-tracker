@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
+import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import {
@@ -149,40 +150,48 @@ export default function StatusManager({ spaceId, initialStatuses }) {
         const newIndex = statuses.findIndex((status) => status.id === over.id);
         // The list can change mid-drag (refetch), leaving an id missing and arrayMove with a -1 index.
         if (oldIndex < 0 || newIndex < 0) return;
-        const reordered = arrayMove(statuses, oldIndex, newIndex);
+        return runExclusively(
+            `reorder:statuses:${spaceId}`,
+            async () => {
+                // A reload still in flight would overwrite the new order, so stop it first
+                await queryClient.cancelQueries({ queryKey: ['statuses', spaceId] });
+                const reordered = arrayMove(statuses, oldIndex, newIndex);
 
-        queryClient.setQueryData(['statuses', spaceId], reordered);
+                queryClient.setQueryData(['statuses', spaceId], reordered);
 
-        const toastId = toast.loading('Saving order...');
+                const toastId = toast.loading('Saving order...');
 
-        let results;
-        try {
-            results = await Promise.all(
-                reordered
-                    .map((status, newPosition) => ({ status, newPosition }))
-                    .filter(({ status, newPosition }) => status.position !== newPosition)
-                    .map(({ status, newPosition }) =>
-                        updateStatus(status.id, { position: newPosition }),
-                    ),
-            );
-        } catch {
-            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-            bustPageCache({ prefixes: ['/lists/'] });
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
+                let results;
+                try {
+                    results = await Promise.all(
+                        reordered
+                            .map((status, newPosition) => ({ status, newPosition }))
+                            .filter(({ status, newPosition }) => status.position !== newPosition)
+                            .map(({ status, newPosition }) =>
+                                updateStatus(status.id, { position: newPosition }),
+                            ),
+                    );
+                } catch {
+                    await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+                    bustPageCache({ prefixes: ['/lists/'] });
+                    toast.error('Could not reach the server. Try again.', { id: toastId });
+                    return;
+                }
 
-        const failed = results.find((updateOutcome) => updateOutcome.error);
-        if (failed) {
-            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-            bustPageCache({ prefixes: ['/lists/'] });
-            toast.error(failed.error, { id: toastId });
-            return;
-        }
+                const failed = results.find((updateOutcome) => updateOutcome.error);
+                if (failed) {
+                    await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+                    bustPageCache({ prefixes: ['/lists/'] });
+                    toast.error(failed.error, { id: toastId });
+                    return;
+                }
 
-        await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-        bustPageCache({ prefixes: ['/lists/'] });
-        toast.success('Order saved', { id: toastId });
+                await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+                bustPageCache({ prefixes: ['/lists/'] });
+                toast.success('Order saved', { id: toastId });
+            },
+            () => toast.info(REORDER_BUSY_MESSAGE),
+        );
     }
 
     function handleConfirmDelete() {

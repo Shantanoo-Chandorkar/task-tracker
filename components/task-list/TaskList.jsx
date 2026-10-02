@@ -57,6 +57,7 @@ import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
+import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
@@ -506,53 +507,65 @@ export default function TaskList({
         const isMovingToStart = newIndex === 0;
         const afterSiblingId = oldIndex < newIndex ? over.id : (siblingIds[newIndex - 1] ?? null);
 
-        // Optimistic reorder - lands in the new slot immediately, without waiting on the persist round-trip.
-        const reorderedSiblingIds = arrayMove(siblingIds, oldIndex, newIndex);
-        queryClient.setQueryData(['tasks', listId], (current) => {
-            const currentTasks = current ?? flatList;
-            const tasksById = new Map(currentTasks.map((task) => [task.id, task]));
-            const reorderedSiblings = reorderedSiblingIds.map((taskId) => tasksById.get(taskId));
-            let siblingCursor = 0;
-            return currentTasks.map((task) =>
-                task.parent_id === activeTask.parent_id &&
-                (task.sublist_id ?? null) === (activeTask.sublist_id ?? null)
-                    ? reorderedSiblings[siblingCursor++]
-                    : task,
-            );
-        });
+        return runExclusively(
+            `reorder:tasks:${listId}`,
+            async () => {
+                // A reload still in flight would overwrite the new order, so stop it first
+                await queryClient.cancelQueries({ queryKey: ['tasks', listId] });
+                // Optimistic reorder - lands in the new slot immediately, without waiting on the persist round-trip.
+                const reorderedSiblingIds = arrayMove(siblingIds, oldIndex, newIndex);
+                queryClient.setQueryData(['tasks', listId], (current) => {
+                    const currentTasks = current ?? flatList;
+                    const tasksById = new Map(currentTasks.map((task) => [task.id, task]));
+                    const reorderedSiblings = reorderedSiblingIds.map((taskId) =>
+                        tasksById.get(taskId),
+                    );
+                    let siblingCursor = 0;
+                    return currentTasks.map((task) =>
+                        task.parent_id === activeTask.parent_id &&
+                        (task.sublist_id ?? null) === (activeTask.sublist_id ?? null)
+                            ? reorderedSiblings[siblingCursor++]
+                            : task,
+                    );
+                });
 
-        const toastId = toast.loading('Saving order...');
+                const toastId = toast.loading('Saving order...');
 
-        try {
-            const response = await fetch(`/api/tasks/${active.id}/move`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    newParentId: activeTask.parent_id ?? null,
-                    sublistId: activeTask.parent_id ? undefined : (activeTask.sublist_id ?? null),
-                    afterSiblingId,
-                    shouldPrependToStart: isMovingToStart,
-                    listId,
-                }),
-            });
+                try {
+                    const response = await fetch(`/api/tasks/${active.id}/move`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            newParentId: activeTask.parent_id ?? null,
+                            sublistId: activeTask.parent_id
+                                ? undefined
+                                : (activeTask.sublist_id ?? null),
+                            afterSiblingId,
+                            shouldPrependToStart: isMovingToStart,
+                            listId,
+                        }),
+                    });
 
-            if (!response.ok) {
-                console.error('Drag reorder failed');
-                toast.error('Failed to reorder task', { id: toastId });
-                await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-                bustThisListPage();
-                return;
-            }
+                    if (!response.ok) {
+                        console.error('Drag reorder failed');
+                        toast.error('Failed to reorder task', { id: toastId });
+                        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                        bustThisListPage();
+                        return;
+                    }
 
-            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-            bustThisListPage();
-            toast.success('Order updated', { id: toastId });
-        } catch (caughtError) {
-            console.error('Drag reorder failed:', caughtError);
-            toast.error('Failed to reorder task', { id: toastId });
-            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-            bustThisListPage();
-        }
+                    await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                    bustThisListPage();
+                    toast.success('Order updated', { id: toastId });
+                } catch (caughtError) {
+                    console.error('Drag reorder failed:', caughtError);
+                    toast.error('Failed to reorder task', { id: toastId });
+                    await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                    bustThisListPage();
+                }
+            },
+            () => toast.info(REORDER_BUSY_MESSAGE),
+        );
     }
 
     async function handleSublistDragEnd({ active, over }) {
@@ -560,35 +573,42 @@ export default function TaskList({
         const newIndex = sublists.findIndex((sublist) => sublist.id === over.id);
         if (oldIndex === -1 || newIndex === -1) return;
 
-        const reordered = arrayMove(sublists, oldIndex, newIndex);
-        queryClient.setQueryData(['sublists', listId], reordered);
+        return runExclusively(
+            `reorder:sublists:${listId}`,
+            async () => {
+                await queryClient.cancelQueries({ queryKey: ['sublists', listId] });
+                const reordered = arrayMove(sublists, oldIndex, newIndex);
+                queryClient.setQueryData(['sublists', listId], reordered);
 
-        const toastId = toast.loading('Saving order...');
-        try {
-            const results = await Promise.all(
-                reordered
-                    .map((sublist, newPosition) => ({ sublist, newPosition }))
-                    .filter(({ sublist, newPosition }) => sublist.position !== newPosition)
-                    .map(({ sublist, newPosition }) =>
-                        updateSublist(sublist.id, { position: newPosition }),
-                    ),
-            );
-            const failed = results.find((updateOutcome) => updateOutcome.error);
-            if (failed) {
-                toast.error(failed.error, { id: toastId });
-                await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-                bustThisListPage();
-                return;
-            }
-            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-            bustThisListPage();
-            toast.success('Order updated', { id: toastId });
-        } catch (caughtError) {
-            console.error('Sublist reorder failed:', caughtError);
-            toast.error('Failed to reorder sublist', { id: toastId });
-            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-            bustThisListPage();
-        }
+                const toastId = toast.loading('Saving order...');
+                try {
+                    const results = await Promise.all(
+                        reordered
+                            .map((sublist, newPosition) => ({ sublist, newPosition }))
+                            .filter(({ sublist, newPosition }) => sublist.position !== newPosition)
+                            .map(({ sublist, newPosition }) =>
+                                updateSublist(sublist.id, { position: newPosition }),
+                            ),
+                    );
+                    const failed = results.find((updateOutcome) => updateOutcome.error);
+                    if (failed) {
+                        toast.error(failed.error, { id: toastId });
+                        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                        bustThisListPage();
+                        return;
+                    }
+                    await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                    bustThisListPage();
+                    toast.success('Order updated', { id: toastId });
+                } catch (caughtError) {
+                    console.error('Sublist reorder failed:', caughtError);
+                    toast.error('Failed to reorder sublist', { id: toastId });
+                    await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                    bustThisListPage();
+                }
+            },
+            () => toast.info(REORDER_BUSY_MESSAGE),
+        );
     }
 
     function handleDragEnd({ active, over }) {
