@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 const THIRTY_SECONDS_MS = 30 * 1000;
 
@@ -15,11 +16,7 @@ const THIRTY_SECONDS_MS = 30 * 1000;
 export function useHomeQuery({ initialData, ...queryOptions } = {}) {
     return useQuery({
         queryKey: ['home'],
-        queryFn: async () => {
-            const response = await fetch('/api/home');
-            if (!response.ok) throw new Error('Failed to fetch home');
-            return response.json();
-        },
+        queryFn: ({ signal }) => fetchJson('/api/home', { signal }),
         staleTime: THIRTY_SECONDS_MS,
         initialData,
         // The service worker can serve a days-old page, so the age comes from the data, not from the page load

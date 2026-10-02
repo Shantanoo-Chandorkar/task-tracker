@@ -26,16 +26,20 @@ export default function ListHeader({ listId, initialSpaces, initialLists, childr
 
     return (
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
+            <div className="min-w-0">
                 {currentSpace && (
-                    <p className="text-xs text-muted-foreground">{currentSpace.name}</p>
+                    <p className="text-xs text-muted-foreground min-w-0 [overflow-wrap:anywhere]">
+                        {currentSpace.name}
+                    </p>
                 )}
                 <div className="mt-1 flex items-center gap-2">
                     <span
                         className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                         style={{ backgroundColor: currentList.color || 'var(--primary)' }}
                     />
-                    <h1 className="text-lg font-semibold text-foreground">{currentList.name}</h1>
+                    <h1 className="text-lg font-semibold text-foreground min-w-0 [overflow-wrap:anywhere]">
+                        {currentList.name}
+                    </h1>
                     <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                         {currentList.task_count ?? 0} tasks
                     </span>

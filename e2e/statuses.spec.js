@@ -28,7 +28,10 @@ test.describe('statuses', () => {
         const statusName = await createStatus(page, sheet);
         const newName = uniqueName('Renamed status');
 
-        await statusRow(sheet, statusName).getByRole('button', { name: 'Edit status' }).click();
+        await statusRow(sheet, statusName)
+            .getByRole('button', { name: `More actions for ${statusName}`, exact: true })
+            .click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
         const form = statusFormDialog(page);
         await form.getByPlaceholder('Status name').fill(newName);
         await form.getByRole('button', { name: 'Save changes' }).click();
@@ -58,18 +61,24 @@ test.describe('statuses', () => {
     // All 3 seeded statuses are built-in/undeletable, so isOnly is unreachable via UI - not tested here.
     test('the default status cannot be deleted', async ({ page }) => {
         const sheet = await openStatusSettings(page, spaceName);
-        // Disabled, so its title (and accessible name) is the reason, not "Delete status".
-        const deleteButton = statusRow(sheet, 'To Do').getByRole('button', {
+        // A disabled menu item shows the reason as its own text, instead of "Delete".
+        await statusRow(sheet, 'To Do')
+            .getByRole('button', { name: 'More actions for To Do', exact: true })
+            .click();
+        const deleteItem = page.getByRole('menuitem', {
             name: 'Cannot delete the default status',
         });
-        await expect(deleteButton).toBeDisabled();
+        await expect(deleteItem).toHaveAttribute('aria-disabled', 'true');
     });
 
     test('a built-in, non-default status cannot be deleted', async ({ page }) => {
         const sheet = await openStatusSettings(page, spaceName);
-        const deleteButton = statusRow(sheet, 'In Progress').getByRole('button', {
+        await statusRow(sheet, 'In Progress')
+            .getByRole('button', { name: 'More actions for In Progress', exact: true })
+            .click();
+        const deleteItem = page.getByRole('menuitem', {
             name: 'Built-in status - can’t be deleted',
         });
-        await expect(deleteButton).toBeDisabled();
+        await expect(deleteItem).toHaveAttribute('aria-disabled', 'true');
     });
 });

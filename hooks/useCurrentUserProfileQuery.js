@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
@@ -14,11 +15,7 @@ const TEN_MINUTES_MS = 10 * 60 * 1000;
 export function useCurrentUserProfileQuery(extraQueryOptions = {}) {
     return useQuery({
         queryKey: ['profile'],
-        queryFn: async () => {
-            const response = await fetch('/api/profile');
-            if (!response.ok) throw new Error('Failed to fetch profile');
-            return response.json();
-        },
+        queryFn: ({ signal }) => fetchJson('/api/profile', { signal }),
         staleTime: TEN_MINUTES_MS,
         ...extraQueryOptions,
     });

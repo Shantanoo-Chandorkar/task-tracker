@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
+import FormError from '@/components/ui/FormError';
 import PasswordInput from '@/components/auth/PasswordInput';
 import GuestEntryButton from '@/components/auth/GuestEntryButton';
 import { signInAction } from '@/actions/auth-actions';
@@ -30,12 +31,16 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
     const [password, setPassword] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const errorId = useId();
+    // Both fields share one message: the server does not say which of them was wrong
+    const errorFieldProps = error ? { 'aria-invalid': true, 'aria-describedby': errorId } : {};
 
     async function handleSubmit(event) {
         event.preventDefault();
         if (!email.trim() || !password) return;
 
         setSubmitting(true);
+        setError('');
 
         let signInResult;
         try {
@@ -47,16 +52,17 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
             setError('Could not reach the server. Check your connection and try again.');
             return;
         }
-        setSubmitting(false);
 
         if (signInResult.error) {
+            setSubmitting(false);
             setError(signInResult.error);
             return;
         }
 
+        // Stays locked through navigation, or a double click would submit the login twice.
         await clearAllCaches(queryClient);
-        router.push(redirectTo);
-        router.refresh();
+        // replace keeps Back off the login card; no refresh, the action's cookie already refreshed the router.
+        router.replace(redirectTo);
     }
 
     return (
@@ -87,6 +93,8 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
                         onChange={(event) => setEmail(event.target.value)}
                         disabled={submitting}
                         autoFocus
+                        aria-required="true"
+                        {...errorFieldProps}
                     />
                 </div>
 
@@ -108,10 +116,12 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         disabled={submitting}
+                        aria-required="true"
+                        {...errorFieldProps}
                     />
                 </div>
 
-                {error && <p className="text-xs text-destructive">{error}</p>}
+                <FormError errorId={errorId}>{error}</FormError>
 
                 <Button
                     type="submit"

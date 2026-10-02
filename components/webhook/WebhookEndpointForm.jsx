@@ -39,7 +39,7 @@ function CheckboxRow({ label, checked, disabled = false, onChange }) {
  * @param {object} props
  * @param {string} props.spaceId - Space the endpoint belongs to
  * @param {object} [props.endpoint] - Existing endpoint to edit; omit to create
- * @param {Function} props.onSaved - Called with `{ secret }` after a create (secret shown once) or `{}` after an edit
+ * @param {Function} props.onSaved - `{ secret, endpointId }` after create, `{}` after edit; form locks until it settles
  * @param {Function} props.onCancel - Called when the owner backs out
  */
 export default function WebhookEndpointForm({ spaceId, endpoint, onSaved, onCancel }) {
@@ -66,6 +66,7 @@ export default function WebhookEndpointForm({ spaceId, endpoint, onSaved, onCanc
 
     async function handleSubmit(event) {
         event.preventDefault();
+        if (isSaving) return;
         if (!url.trim()) {
             toast.error('Enter the address to send events to');
             return;
@@ -86,7 +87,11 @@ export default function WebhookEndpointForm({ spaceId, endpoint, onSaved, onCanc
                 return;
             }
             toast.success(isEditing ? 'Webhook updated' : 'Webhook created');
-            onSaved({ secret: saveResult.data?.secret });
+            // Awaited so the form stays locked until the parent's refetch finishes.
+            await onSaved({
+                secret: saveResult.data?.secret,
+                endpointId: saveResult.data?.endpoint?.id,
+            });
         } catch {
             toast.error('Could not reach the server. Try again.');
         } finally {
@@ -101,23 +106,29 @@ export default function WebhookEndpointForm({ spaceId, endpoint, onSaved, onCanc
             aria-label={isEditing ? 'Edit webhook' : 'Add webhook'}
         >
             <LabeledField label="Name">
-                <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    maxLength={100}
-                    placeholder="Webhook name"
-                />
+                {({ controlId }) => (
+                    <Input
+                        id={controlId}
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        maxLength={100}
+                        placeholder="Webhook name"
+                    />
+                )}
             </LabeledField>
 
             <LabeledField label="Send events to (https address)">
-                <Input
-                    type="url"
-                    value={url}
-                    onChange={(event) => setUrl(event.target.value)}
-                    maxLength={2048}
-                    placeholder="https://hooks.example.com/..."
-                    autoComplete="off"
-                />
+                {({ controlId }) => (
+                    <Input
+                        id={controlId}
+                        type="url"
+                        value={url}
+                        onChange={(event) => setUrl(event.target.value)}
+                        maxLength={2048}
+                        placeholder="https://hooks.example.com/..."
+                        autoComplete="off"
+                    />
+                )}
             </LabeledField>
 
             <fieldset className="space-y-0.5">

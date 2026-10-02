@@ -4,9 +4,8 @@ import { useId } from 'react';
 import { useColorNameForm } from '@/hooks/useColorNameForm';
 import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
-import CharLimitField from '@/components/ui/CharLimitField';
+import ColorNameField from '@/components/ui/ColorNameField';
 import { createStatus, updateStatus } from '@/actions/status-actions';
 
 const STATUS_NAME_MAX = 50;
@@ -30,6 +29,7 @@ export default function StatusFormDialog({ open, onClose, status = null, spaceId
             update: updateStatus,
             buildFields: () => ({ space_id: spaceId }),
             invalidateQueryKey: ['statuses', spaceId],
+            createdRowDefaults: {},
             bustCache: () => ({ prefixes: ['/lists/'] }),
             onClose,
         });
@@ -38,6 +38,7 @@ export default function StatusFormDialog({ open, onClose, status = null, spaceId
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit Status' : 'New Status'}
             footer={
                 <>
@@ -57,31 +58,16 @@ export default function StatusFormDialog({ open, onClose, status = null, spaceId
             }
         >
             <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
-                <CharLimitField
+                <ColorNameField
                     label="Status name"
-                    currentLength={name.length}
+                    name={name}
+                    onNameChange={setName}
+                    color={color}
+                    onColorChange={setColor}
                     maxLength={STATUS_NAME_MAX}
                     error={error}
-                >
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="color"
-                            value={color}
-                            onChange={(event) => setColor(event.target.value)}
-                            className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
-                            disabled={submitting}
-                        />
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder="Status name"
-                            className="flex-1"
-                            autoFocus
-                            disabled={submitting}
-                            maxLength={STATUS_NAME_MAX}
-                        />
-                    </div>
-                </CharLimitField>
+                    disabled={submitting}
+                />
             </form>
         </ModalShell>
     );

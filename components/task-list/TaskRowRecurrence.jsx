@@ -24,7 +24,7 @@ export default function TaskRowRecurrence({ recurrenceRule }) {
                     clickEvent.stopPropagation();
                     setIsOpen(true);
                 }}
-                className="inline-flex flex-shrink-0 items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/25"
+                className="inline-flex flex-shrink-0 items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-700 dark:text-blue-400 border border-blue-500/25"
             >
                 <RefreshCw className="h-2.5 w-2.5" />
                 {frequencyLabel}

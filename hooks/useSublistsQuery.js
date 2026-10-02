@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 /**
  * Shared sublists query for one list, kept on the global default staleTime.
@@ -13,11 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 export function useSublistsQuery(listId, options = {}) {
     return useQuery({
         queryKey: ['sublists', listId],
-        queryFn: async () => {
-            const response = await fetch(`/api/sublists?list_id=${listId}`);
-            if (!response.ok) throw new Error('Failed to fetch sublists');
-            return response.json();
-        },
+        queryFn: ({ signal }) => fetchJson(`/api/sublists?list_id=${listId}`, { signal }),
         ...options,
     });
 }

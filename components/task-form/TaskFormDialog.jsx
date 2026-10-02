@@ -11,6 +11,7 @@ import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CharLimitField from '@/components/ui/CharLimitField';
+import FormError from '@/components/ui/FormError';
 import {
     Select,
     SelectContent,
@@ -25,8 +26,11 @@ import LabeledField from '@/components/ui/LabeledField';
 import { createTaskWithTags, updateTask } from '@/actions/task-actions';
 import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
 import { Loader } from '@/components/ui/loader';
+import EditorErrorBoundary from '@/components/ui/EditorErrorBoundary';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
+import { createClientId } from '@/lib/client-id';
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 10000;
@@ -40,6 +44,29 @@ const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor'), {
         </div>
     ),
 });
+
+const IDLE_FALLBACK_DELAY_MS = 2000;
+
+/**
+ * Fetches the editor's code in the background once the browser is idle, so the first New or Edit open has no wait.
+ * Skipped when Data Saver is on.
+ *
+ * @returns {() => void} Cancels the pending prefetch, for use as an effect cleanup.
+ */
+export function scheduleEditorPrefetch() {
+    if (typeof window === 'undefined' || navigator.connection?.saveData) return () => {};
+
+    // A failed warm-up is harmless: the dialog loads the editor itself when it opens
+    const prefetchEditor = () => import('@/components/ui/RichTextEditor').catch(() => {});
+
+    if (window.requestIdleCallback) {
+        const idleHandle = window.requestIdleCallback(prefetchEditor);
+        return () => window.cancelIdleCallback(idleHandle);
+    }
+    // Safari has no requestIdleCallback
+    const timerId = window.setTimeout(prefetchEditor, IDLE_FALLBACK_DELAY_MS);
+    return () => window.clearTimeout(timerId);
+}
 
 /**
  * Modal for creating or editing a task, via the shared ModalShell container.
@@ -77,6 +104,8 @@ export default function TaskFormDialog({
     const [isRecurring, setIsRecurring] = useState(false);
     const [recurrenceRule, setRecurrenceRule] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    // Made when the dialog opens and kept for retries, so a retry after a lost reply cannot create a second task
+    const [createRequestId, setCreateRequestId] = useState(() => createClientId());
     const [titleError, setTitleError] = useState('');
     const [dueDateError, setDueDateError] = useState('');
     const [formError, setFormError] = useState('');
@@ -89,7 +118,8 @@ export default function TaskFormDialog({
     const resetKey = open
         ? `${task?.id ?? 'create'}:${defaultStatusId ?? ''}:${defaultSublistId ?? ''}`
         : null;
-    const [lastResetKey, setLastResetKey] = useState(resetKey);
+    // Starts null so a dialog first mounted already open still fills its fields from `task`
+    const [lastResetKey, setLastResetKey] = useState(null);
     if (resetKey !== lastResetKey) {
         setLastResetKey(resetKey);
         if (open) {
@@ -106,6 +136,8 @@ export default function TaskFormDialog({
             setTitleError('');
             setDueDateError('');
             setFormError('');
+            setSubmitting(false);
+            setCreateRequestId(createClientId());
         }
     }
 
@@ -115,6 +147,7 @@ export default function TaskFormDialog({
 
     async function handleSubmit(event) {
         event.preventDefault();
+        if (submitting) return;
 
         if (!title.trim()) {
             setTitleError('Title is required');
@@ -138,6 +171,7 @@ export default function TaskFormDialog({
             ...(isEditing
                 ? {}
                 : {
+                      ...(createRequestId && { id: createRequestId }),
                       list_id: listId,
                       sublist_id: isRootCreate ? sublistId || null : null,
                       tagNames,
@@ -148,9 +182,12 @@ export default function TaskFormDialog({
         };
 
         try {
-            const { error, code, tagErrors } = isEditing
-                ? await updateTask(task.id, fields)
-                : await createTaskWithTags(fields);
+            const {
+                data: savedTask,
+                error,
+                code,
+                tagErrors,
+            } = isEditing ? await updateTask(task.id, fields) : await createTaskWithTags(fields);
 
             if (error) {
                 if (code === TASK_DUE_DATE_REQUIRED) {
@@ -159,6 +196,7 @@ export default function TaskFormDialog({
                     setFormError(error);
                 }
                 toast.error(isEditing ? 'Failed to update task' : 'Failed to create task');
+                setSubmitting(false);
                 return;
             }
 
@@ -166,9 +204,18 @@ export default function TaskFormDialog({
             if (tagErrors?.length) {
                 toast.info(`Task saved, but couldn't add: ${tagErrors.join(', ')}`);
             }
+            // No unlock on success: the dialog stays on screen while it animates out, and the next open resets it.
             onClose();
+            const taskListId = listId ?? task?.list_id;
+            if (savedTask) {
+                queryClient.setQueryData(['tasks', taskListId], (cachedTasks) =>
+                    withSavedRow(cachedTasks, withStatusDisplay(savedTask, statuses), isEditing, {
+                        tags: [],
+                    }),
+                );
+            }
             // Not awaited - the dialog closes immediately instead of blocking on this refetch.
-            queryClient.invalidateQueries({ queryKey: ['tasks', listId ?? task?.list_id] });
+            queryClient.invalidateQueries({ queryKey: ['tasks', taskListId] });
             // A new task changes the list's total count - the sidebar's ['lists'] query needs telling.
             if (!isEditing) queryClient.invalidateQueries({ queryKey: ['lists'] });
             bustPageCache({ urls: [`/lists/${listId ?? task?.list_id}`] });
@@ -177,7 +224,6 @@ export default function TaskFormDialog({
             const message = 'Could not save. Check your connection and try again.';
             setFormError(message);
             toast.error(message);
-        } finally {
             setSubmitting(false);
         }
     }
@@ -186,6 +232,7 @@ export default function TaskFormDialog({
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit Task' : 'New Task'}
             contentClassName="sm:max-w-3xl"
             footer={
@@ -200,7 +247,13 @@ export default function TaskFormDialog({
                 </>
             }
         >
-            <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2 min-w-0">
+            {/* inert locks every field at once while saving, so nothing can be edited under an in-flight write */}
+            <form
+                id={formId}
+                onSubmit={handleSubmit}
+                inert={submitting}
+                className="space-y-4 mt-2 min-w-0"
+            >
                 {/* Title */}
                 <CharLimitField
                     label="Task title"
@@ -208,15 +261,18 @@ export default function TaskFormDialog({
                     maxLength={TITLE_MAX}
                     error={titleError}
                 >
-                    <Input
-                        value={title}
-                        onChange={(event) => {
-                            setTitle(event.target.value);
-                            setTitleError('');
-                        }}
-                        placeholder="Task title"
-                        maxLength={TITLE_MAX}
-                    />
+                    {(titleControlProps) => (
+                        <Input
+                            {...titleControlProps}
+                            value={title}
+                            onChange={(event) => {
+                                setTitle(event.target.value);
+                                setTitleError('');
+                            }}
+                            placeholder="Task title"
+                            maxLength={TITLE_MAX}
+                        />
+                    )}
                 </CharLimitField>
 
                 {/* Description */}
@@ -225,93 +281,119 @@ export default function TaskFormDialog({
                     currentLength={description.length}
                     maxLength={DESCRIPTION_MAX}
                 >
-                    <RichTextEditor
-                        value={description}
-                        onChange={setDescription}
-                        maxLength={DESCRIPTION_MAX}
-                        placeholder="Description (optional)"
-                    />
+                    {() => (
+                        <EditorErrorBoundary
+                            value={description}
+                            onChange={setDescription}
+                            maxLength={DESCRIPTION_MAX}
+                            placeholder="Description (optional)"
+                        >
+                            <RichTextEditor
+                                value={description}
+                                onChange={setDescription}
+                                maxLength={DESCRIPTION_MAX}
+                                placeholder="Description (optional)"
+                                ariaLabel="Description"
+                            />
+                        </EditorErrorBoundary>
+                    )}
                 </CharLimitField>
 
                 {/* 2-column grid - stacking these four full-width each wastes space on wider screens */}
                 <div className="grid grid-cols-2 gap-4">
                     {/* Status */}
                     <LabeledField label="Status">
-                        <Select value={statusId} onValueChange={setStatusId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select status..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {statuses.map((status) => (
-                                    <SelectItem key={status.id} value={status.id}>
-                                        <span className="flex items-center gap-2">
-                                            <span
-                                                className="h-2 w-2 rounded-full flex-shrink-0"
-                                                style={{ backgroundColor: status.color }}
-                                            />
-                                            {status.name}
-                                        </span>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {({ controlId }) => (
+                            <Select value={statusId} onValueChange={setStatusId}>
+                                <SelectTrigger id={controlId}>
+                                    <SelectValue placeholder="Select status..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {statuses.map((status) => (
+                                        <SelectItem key={status.id} value={status.id}>
+                                            <span className="flex items-center gap-2">
+                                                <span
+                                                    className="h-2 w-2 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: status.color }}
+                                                />
+                                                {status.name}
+                                            </span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
                     </LabeledField>
 
                     {/* Tags */}
                     <LabeledField label="Tags">
-                        {isEditing ? (
-                            <TaskTagPicker task={task} spaceId={spaceId} isFieldSized />
-                        ) : (
-                            <StagedTagPicker
-                                spaceId={spaceId}
-                                tagNames={tagNames}
-                                onChange={setTagNames}
-                            />
+                        {({ labelId }) => (
+                            <div role="group" aria-labelledby={labelId}>
+                                {isEditing ? (
+                                    <TaskTagPicker task={task} spaceId={spaceId} isFieldSized />
+                                ) : (
+                                    <StagedTagPicker
+                                        spaceId={spaceId}
+                                        tagNames={tagNames}
+                                        onChange={setTagNames}
+                                    />
+                                )}
+                            </div>
                         )}
                     </LabeledField>
 
                     {/* Sublist - root-level tasks only */}
                     {isRootCreate && sublists.length > 0 && (
                         <LabeledField label="Sublist">
-                            <Select
-                                value={sublistId || 'none'}
-                                onValueChange={(value) =>
-                                    setSublistId(value === 'none' ? '' : value)
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="No sublist" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">No sublist</SelectItem>
-                                    {sublists.map((sublist) => (
-                                        <SelectItem key={sublist.id} value={sublist.id}>
-                                            <span className="flex items-center gap-2">
-                                                <span
-                                                    className="h-2 w-2 rounded-full flex-shrink-0"
-                                                    style={{ backgroundColor: sublist.color }}
-                                                />
-                                                {sublist.name}
-                                            </span>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            {({ controlId }) => (
+                                <Select
+                                    value={sublistId || 'none'}
+                                    onValueChange={(value) =>
+                                        setSublistId(value === 'none' ? '' : value)
+                                    }
+                                >
+                                    <SelectTrigger id={controlId}>
+                                        <SelectValue placeholder="No sublist" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No sublist</SelectItem>
+                                        {sublists.map((sublist) => (
+                                            <SelectItem key={sublist.id} value={sublist.id}>
+                                                <span className="flex items-center gap-2">
+                                                    <span
+                                                        className="h-2 w-2 rounded-full flex-shrink-0"
+                                                        style={{ backgroundColor: sublist.color }}
+                                                    />
+                                                    {sublist.name}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
                         </LabeledField>
                     )}
 
                     {/* Due date */}
                     <LabeledField label={requiresDueDate ? 'Due date *' : 'Due date'}>
-                        <Input
-                            type="date"
-                            value={dueDate}
-                            onChange={(event) => {
-                                setDueDate(event.target.value);
-                                setDueDateError('');
-                            }}
-                        />
-                        {dueDateError && (
-                            <p className="text-xs text-destructive mt-1">{dueDateError}</p>
+                        {({ controlId }) => (
+                            <>
+                                <Input
+                                    id={controlId}
+                                    type="date"
+                                    value={dueDate}
+                                    aria-required={requiresDueDate ? true : undefined}
+                                    aria-invalid={dueDateError ? true : undefined}
+                                    aria-describedby={
+                                        dueDateError ? `${controlId}-error` : undefined
+                                    }
+                                    onChange={(event) => {
+                                        setDueDate(event.target.value);
+                                        setDueDateError('');
+                                    }}
+                                />
+                                <FormError errorId={`${controlId}-error`}>{dueDateError}</FormError>
+                            </>
                         )}
                     </LabeledField>
                 </div>

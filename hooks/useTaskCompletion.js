@@ -12,6 +12,9 @@ import {
     uncompleteTaskAndDescendants,
 } from '@/actions/task-actions';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { claimInFlight } from '@/lib/in-flight-entities';
+import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 /**
  * Single source of truth for marking a task (and its descendants) complete or incomplete.
@@ -20,6 +23,8 @@ import { bustPageCache } from '@/lib/service-worker-cache';
  *
  * @param {string} listId - The list this completion state applies to (resolves its space's statuses)
  * @returns {{
+ *   statuses: object[],
+ *   isResolvingStatuses: boolean,
  *   doneStatus: object|undefined,
  *   defaultStatus: object|undefined,
  *   isDone: (task: object) => boolean,
@@ -28,13 +33,14 @@ import { bustPageCache } from '@/lib/service-worker-cache';
  *   setComplete: (task: object, flatList: object[], listId: string, isComplete: boolean) => Promise<void>,
  *   confirmState: {task: object, listId: string, isComplete: boolean, descendantCount: number}|null,
  *   closeConfirm: () => void,
- *   confirmCascade: () => Promise<void>,
+ *   confirmCascade: () => Promise<boolean>|undefined,
+ *   completeDialogProps: object,
  * }}
  */
 export function useTaskCompletion(listId) {
     const queryClient = useQueryClient();
     const spaceId = useSpaceIdForList(listId);
-    const { data: statuses = [] } = useStatusesQuery(spaceId);
+    const { data: statuses = [], isLoading: isStatusesLoading } = useStatusesQuery(spaceId);
     const [confirmState, setConfirmState] = useState(null);
 
     const doneStatus = statuses.find((status) => status.code === 'done');
@@ -57,46 +63,6 @@ export function useTaskCompletion(listId) {
         [doneStatus],
     );
 
-    const runCascade = useCallback(
-        async (taskId, listId, isComplete) => {
-            const toastId = toast.loading(
-                isComplete ? 'Marking complete...' : 'Marking incomplete...',
-            );
-
-            let result;
-            try {
-                result = isComplete
-                    ? await completeTaskAndDescendants(taskId)
-                    : await uncompleteTaskAndDescendants(taskId);
-            } catch {
-                toast.error('Could not reach the server. Check your connection and try again.', {
-                    id: toastId,
-                });
-                return;
-            }
-
-            if (result.error) {
-                toast.error(result.error, { id: toastId });
-                return;
-            }
-
-            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-            bustPageCache({ urls: [`/lists/${listId}`] });
-
-            // RLS silently skips descendants the caller doesn't own, so surface the real count.
-            if (result.completedCount !== undefined && result.completedCount < result.totalCount) {
-                toast.info(
-                    `${isComplete ? 'Completed' : 'Reopened'} ${result.completedCount} of ${result.totalCount} tasks - you can only update tasks you created`,
-                    { id: toastId },
-                );
-                return;
-            }
-
-            toast.dismiss(toastId);
-        },
-        [queryClient],
-    );
-
     const setComplete = useCallback(
         async (task, flatList, listId, isComplete) => {
             if (!doneStatus || !defaultStatus) return;
@@ -110,43 +76,106 @@ export function useTaskCompletion(listId) {
                 return;
             }
 
+            const releaseInFlight = claimInFlight(`task-complete:${task.id}`);
+            if (!releaseInFlight) return;
             const targetStatus = isComplete ? doneStatus : defaultStatus;
             const toastId = toast.loading(
                 isComplete ? 'Marking complete...' : 'Marking incomplete...',
             );
 
-            let error;
             try {
-                ({ error } = await updateTask(task.id, { status_id: targetStatus.id }));
-            } catch {
-                toast.error('Could not reach the server. Check your connection and try again.', {
-                    id: toastId,
-                });
-                return;
-            }
+                let saveResult;
+                try {
+                    saveResult = await updateTask(task.id, { status_id: targetStatus.id });
+                } catch {
+                    toast.error(
+                        'Could not reach the server. Check your connection and try again.',
+                        { id: toastId },
+                    );
+                    return;
+                }
 
-            if (error) {
-                toast.error(error, { id: toastId });
-                return;
-            }
+                if (saveResult.error) {
+                    toast.error(saveResult.error, { id: toastId });
+                    return;
+                }
 
-            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-            bustPageCache({ urls: [`/lists/${listId}`] });
-            toast.dismiss(toastId);
+                // The checkbox flips as soon as the server confirms; the reload only reconciles in the background.
+                if (saveResult.data) {
+                    queryClient.setQueryData(['tasks', listId], (cachedTasks) =>
+                        withSavedRow(
+                            cachedTasks,
+                            withStatusDisplay(saveResult.data, statuses),
+                            true,
+                        ),
+                    );
+                }
+                queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                bustPageCache({ urls: [`/lists/${listId}`] });
+                toast.dismiss(toastId);
+            } finally {
+                releaseInFlight();
+            }
         },
-        [doneStatus, defaultStatus, getIncompleteDescendants, getCompletedDescendants, queryClient],
+        [
+            doneStatus,
+            defaultStatus,
+            statuses,
+            getIncompleteDescendants,
+            getCompletedDescendants,
+            queryClient,
+        ],
     );
 
     const closeConfirm = useCallback(() => setConfirmState(null), []);
 
-    const confirmCascade = useCallback(async () => {
+    const cascadeConfirm = useConfirmAction(Boolean(confirmState));
+
+    const confirmCascade = useCallback(() => {
         if (!confirmState) return;
         const { task, listId, isComplete } = confirmState;
-        setConfirmState(null);
-        await runCascade(task.id, listId, isComplete);
-    }, [confirmState, runCascade]);
+
+        return cascadeConfirm.runConfirmedAction({
+            // Same key as the single-task path, so a checkbox click cannot overlap this cascade.
+            entityKey: `task-complete:${task.id}`,
+            loadingMessage: isComplete ? 'Marking complete...' : 'Marking incomplete...',
+            successMessage: (cascadeResult) =>
+                // RLS silently skips descendants the caller doesn't own, so surface the real count.
+                cascadeResult.completedCount !== undefined &&
+                cascadeResult.completedCount < cascadeResult.totalCount
+                    ? `${isComplete ? 'Completed' : 'Reopened'} ${cascadeResult.completedCount} of ${cascadeResult.totalCount} tasks - you can only update tasks you created`
+                    : isComplete
+                      ? 'Marked complete'
+                      : 'Marked incomplete',
+            action: () =>
+                isComplete
+                    ? completeTaskAndDescendants(task.id)
+                    : uncompleteTaskAndDescendants(task.id),
+            // Many rows change, so the popup waits for the reload instead of showing stale statuses.
+            onSuccess: async () => {
+                await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                bustPageCache({ urls: [`/lists/${listId}`] });
+            },
+            close: () => setConfirmState(null),
+        });
+    }, [confirmState, cascadeConfirm, queryClient]);
+
+    // Everything CompleteTaskDialog needs, so each consumer renders it with one spread.
+    const completeDialogProps = {
+        open: Boolean(confirmState),
+        onClose: closeConfirm,
+        task: confirmState?.task,
+        isComplete: confirmState?.isComplete,
+        descendantCount: confirmState?.descendantCount ?? 0,
+        onConfirm: confirmCascade,
+        isPending: cascadeConfirm.isPending,
+        errorMessage: cascadeConfirm.errorMessage,
+    };
 
     return {
+        statuses,
+        // Separates "not resolved yet" from "confirmed no status" to avoid an SSR hydration flash
+        isResolvingStatuses: !spaceId || isStatusesLoading,
         doneStatus,
         defaultStatus,
         isDone,
@@ -156,5 +185,6 @@ export function useTaskCompletion(listId) {
         confirmState,
         closeConfirm,
         confirmCascade,
+        completeDialogProps,
     };
 }

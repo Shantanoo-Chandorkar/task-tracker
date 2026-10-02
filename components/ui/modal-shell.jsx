@@ -57,6 +57,8 @@ function blockOutsideDismiss(event) {
  * @param {string} [props.footerClassName] - Extra classes for the footer bar (e.g. a stacked button layout)
  * @param {Function} [props.onCloseAutoFocus] - Override Radix's default post-close focus return (variant 'form')
  * @param {boolean} [props.dismissOnOutsideClick] - Whether an outside click closes the modal (default true)
+ * @param {boolean} [props.isBusy] - While true, Esc, outside click and the X are ignored so a save cannot be abandoned
+ * @param {string} [props.errorMessage] - Alert variant only: failure text shown inside the popup, which stays open
  * @param {import('react').ReactNode} props.children - Modal body content
  */
 export default function ModalShell({
@@ -73,10 +75,12 @@ export default function ModalShell({
     footerClassName,
     onCloseAutoFocus,
     dismissOnOutsideClick = true,
+    isBusy = false,
+    errorMessage,
     children,
 }) {
     const isDesktop = useIsDesktop();
-    const handleOpenChange = (isOpen) => !isOpen && onClose();
+    const handleOpenChange = (isOpen) => !isOpen && !isBusy && onClose();
     const onPointerDownOutside = dismissOnOutsideClick ? undefined : blockOutsideDismiss;
 
     if (variant === 'alert') {
@@ -90,6 +94,11 @@ export default function ModalShell({
                         )}
                     </AlertDialogHeader>
                     {children}
+                    {errorMessage && (
+                        <p role="alert" className="text-sm text-destructive">
+                            {errorMessage}
+                        </p>
+                    )}
                     <ModalFooter roundedBottom className={footerClassName}>
                         {footer}
                     </ModalFooter>
@@ -109,6 +118,7 @@ export default function ModalShell({
                             ? contentClassName
                             : cn('max-h-[90dvh] overflow-y-auto', contentClassName)
                     }
+                    showCloseButton={!isBusy}
                     onOpenAutoFocus={(event) => event.preventDefault()}
                     onCloseAutoFocus={onCloseAutoFocus}
                     onPointerDownOutside={onPointerDownOutside}
@@ -130,6 +140,7 @@ export default function ModalShell({
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
                 className={cn('sm:max-w-xl max-h-[90dvh] overflow-y-auto', contentClassName)}
+                showCloseButton={!isBusy}
                 onOpenAutoFocus={(event) => event.preventDefault()}
                 onCloseAutoFocus={onCloseAutoFocus}
                 onPointerDownOutside={onPointerDownOutside}

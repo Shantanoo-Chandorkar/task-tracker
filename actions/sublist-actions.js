@@ -1,6 +1,7 @@
 'use server';
 
 import { getNextPosition } from '@/lib/position';
+import { readClientId, findOwnRowById, insertRowOnce } from '@/lib/idempotent-create';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
@@ -15,6 +16,7 @@ import {
  * Creates a new sublist under a list. Appends it after the last existing sublist in that list.
  *
  * @param {object} fields
+ * @param {string} [fields.id] - Optional client-made UUID; a retry with the same id returns the first try's row
  * @param {string} fields.name - Required sublist name
  * @param {string} fields.list_id - Required parent list ID
  * @param {string} [fields.color] - Hex color string, defaults to grey
@@ -24,6 +26,17 @@ export const createSublist = withAuthenticatedAction(
     '[sublists] create',
     'Unexpected error creating sublist',
     async (user, supabase, fields) => {
+        const clientId = readClientId(fields);
+        if (clientId.failure) return { data: null, ...clientId.failure };
+        const replayedSublist = await findOwnRowById(
+            supabase,
+            'sublists',
+            clientId.id,
+            'created_by',
+            user.id,
+        );
+        if (replayedSublist) return { data: replayedSublist, error: null };
+
         const name = sanitizeString(fields.name, true);
         if (!name) {
             return { data: null, error: 'Sublist name is required' };
@@ -42,17 +55,18 @@ export const createSublist = withAuthenticatedAction(
 
         const position = await getNextPosition(supabase, 'sublists', { list_id: fields.list_id });
 
-        const { data: createdSublist, error } = await supabase
-            .from('sublists')
-            .insert({
+        const { data: createdSublist, error } = await insertRowOnce(
+            supabase,
+            'sublists',
+            {
                 name,
                 list_id: fields.list_id,
                 color: fields.color ?? '#6b7280',
                 position,
                 created_by: user.id,
-            })
-            .select()
-            .single();
+            },
+            { clientId: clientId.id, ownerColumn: 'created_by', userId: user.id },
+        );
 
         if (error) {
             const guestLimitResult = toGuestLimitResult(error);

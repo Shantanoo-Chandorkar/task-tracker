@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import ModalShell from '@/components/ui/modal-shell';
+import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
 
 const TAG_DISPLAY_MAX = 15;
 
@@ -35,21 +36,23 @@ export default function TaskRowTags({ tags = [] }) {
                     clickEvent.stopPropagation();
                     setOpen(true);
                 }}
-                className="flex-shrink-0"
+                className="hit-area flex-shrink-0"
             >
                 <Badge variant="tag">
                     {tags.length === 1 ? truncateTagName(tags[0].name) : `${tags.length} tags`}
                 </Badge>
             </button>
-            <ModalShell open={open} onClose={() => setOpen(false)} title="Tags">
-                <div className="flex flex-wrap gap-1.5">
-                    {tags.map((tag) => (
-                        <Badge key={tag.id} variant="tag">
-                            {tag.name}
-                        </Badge>
-                    ))}
-                </div>
-            </ModalShell>
+            <MountOnFirstOpen open={open}>
+                <ModalShell open={open} onClose={() => setOpen(false)} title="Tags">
+                    <div className="flex flex-wrap gap-1.5">
+                        {tags.map((tag) => (
+                            <Badge key={tag.id} variant="tag">
+                                {tag.name}
+                            </Badge>
+                        ))}
+                    </div>
+                </ModalShell>
+            </MountOnFirstOpen>
         </>
     );
 }

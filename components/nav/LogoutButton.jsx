@@ -41,13 +41,14 @@ export default function LogoutButton({ onNavigate, initialProfile }) {
             });
             return;
         }
-        setIsPending(false);
 
         if (signOutResult.error) {
+            setIsPending(false);
             toast.error(signOutResult.error, { id: toastId });
             return;
         }
 
+        // Stays locked through navigation, or a second click would fire another sign-out.
         await clearAllCaches(queryClient);
         toast.success('Logged out', { id: toastId });
         onNavigate?.();
@@ -61,7 +62,7 @@ export default function LogoutButton({ onNavigate, initialProfile }) {
             size="icon"
             onClick={handleLogout}
             disabled={isPending}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="hit-area [--hit-size:44px] h-8 w-8 text-muted-foreground hover:text-foreground"
             aria-label={logoutLabel}
             title={logoutLabel}
         >

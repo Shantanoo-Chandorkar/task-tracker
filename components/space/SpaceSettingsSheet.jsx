@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import ModalShell from '@/components/ui/modal-shell';
 import StatusManager from '@/components/status/StatusManager';
@@ -19,17 +19,28 @@ import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
  * @param {import('react').ReactNode} props.children - Section body, rendered only while open
  */
 function SettingsSection({ title, isOpen, onToggle, children }) {
+    const panelId = useId();
     return (
         <div className="border-t border-border first:border-t-0">
             <button
                 type="button"
                 onClick={onToggle}
+                aria-expanded={isOpen}
+                aria-controls={panelId}
                 className="flex w-full items-center justify-between px-1 py-2.5 text-sm font-medium text-foreground"
             >
                 {title}
-                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {isOpen ? (
+                    <ChevronUp aria-hidden="true" className="h-4 w-4" />
+                ) : (
+                    <ChevronDown aria-hidden="true" className="h-4 w-4" />
+                )}
             </button>
-            {isOpen && <div className="pb-3">{children}</div>}
+            {isOpen && (
+                <div id={panelId} className="pb-3">
+                    {children}
+                </div>
+            )}
         </div>
     );
 }

@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { hashInviteToken } from '@/lib/invites/invite-tokens';
 import AcceptInviteCard from '@/components/invites/AcceptInviteCard';
 
-export const metadata = { title: 'Accept invite - Task Tracker' };
+export const metadata = { title: 'Accept invite' };
 
 /**
  * Server-side, side-effect-free preview of an invite by its token hash -- never redeems it, so

@@ -6,9 +6,8 @@ import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
 import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
-import CharLimitField from '@/components/ui/CharLimitField';
+import ColorNameField from '@/components/ui/ColorNameField';
 import LabeledField from '@/components/ui/LabeledField';
 import {
     Select,
@@ -53,6 +52,7 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
             update: updateSublist,
             buildFields: () => ({ list_id: targetListId }),
             invalidateQueryKey: ['sublists', targetListId],
+            createdRowDefaults: { task_count: 0 },
             bustCache: () => ({ urls: [`/lists/${targetListId}`] }),
             onReset: () => setSelectedListId(''),
             onClose,
@@ -62,6 +62,7 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit Sublist' : 'New Sublist'}
             footer={
                 <>
@@ -83,48 +84,39 @@ export default function SublistFormDialog({ open, onClose, sublist = null, listI
             <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
                 {isGlobalMode && (
                     <LabeledField label="List">
-                        <Select value={selectedListId} onValueChange={setSelectedListId}>
-                            <SelectTrigger className="w-full" disabled={submitting}>
-                                <SelectValue placeholder="Select list" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {lists.map((list) => (
-                                    <SelectItem key={list.id} value={list.id}>
-                                        {spaceNameById.get(list.space_id)
-                                            ? `${spaceNameById.get(list.space_id)} / ${list.name}`
-                                            : list.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {({ controlId }) => (
+                            <Select value={selectedListId} onValueChange={setSelectedListId}>
+                                <SelectTrigger
+                                    id={controlId}
+                                    className="w-full"
+                                    disabled={submitting}
+                                >
+                                    <SelectValue placeholder="Select list" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {lists.map((list) => (
+                                        <SelectItem key={list.id} value={list.id}>
+                                            {spaceNameById.get(list.space_id)
+                                                ? `${spaceNameById.get(list.space_id)} / ${list.name}`
+                                                : list.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
                     </LabeledField>
                 )}
 
-                <CharLimitField
+                <ColorNameField
                     label="Sublist name"
-                    currentLength={name.length}
+                    name={name}
+                    onNameChange={setName}
+                    color={color}
+                    onColorChange={setColor}
                     maxLength={SUBLIST_NAME_MAX}
                     error={error}
-                >
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="color"
-                            value={color}
-                            onChange={(event) => setColor(event.target.value)}
-                            className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
-                            disabled={submitting}
-                        />
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder="Sublist name"
-                            className="flex-1"
-                            autoFocus
-                            disabled={submitting}
-                            maxLength={SUBLIST_NAME_MAX}
-                        />
-                    </div>
-                </CharLimitField>
+                    disabled={submitting}
+                />
             </form>
         </ModalShell>
     );

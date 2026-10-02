@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { runExclusively } from '@/lib/in-flight-entities';
 import { useTagsQuery } from '@/hooks/useTagsQuery';
 import { addTagToTask, removeTagFromTask } from '@/actions/tag-actions';
 import { bustPageCache } from '@/lib/service-worker-cache';
@@ -32,36 +33,47 @@ export default function TaskTagPicker({ task, spaceId, isFieldSized = false }) {
         bustPageCache({ urls: [`/lists/${task.list_id}`] });
     }
 
-    async function handleAdd(name) {
-        setPending(true);
-        try {
-            const result = await addTagToTask({ taskId: task.id, name });
-            if (result.error) {
-                toast.error(result.error);
-                return;
-            }
-            await refreshTags();
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-        } finally {
-            setPending(false);
-        }
+    // One tag change per task at a time: a second one racing the first reload can lose a write.
+    function runTagChange(work) {
+        return runExclusively(`task-tag:${task.id}`, work, () =>
+            toast.info('Still saving the last tag change'),
+        );
     }
 
-    async function handleRemove(tagId) {
-        setRemovingKey(tagId);
-        try {
-            const result = await removeTagFromTask({ taskId: task.id, tagId });
-            if (result.error) {
-                toast.error(result.error);
-                return;
+    function handleAdd(name) {
+        return runTagChange(async () => {
+            setPending(true);
+            try {
+                const result = await addTagToTask({ taskId: task.id, name });
+                if (result.error) {
+                    toast.error(result.error);
+                    return;
+                }
+                await refreshTags();
+            } catch {
+                toast.error('Could not reach the server. Try again.');
+            } finally {
+                setPending(false);
             }
-            await refreshTags();
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-        } finally {
-            setRemovingKey(null);
-        }
+        });
+    }
+
+    function handleRemove(tagId) {
+        return runTagChange(async () => {
+            setRemovingKey(tagId);
+            try {
+                const result = await removeTagFromTask({ taskId: task.id, tagId });
+                if (result.error) {
+                    toast.error(result.error);
+                    return;
+                }
+                await refreshTags();
+            } catch {
+                toast.error('Could not reach the server. Try again.');
+            } finally {
+                setRemovingKey(null);
+            }
+        });
     }
 
     return (

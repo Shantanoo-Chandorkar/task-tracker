@@ -5,9 +5,8 @@ import { useColorNameForm } from '@/hooks/useColorNameForm';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import ModalShell from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/ui/loader';
-import CharLimitField from '@/components/ui/CharLimitField';
+import ColorNameField from '@/components/ui/ColorNameField';
 import LabeledField from '@/components/ui/LabeledField';
 import {
     Select,
@@ -44,6 +43,7 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
             update: updateList,
             buildFields: () => ({ space_id: spaceId }),
             invalidateQueryKey: ['lists'],
+            createdRowDefaults: { task_count: 0 },
             bustCache: () => ({ urls: ['/spaces', ...(list ? [`/lists/${list.id}`] : [])] }),
             onClose,
         });
@@ -52,6 +52,7 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
         <ModalShell
             open={open}
             onClose={onClose}
+            isBusy={submitting}
             title={isEditing ? 'Edit List' : 'New List'}
             footer={
                 <>
@@ -71,45 +72,32 @@ export default function ListFormDialog({ open, onClose, list = null, defaultSpac
             }
         >
             <form id={formId} onSubmit={handleSubmit} className="space-y-4 mt-2">
-                <CharLimitField
+                <ColorNameField
                     label="List name"
-                    currentLength={name.length}
+                    name={name}
+                    onNameChange={setName}
+                    color={color}
+                    onColorChange={setColor}
                     maxLength={LIST_NAME_MAX}
                     error={error}
-                >
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="color"
-                            value={color}
-                            onChange={(event) => setColor(event.target.value)}
-                            className="h-9 w-11 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
-                            disabled={submitting}
-                        />
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder="List name"
-                            className="flex-1"
-                            autoFocus
-                            disabled={submitting}
-                            maxLength={LIST_NAME_MAX}
-                        />
-                    </div>
-                </CharLimitField>
+                    disabled={submitting}
+                />
 
                 <LabeledField label="Space">
-                    <Select value={spaceId} onValueChange={setSpaceId} disabled={submitting}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a space..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {spaces.map((space) => (
-                                <SelectItem key={space.id} value={space.id}>
-                                    {space.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    {({ controlId }) => (
+                        <Select value={spaceId} onValueChange={setSpaceId} disabled={submitting}>
+                            <SelectTrigger id={controlId}>
+                                <SelectValue placeholder="Select a space..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {spaces.map((space) => (
+                                    <SelectItem key={space.id} value={space.id}>
+                                        {space.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
                 </LabeledField>
             </form>
         </ModalShell>

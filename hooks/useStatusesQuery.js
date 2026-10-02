@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -15,11 +16,7 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
 export function useStatusesQuery(spaceId, options = {}) {
     return useQuery({
         queryKey: ['statuses', spaceId],
-        queryFn: async () => {
-            const response = await fetch(`/api/statuses?space_id=${spaceId}`);
-            if (!response.ok) throw new Error('Failed to fetch statuses');
-            return response.json();
-        },
+        queryFn: ({ signal }) => fetchJson(`/api/statuses?space_id=${spaceId}`, { signal }),
         enabled: Boolean(spaceId),
         staleTime: FIVE_MINUTES_MS,
         ...options,

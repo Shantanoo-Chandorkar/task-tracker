@@ -1,11 +1,28 @@
 'use client';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { shouldRetryRequest } from '@/lib/fetch-json';
 
 // Data the Home screen shows; invalidating any of it must also refresh Home
 const HOME_SOURCE_QUERY_KEYS = ['tasks', 'lists', 'sublists', 'spaces', 'statuses'];
+
+// A fixed id makes Sonner replace the toast instead of stacking one per failed query
+const REFRESH_FAILED_TOAST_ID = 'query-refresh-failed';
+
+/**
+ * Tells the user a background refresh failed, but only when the screen already has data to keep showing.
+ * A first load that fails has no data, and the page's own error state covers that.
+ *
+ * @param {Error} _error - What the query threw; not shown, since it can carry server wording.
+ * @param {import('@tanstack/react-query').Query} failedQuery - The query that failed.
+ */
+export function handleQueryError(_error, failedQuery) {
+    if (failedQuery.state.data === undefined) return;
+    toast.error('Could not refresh. Showing saved data.', { id: REFRESH_FAILED_TOAST_ID });
+}
 
 /**
  * QueryClient that refreshes the Home summary whenever the data behind it is invalidated.
@@ -39,8 +56,10 @@ export function QueryProvider({ children }) {
     const [queryClient] = useState(
         () =>
             new HomeAwareQueryClient({
+                queryCache: new QueryCache({ onError: handleQueryError }),
                 defaultOptions: {
                     queries: {
+                        retry: shouldRetryRequest,
                         // Keep data fresh for 60 seconds before marking stale
                         staleTime: 60 * 1000,
                     },

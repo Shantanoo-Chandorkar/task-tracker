@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/lib/fetch-json';
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -14,11 +15,7 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
 export function useSpacesQuery(options = {}) {
     return useQuery({
         queryKey: ['spaces'],
-        queryFn: async () => {
-            const response = await fetch('/api/spaces');
-            if (!response.ok) throw new Error('Failed to fetch spaces');
-            return response.json();
-        },
+        queryFn: ({ signal }) => fetchJson('/api/spaces', { signal }),
         staleTime: FIVE_MINUTES_MS,
         ...options,
     });

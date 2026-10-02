@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
+import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import {
@@ -22,13 +24,16 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { GripVertical } from 'lucide-react';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
 import { Loader } from '@/components/ui/loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
 import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
+import { getMoveTargets } from '@/lib/move-targets';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };
@@ -42,8 +47,10 @@ const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
  * @param {Function} props.onEditRequest - Called with the status to open it for editing
  * @param {Function} props.onDeleteRequest - Called with the status to ask for delete confirmation
  * @param {boolean} props.isOnly - Whether this is the only status (disables delete)
+ * @param {{ previousId: string|null, nextId: string|null }} props.moveTargets - Neighbouring statuses for Move up/down
+ * @param {(statusId: string, neighbourId: string) => void} props.onMoveStatus - Moves the status next to a neighbour
  */
-function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
+function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly, moveTargets, onMoveStatus }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: status.id,
     });
@@ -55,18 +62,27 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
     };
 
     const canDelete = !isOnly && !status.is_default && !status.code;
+    // A disabled item says why it is disabled, so the reason is not hidden in a tooltip
+    const deleteLabel = status.is_default
+        ? 'Cannot delete the default status'
+        : status.code
+          ? 'Built-in status - can’t be deleted'
+          : isOnly
+            ? 'Cannot delete the only status'
+            : 'Delete';
 
     return (
         <div
             ref={setNodeRef}
             style={style}
-            {...attributes}
             className="flex items-center gap-3 py-2.5 px-3 border-b border-border last:border-b-0"
         >
+            {/* dnd attributes on the row made a focusable box around other buttons, so they live on the handle */}
             <button
+                {...attributes}
                 {...listeners}
-                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
-                aria-label="Drag to reorder"
+                className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
+                aria-label={`Drag to reorder ${status.name}`}
             >
                 <GripVertical className="h-4 w-4" />
             </button>
@@ -75,7 +91,7 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
                 className="h-4 w-4 rounded-full flex-shrink-0"
                 style={{ backgroundColor: status.color }}
             />
-            <span className="flex-1 text-sm text-foreground">
+            <span className="flex-1 text-sm text-foreground min-w-0 [overflow-wrap:anywhere]">
                 {status.name}
                 {status.is_default && (
                     <span className="ml-2 text-xs text-muted-foreground">(default)</span>
@@ -84,33 +100,24 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
                     <span className="ml-2 text-xs text-muted-foreground">(built-in)</span>
                 )}
             </span>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                onClick={() => onEditRequest(status)}
-                aria-label="Edit status"
-            >
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() => canDelete && onDeleteRequest(status)}
-                disabled={!canDelete}
-                title={
-                    status.is_default
-                        ? 'Cannot delete the default status'
-                        : status.code
-                          ? 'Built-in status - can’t be deleted'
-                          : isOnly
-                            ? 'Cannot delete the only status'
-                            : 'Delete status'
-                }
-            >
-                <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <RowActionsMenu label={`More actions for ${status.name}`}>
+                <DropdownMenuItem onClick={() => onEditRequest(status)}>Edit</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <MoveMenuItems
+                    canMoveUp={Boolean(moveTargets.previousId)}
+                    canMoveDown={Boolean(moveTargets.nextId)}
+                    onMoveUp={() => onMoveStatus(status.id, moveTargets.previousId)}
+                    onMoveDown={() => onMoveStatus(status.id, moveTargets.nextId)}
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    onSelect={() => onDeleteRequest(status)}
+                    disabled={!canDelete}
+                    className={canDelete ? 'text-destructive focus:text-destructive' : undefined}
+                >
+                    {deleteLabel}
+                </DropdownMenuItem>
+            </RowActionsMenu>
         </div>
     );
 }
@@ -126,9 +133,8 @@ function StatusRow({ status, onEditRequest, onDeleteRequest, isOnly }) {
 export default function StatusManager({ spaceId, initialStatuses }) {
     const queryClient = useQueryClient();
     const [statusDialog, setStatusDialog] = useState({ open: false, status: null });
-    const [error, setError] = useState('');
     const [deleteTarget, setDeleteTarget] = useState(null);
-    const [deleting, setDeleting] = useState(false);
+    const deleteConfirm = useConfirmAction(Boolean(deleteTarget));
 
     const { data: statuses = [], isLoading } = useStatusesQuery(
         spaceId,
@@ -147,68 +153,79 @@ export default function StatusManager({ spaceId, initialStatuses }) {
 
         const oldIndex = statuses.findIndex((status) => status.id === active.id);
         const newIndex = statuses.findIndex((status) => status.id === over.id);
-        const reordered = arrayMove(statuses, oldIndex, newIndex);
+        // The list can change mid-drag (refetch), leaving an id missing and arrayMove with a -1 index.
+        if (oldIndex < 0 || newIndex < 0) return;
+        return runExclusively(
+            `reorder:statuses:${spaceId}`,
+            async () => {
+                // A reload still in flight would overwrite the new order, so stop it first
+                await queryClient.cancelQueries({ queryKey: ['statuses', spaceId] });
+                const reordered = arrayMove(statuses, oldIndex, newIndex);
 
-        queryClient.setQueryData(['statuses', spaceId], reordered);
+                queryClient.setQueryData(['statuses', spaceId], reordered);
 
-        const toastId = toast.loading('Saving order...');
+                const toastId = toast.loading('Saving order...');
 
-        let results;
-        try {
-            results = await Promise.all(
-                reordered
-                    .map((status, newPosition) => ({ status, newPosition }))
-                    .filter(({ status, newPosition }) => status.position !== newPosition)
-                    .map(({ status, newPosition }) =>
-                        updateStatus(status.id, { position: newPosition }),
-                    ),
-            );
-        } catch {
-            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-            bustPageCache({ prefixes: ['/lists/'] });
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
+                let results;
+                try {
+                    results = await Promise.all(
+                        reordered
+                            .map((status, newPosition) => ({ status, newPosition }))
+                            .filter(({ status, newPosition }) => status.position !== newPosition)
+                            .map(({ status, newPosition }) =>
+                                updateStatus(status.id, { position: newPosition }),
+                            ),
+                    );
+                } catch {
+                    await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+                    bustPageCache({ prefixes: ['/lists/'] });
+                    toast.error('Could not reach the server. Try again.', { id: toastId });
+                    return;
+                }
 
-        const failed = results.find((updateOutcome) => updateOutcome.error);
-        if (failed) {
-            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-            bustPageCache({ prefixes: ['/lists/'] });
-            toast.error(failed.error, { id: toastId });
-            return;
-        }
+                const failed = results.find((updateOutcome) => updateOutcome.error);
+                if (failed) {
+                    await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+                    bustPageCache({ prefixes: ['/lists/'] });
+                    toast.error(failed.error, { id: toastId });
+                    return;
+                }
 
-        await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-        bustPageCache({ prefixes: ['/lists/'] });
-        toast.success('Order saved', { id: toastId });
+                await queryClient.invalidateQueries({ queryKey: ['statuses'] });
+                bustPageCache({ prefixes: ['/lists/'] });
+                toast.success('Order saved', { id: toastId });
+            },
+            () => toast.info(REORDER_BUSY_MESSAGE),
+        );
     }
 
-    async function handleConfirmDelete() {
+    /** Move up / Move down: the same save path as a drag, so the same guards and optimistic update apply. */
+    function moveStatusNextTo(statusId, neighbourId) {
+        return handleDragEnd({ active: { id: statusId }, over: { id: neighbourId } });
+    }
+
+    const announcements = buildAnnouncements(
+        (rowId) => statuses.find((status) => status.id === rowId)?.name,
+    );
+
+    function handleConfirmDelete() {
         if (!deleteTarget) return;
 
-        setDeleting(true);
-        const toastId = toast.loading('Deleting status...');
-
-        let result;
-        try {
-            result = await deleteStatus(deleteTarget.id);
-        } catch {
-            setDeleting(false);
-            setDeleteTarget(null);
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        setDeleting(false);
-        setDeleteTarget(null);
-
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
-            setError(result.error);
-        } else {
-            await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-            bustPageCache({ prefixes: ['/lists/'] });
-            toast.success('Status deleted', { id: toastId });
-        }
+        return deleteConfirm.runConfirmedAction({
+            entityKey: `status-delete:${deleteTarget.id}`,
+            loadingMessage: 'Deleting status...',
+            successMessage: 'Status deleted',
+            action: () => deleteStatus(deleteTarget.id),
+            // Tasks lose the deleted status, so the popup waits for both reloads instead of showing stale groups.
+            onSuccess: async () => {
+                await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ['statuses'] }),
+                    queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+                ]);
+                bustPageCache({ prefixes: ['/lists/'] });
+            },
+            close: () => setDeleteTarget(null),
+        });
     }
 
     return (
@@ -219,12 +236,6 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                     Manage the statuses used to organize your tasks. Drag to reorder.
                 </p>
             </div>
-
-            {error && (
-                <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
-                    {error}
-                </p>
-            )}
 
             {isLoading ? (
                 <div className="flex items-center justify-center gap-2 rounded-xl bg-card py-6 text-sm text-muted-foreground">
@@ -237,6 +248,10 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
+                    accessibility={{
+                        announcements,
+                        screenReaderInstructions: SCREEN_READER_INSTRUCTIONS,
+                    }}
                 >
                     <SortableContext
                         items={statuses.map((status) => status.id)}
@@ -252,6 +267,8 @@ export default function StatusManager({ spaceId, initialStatuses }) {
                                     }
                                     onDeleteRequest={setDeleteTarget}
                                     isOnly={statuses.length === 1}
+                                    moveTargets={getMoveTargets(statuses, status.id)}
+                                    onMoveStatus={moveStatusNextTo}
                                 />
                             ))}
                         </div>
@@ -278,20 +295,25 @@ export default function StatusManager({ spaceId, initialStatuses }) {
             <ModalShell
                 open={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
+                isBusy={deleteConfirm.isPending}
+                errorMessage={deleteConfirm.errorMessage}
                 variant="alert"
                 title={<>Delete &ldquo;{deleteTarget?.name}&rdquo;?</>}
                 description="Tasks using this status will lose it. This cannot be undone."
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setDeleteTarget(null)}
+                            disabled={deleteConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
-                            disabled={deleting}
+                            disabled={deleteConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleting && <Loader size="xs" />}
+                            {deleteConfirm.isPending && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
                     </>

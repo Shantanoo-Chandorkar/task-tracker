@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
@@ -23,8 +23,9 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2, ChevronDown, ChevronUp, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { GripVertical, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/ui/loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
@@ -40,6 +41,13 @@ import JoinSpaceDialog from './JoinSpaceDialog';
 import SpaceSharingSection from './SpaceSharingSection';
 import SpaceSettingsSheet from './SpaceSettingsSheet';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { removeRowFromCache } from '@/lib/query-cache';
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
+import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
+import { countSpaceContents } from '@/lib/delete-counts';
+import { getMoveTargets } from '@/lib/move-targets';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };
@@ -53,8 +61,10 @@ const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
  * @param {object} props.list - List to display
  * @param {Function} props.onEditRequest - Called with the list to open it for editing
  * @param {Function} props.onDeleteRequest - Called with the list to ask for delete confirmation
+ * @param {{ previousId: string|null, nextId: string|null }} props.moveTargets - Neighbouring lists for Move up/down
+ * @param {(list: object, neighbourId: string) => void} props.onMoveList - Moves the list next to a neighbour
  */
-function ListRow({ list, onEditRequest, onDeleteRequest }) {
+function ListRow({ list, onEditRequest, onDeleteRequest, moveTargets, onMoveList }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: list.id,
         data: { type: 'list', spaceId: list.space_id },
@@ -75,8 +85,8 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
             <button
                 {...listeners}
                 {...attributes}
-                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
-                aria-label="Drag to reorder"
+                className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
+                aria-label={`Drag to reorder ${list.name}`}
             >
                 <GripVertical className="h-3.5 w-3.5" />
             </button>
@@ -84,27 +94,29 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
                 className="h-3 w-3 rounded-full flex-shrink-0"
                 style={{ backgroundColor: list.color }}
             />
-            <Link href={`/lists/${list.id}`} className="flex-1 text-sm text-foreground">
+            <Link
+                href={`/lists/${list.id}`}
+                className="flex-1 text-sm text-foreground min-w-0 [overflow-wrap:anywhere]"
+            >
                 {list.name}
             </Link>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                onClick={() => onEditRequest(list)}
-                aria-label="Edit list"
-            >
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() => onDeleteRequest(list)}
-                aria-label="Delete list"
-            >
-                <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <RowActionsMenu label={`More actions for ${list.name}`}>
+                <DropdownMenuItem onClick={() => onEditRequest(list)}>Edit</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <MoveMenuItems
+                    canMoveUp={Boolean(moveTargets.previousId)}
+                    canMoveDown={Boolean(moveTargets.nextId)}
+                    onMoveUp={() => onMoveList(list, moveTargets.previousId)}
+                    onMoveDown={() => onMoveList(list, moveTargets.nextId)}
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    onClick={() => onDeleteRequest(list)}
+                    className="text-destructive focus:text-destructive"
+                >
+                    Delete
+                </DropdownMenuItem>
+            </RowActionsMenu>
         </div>
     );
 }
@@ -126,6 +138,9 @@ function ListRow({ list, onEditRequest, onDeleteRequest }) {
  * @param {Function} props.onEditListRequest - Called with the list to open it for editing
  * @param {Function} props.onDeleteListRequest - Called with the list to ask for delete confirmation
  * @param {Function} props.onLeaveSpaceRequest - Called with the space to leave it
+ * @param {{ previousId: string|null, nextId: string|null }} [props.moveTargets] - Owned-space neighbours for Move
+ * @param {(spaceId: string, neighbourId: string) => void} [props.onMoveSpace] - Moves the space next to a neighbour
+ * @param {(list: object, neighbourId: string) => void} props.onMoveListRequest - Moves a list next to a neighbour
  */
 function SpaceSection({
     space,
@@ -138,9 +153,13 @@ function SpaceSection({
     onEditListRequest,
     onDeleteListRequest,
     onLeaveSpaceRequest,
+    moveTargets,
+    onMoveSpace,
+    onMoveListRequest,
 }) {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [sharingOpen, setSharingOpen] = useState(false);
+    const sharingPanelId = useId();
     const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
     // Guests cannot share; the button stays hidden until the profile confirms a registered user
     const canShareSpace = isOwner && profile?.is_guest === false;
@@ -163,8 +182,8 @@ function SpaceSection({
                     <button
                         {...listeners}
                         {...attributes}
-                        className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
-                        aria-label="Drag to reorder"
+                        className="hit-area [--hit-size:44px] touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
+                        aria-label={`Drag to reorder ${space.name}`}
                     >
                         <GripVertical className="h-3.5 w-3.5" />
                     </button>
@@ -173,7 +192,7 @@ function SpaceSection({
                     className="h-4 w-4 rounded-full flex-shrink-0"
                     style={{ backgroundColor: space.color }}
                 />
-                <span className="flex-1 text-sm font-semibold text-foreground">
+                <span className="flex-1 text-sm font-semibold text-foreground min-w-0 [overflow-wrap:anywhere]">
                     {space.name}
                     {!isOwner && (
                         <span className="ml-2 inline-flex items-center gap-1.5 align-middle">
@@ -192,26 +211,25 @@ function SpaceSection({
                     )}
                 </span>
                 {isOwner && (
-                    <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                            onClick={() => onEditSpaceRequest(space)}
-                            aria-label="Edit space"
-                        >
-                            <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                    <RowActionsMenu label={`More actions for ${space.name}`}>
+                        <DropdownMenuItem onClick={() => onEditSpaceRequest(space)}>
+                            Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <MoveMenuItems
+                            canMoveUp={Boolean(moveTargets.previousId)}
+                            canMoveDown={Boolean(moveTargets.nextId)}
+                            onMoveUp={() => onMoveSpace(space.id, moveTargets.previousId)}
+                            onMoveDown={() => onMoveSpace(space.id, moveTargets.nextId)}
+                        />
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
                             onClick={() => onDeleteSpaceRequest(space)}
-                            aria-label="Delete space"
+                            className="text-destructive focus:text-destructive"
                         >
-                            <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                    </>
+                            Delete
+                        </DropdownMenuItem>
+                    </RowActionsMenu>
                 )}
             </div>
 
@@ -226,6 +244,8 @@ function SpaceSection({
                             list={list}
                             onEditRequest={onEditListRequest}
                             onDeleteRequest={onDeleteListRequest}
+                            moveTargets={getMoveTargets(lists, list.id)}
+                            onMoveList={onMoveListRequest}
                         />
                     ))}
                 </SortableContext>
@@ -253,13 +273,15 @@ function SpaceSection({
                     <button
                         type="button"
                         onClick={() => setSharingOpen((open) => !open)}
+                        aria-expanded={sharingOpen}
+                        aria-controls={sharingPanelId}
                         className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
                     >
                         Share this space
                         {sharingOpen ? (
-                            <ChevronUp className="h-3 w-3" />
+                            <ChevronUp aria-hidden="true" className="h-3 w-3" />
                         ) : (
-                            <ChevronDown className="h-3 w-3" />
+                            <ChevronDown aria-hidden="true" className="h-3 w-3" />
                         )}
                     </button>
                 )}
@@ -283,7 +305,7 @@ function SpaceSection({
             />
 
             {canShareSpace && sharingOpen && (
-                <div className="border-t border-border px-3 py-3">
+                <div id={sharingPanelId} className="border-t border-border px-3 py-3">
                     <SpaceSharingSection space={space} />
                 </div>
             )}
@@ -322,10 +344,9 @@ export default function SpaceListManager({
             ? { open: true, prefillSpaceId: joinId }
             : { open: false, prefillSpaceId: '' };
     });
-    const [error, setError] = useState('');
     // { type: 'space'|'list'|'leave-space', id, name, counts }
-    const [deleteTarget, setDeleteTarget] = useState(null);
-    const [deleting, setDeleting] = useState(false);
+    const { deleteTarget, setDeleteTarget, requestDelete } = useDeleteConfirm();
+    const deleteConfirm = useConfirmAction(Boolean(deleteTarget));
 
     const { data: spaces = [] } = useSpacesQuery({ initialData: initialSpaces });
     const { data: lists = [] } = useListsQuery({ initialData: initialLists });
@@ -384,141 +405,162 @@ export default function SpaceListManager({
     async function handleDragEnd({ active, over }) {
         if (!over || active.id === over.id) return;
         const type = active.data.current?.type;
-        const toastId = toast.loading('Saving order...');
-        let persistError;
+        return runExclusively(
+            'reorder:spaces-and-lists',
+            async () => {
+                // A reload still in flight would overwrite the new order, so stop it first
+                await queryClient.cancelQueries({ queryKey: ['spaces'] });
+                await queryClient.cancelQueries({ queryKey: ['lists'] });
+                const toastId = toast.loading('Saving order...');
+                let persistError;
 
-        if (type === 'space') {
-            const oldIndex = ownedSpaces.findIndex((space) => space.id === active.id);
-            const newIndex = ownedSpaces.findIndex((space) => space.id === over.id);
-            if (oldIndex === -1 || newIndex === -1) {
-                toast.dismiss(toastId);
-                return;
-            }
+                if (type === 'space') {
+                    const oldIndex = ownedSpaces.findIndex((space) => space.id === active.id);
+                    const newIndex = ownedSpaces.findIndex((space) => space.id === over.id);
+                    if (oldIndex === -1 || newIndex === -1) {
+                        toast.dismiss(toastId);
+                        return;
+                    }
 
-            const reorderedOwned = arrayMove(ownedSpaces, oldIndex, newIndex);
-            queryClient.setQueryData(['spaces'], [...reorderedOwned, ...sharedSpaces]);
-            persistError = await persistPositions(reorderedOwned, updateSpace);
-        } else if (type === 'list') {
-            const spaceId = active.data.current.spaceId;
-            const spaceLists = lists.filter((list) => list.space_id === spaceId);
-            const oldIndex = spaceLists.findIndex((list) => list.id === active.id);
-            const newIndex = spaceLists.findIndex((list) => list.id === over.id);
-            if (oldIndex === -1 || newIndex === -1) {
-                toast.dismiss(toastId);
-                return;
-            }
+                    const reorderedOwned = arrayMove(ownedSpaces, oldIndex, newIndex);
+                    queryClient.setQueryData(['spaces'], [...reorderedOwned, ...sharedSpaces]);
+                    persistError = await persistPositions(reorderedOwned, updateSpace);
+                } else if (type === 'list') {
+                    const spaceId = active.data.current.spaceId;
+                    const spaceLists = lists.filter((list) => list.space_id === spaceId);
+                    const oldIndex = spaceLists.findIndex((list) => list.id === active.id);
+                    const newIndex = spaceLists.findIndex((list) => list.id === over.id);
+                    if (oldIndex === -1 || newIndex === -1) {
+                        toast.dismiss(toastId);
+                        return;
+                    }
 
-            const reorderedSpaceLists = arrayMove(spaceLists, oldIndex, newIndex);
-            const otherLists = lists.filter((list) => list.space_id !== spaceId);
-            queryClient.setQueryData(['lists'], [...otherLists, ...reorderedSpaceLists]);
-            persistError = await persistPositions(reorderedSpaceLists, updateList);
-        } else {
-            toast.dismiss(toastId);
-            return;
-        }
+                    const reorderedSpaceLists = arrayMove(spaceLists, oldIndex, newIndex);
+                    const otherLists = lists.filter((list) => list.space_id !== spaceId);
+                    queryClient.setQueryData(['lists'], [...otherLists, ...reorderedSpaceLists]);
+                    persistError = await persistPositions(reorderedSpaceLists, updateList);
+                } else {
+                    toast.dismiss(toastId);
+                    return;
+                }
 
-        toast[persistError ? 'error' : 'success'](persistError ?? 'Order saved', { id: toastId });
+                toast[persistError ? 'error' : 'success'](persistError ?? 'Order saved', {
+                    id: toastId,
+                });
+            },
+            () => toast.info(REORDER_BUSY_MESSAGE),
+        );
     }
 
-    async function requestDeleteSpace(space) {
-        setError('');
-        try {
-            const response = await fetch(`/api/spaces/${space.id}`);
-            const spaceDeleteCounts = await response.json();
-            setDeleteTarget({
+    /** Move up / Move down: the same save path as a drag, so the same guards and optimistic update apply. */
+    function moveSpaceNextTo(spaceId, neighbourId) {
+        return handleDragEnd({
+            active: { id: spaceId, data: { current: { type: 'space' } } },
+            over: { id: neighbourId },
+        });
+    }
+
+    function moveListNextTo(list, neighbourId) {
+        return handleDragEnd({
+            active: { id: list.id, data: { current: { type: 'list', spaceId: list.space_id } } },
+            over: { id: neighbourId },
+        });
+    }
+
+    const announcements = buildAnnouncements(
+        (rowId) =>
+            spaces.find((space) => space.id === rowId)?.name ??
+            lists.find((list) => list.id === rowId)?.name,
+    );
+
+    function requestDeleteSpace(space) {
+        requestDelete(
+            {
                 type: 'space',
                 id: space.id,
                 name: space.name,
-                counts: response.ok
-                    ? { lists: spaceDeleteCounts.list_count, tasks: spaceDeleteCounts.task_count }
-                    : null,
-            });
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-        }
+                counts: countSpaceContents(space.id, lists),
+            },
+            {
+                countsUrl: `/api/spaces/${space.id}`,
+                withFreshCounts: (openTarget, fetched) => ({
+                    ...openTarget,
+                    counts: { lists: fetched.list_count, tasks: fetched.task_count },
+                }),
+            },
+        );
     }
 
-    async function requestDeleteList(list) {
-        setError('');
-        try {
-            const response = await fetch(`/api/lists/${list.id}`);
-            const listDeleteCounts = await response.json();
-            setDeleteTarget({
+    function requestDeleteList(list) {
+        requestDelete(
+            {
                 type: 'list',
                 id: list.id,
                 name: list.name,
-                counts: response.ok ? { tasks: listDeleteCounts.task_count } : null,
-            });
-        } catch {
-            toast.error('Could not reach the server. Try again.');
-        }
+                counts: { tasks: list.task_count ?? 0 },
+            },
+            {
+                countsUrl: `/api/lists/${list.id}`,
+                withFreshCounts: (openTarget, fetched) => ({
+                    ...openTarget,
+                    counts: { tasks: fetched.task_count },
+                }),
+            },
+        );
     }
 
-    async function handleConfirmDelete() {
+    function handleConfirmDelete() {
         if (!deleteTarget) return;
-        const { type } = deleteTarget;
+        const { type, id: targetId } = deleteTarget;
+        const copyByType = {
+            space: { loading: 'Deleting space...', done: 'Space deleted' },
+            list: { loading: 'Deleting list...', done: 'List deleted' },
+            'leave-space': { loading: 'Leaving space...', done: 'Left space' },
+        };
 
-        setDeleting(true);
-        const toastId = toast.loading(
-            type === 'space'
-                ? 'Deleting space...'
-                : type === 'list'
-                  ? 'Deleting list...'
-                  : 'Leaving space...',
-        );
-
-        let result;
-        try {
-            if (type === 'space') result = await deleteSpace(deleteTarget.id);
-            else if (type === 'list') result = await deleteList(deleteTarget.id);
-            else result = await leaveSpace({ spaceId: deleteTarget.id });
-        } catch {
-            setDeleting(false);
-            setDeleteTarget(null);
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        setDeleting(false);
-
-        setDeleteTarget(null);
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
-            setError(result.error);
-        } else {
-            if (type === 'space') bustPageCache({ prefixes: ['/lists/'] });
-            else if (type === 'list') bustPageCache({ urls: [`/lists/${deleteTarget.id}`] });
-            await refetchAll();
-            toast.success(
-                type === 'space'
-                    ? 'Space deleted'
-                    : type === 'list'
-                      ? 'List deleted'
-                      : 'Left space',
-                { id: toastId },
-            );
-        }
+        return deleteConfirm.runConfirmedAction({
+            entityKey: `${type}-delete:${targetId}`,
+            loadingMessage: copyByType[type].loading,
+            successMessage: copyByType[type].done,
+            action: () => {
+                if (type === 'space') return deleteSpace(targetId);
+                if (type === 'list') return deleteList(targetId);
+                return leaveSpace({ spaceId: targetId });
+            },
+            // The row leaves the lists at once, so the popup closes onto the final screen; the reload is quiet.
+            onSuccess: () => {
+                if (type === 'list') bustPageCache({ urls: [`/lists/${targetId}`] });
+                else bustPageCache({ prefixes: ['/lists/'] });
+                removeRowFromCache(queryClient, type === 'list' ? ['lists'] : ['spaces'], targetId);
+                if (type !== 'list') {
+                    queryClient.setQueryData(['lists'], (cachedLists) =>
+                        cachedLists?.filter((list) => list.space_id !== targetId),
+                    );
+                }
+                refetchAll();
+            },
+            close: () => setDeleteTarget(null),
+        });
     }
 
     return (
         <div className="space-y-6 max-w-lg">
             <div>
-                <h2 className="text-base font-semibold mb-1">Spaces</h2>
+                <h2 className="text-base font-semibold mb-1">Your spaces</h2>
                 <p className="text-sm text-muted-foreground">
                     Spaces group your lists. Each list holds its own tasks. Drag to reorder.
                 </p>
             </div>
-
-            {error && (
-                <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
-                    {error}
-                </p>
-            )}
 
             <DndContext
                 id="space-list-dnd"
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
+                accessibility={{
+                    announcements,
+                    screenReaderInstructions: SCREEN_READER_INSTRUCTIONS,
+                }}
             >
                 <SortableContext
                     items={ownedSpaces.map((space) => space.id)}
@@ -547,6 +589,9 @@ export default function SpaceListManager({
                                     setListDialog({ open: true, list, defaultSpaceId: null })
                                 }
                                 onDeleteListRequest={requestDeleteList}
+                                moveTargets={getMoveTargets(ownedSpaces, space.id)}
+                                onMoveSpace={moveSpaceNextTo}
+                                onMoveListRequest={moveListNextTo}
                             />
                         ))}
                     </div>
@@ -578,6 +623,7 @@ export default function SpaceListManager({
                                     }
                                     onDeleteListRequest={requestDeleteList}
                                     onLeaveSpaceRequest={handleLeaveSpace}
+                                    onMoveListRequest={moveListNextTo}
                                 />
                             ))}
                         </SortableContext>
@@ -626,6 +672,8 @@ export default function SpaceListManager({
             <ModalShell
                 open={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
+                isBusy={deleteConfirm.isPending}
+                errorMessage={deleteConfirm.errorMessage}
                 variant="alert"
                 title={
                     deleteTarget?.type === 'leave-space'
@@ -643,15 +691,18 @@ export default function SpaceListManager({
                 }
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setDeleteTarget(null)}
+                            disabled={deleteConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
-                            disabled={deleting}
+                            disabled={deleteConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleting && <Loader size="xs" />}
+                            {deleteConfirm.isPending && <Loader size="xs" />}
                             {deleteTarget?.type === 'leave-space' ? 'Leave' : 'Delete'}
                         </AlertDialogAction>
                     </>

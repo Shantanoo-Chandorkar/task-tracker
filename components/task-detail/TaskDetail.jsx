@@ -1,21 +1,24 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { findAncestors, findDescendantIds, flatToTree } from '@/lib/tree';
 import { humanReadableLabel } from '@/lib/recurrence';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useTasksQuery } from '@/hooks/useTasksQuery';
+import { useTaskCompletion } from '@/hooks/useTaskCompletion';
+import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
+import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSpaceById } from '@/hooks/useSpaceById';
 import StatusBadge from '@/components/status/StatusBadge';
 import TaskTagPicker from './TaskTagPicker';
 import TaskRowActions from '@/components/task-list/TaskRowActions';
 import LimitWarning from '@/components/task-list/LimitWarning';
-import TaskFormDialog from '@/components/task-form/TaskFormDialog';
+import TaskFormDialog, { scheduleEditorPrefetch } from '@/components/task-form/TaskFormDialog';
 import SubtaskTree from './SubtaskTree';
 import { Button } from '@/components/ui/button';
 import RichTextRenderer from '@/components/ui/RichTextRenderer';
@@ -40,19 +43,14 @@ export default function TaskDetail({
     const router = useRouter();
     const [addSubtaskOpen, setAddSubtaskOpen] = useState(false);
 
-    const { data: flatList = [] } = useQuery({
-        queryKey: ['tasks', listId],
-        queryFn: async () => {
-            const response = await fetch(`/api/tasks?list_id=${listId}`);
-            if (!response.ok) throw new Error('Failed to fetch tasks');
-            return response.json();
-        },
-        initialData: initialTasks,
-    });
+    useEffect(() => scheduleEditorPrefetch(), []);
+
+    const { data: flatList = [] } = useTasksQuery(listId, { initialData: initialTasks });
 
     // Seeds the shared ['statuses', spaceId] cache so SubtaskTree's checkboxes don't hydrate-mismatch on mount.
     const spaceId = useSpaceIdForList(listId, { initialData: initialLists });
     useStatusesQuery(spaceId, { initialData: initialStatuses });
+    const completion = useTaskCompletion(listId);
     const maxSubtasksPerParent = useSpaceById(spaceId)?.max_subtasks_per_parent ?? null;
 
     const task = flatList.find((task) => task.id === taskId);
@@ -97,33 +95,39 @@ export default function TaskDetail({
     return (
         <div className="space-y-6">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
-                <Link
-                    href={`/lists/${listId}`}
-                    className="hover:text-foreground flex items-center gap-1"
-                >
-                    <ArrowLeft className="h-3 w-3" />
-                    List
-                </Link>
-                {ancestors.map((ancestor) => (
-                    <span key={ancestor.id} className="flex items-center gap-1">
-                        <span>/</span>
+            <nav aria-label="Breadcrumb">
+                <ol className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
+                    <li>
                         <Link
-                            href={`/lists/${listId}/tasks/${ancestor.id}`}
-                            className="hover:text-foreground truncate max-w-40"
+                            href={`/lists/${listId}`}
+                            className="hover:text-foreground flex items-center gap-1"
                         >
-                            {ancestor.title}
+                            <ArrowLeft aria-hidden="true" className="h-3 w-3" />
+                            List
                         </Link>
-                    </span>
-                ))}
-            </div>
+                    </li>
+                    {ancestors.map((ancestor) => (
+                        <li key={ancestor.id} className="flex items-center gap-1">
+                            <span aria-hidden="true">/</span>
+                            <Link
+                                href={`/lists/${listId}/tasks/${ancestor.id}`}
+                                className="hover:text-foreground truncate max-w-40"
+                            >
+                                {ancestor.title}
+                            </Link>
+                        </li>
+                    ))}
+                </ol>
+            </nav>
 
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
-                <h1 className="text-lg font-semibold text-foreground flex-1">{task.title}</h1>
+                <h1 className="text-lg font-semibold text-foreground flex-1 min-w-0 [overflow-wrap:anywhere]">
+                    {task.title}
+                </h1>
                 <TaskRowActions
                     task={task}
-                    flatList={flatList}
+                    completion={completion}
                     onAddSubtask={() => setAddSubtaskOpen(true)}
                     canAddSubtask={canAddSubtask}
                     listId={listId}
@@ -191,12 +195,19 @@ export default function TaskDetail({
                 )}
             </div>
 
-            <TaskFormDialog
-                open={addSubtaskOpen}
-                onClose={() => setAddSubtaskOpen(false)}
-                parentId={task.id}
-                listId={listId}
-            />
+            <MountOnFirstOpen open={addSubtaskOpen}>
+                <TaskFormDialog
+                    open={addSubtaskOpen}
+                    onClose={() => setAddSubtaskOpen(false)}
+                    parentId={task.id}
+                    listId={listId}
+                />
+            </MountOnFirstOpen>
+
+            {/* Cascade confirmation for the actions menu's Mark as complete */}
+            <MountOnFirstOpen open={completion.completeDialogProps.open}>
+                <CompleteTaskDialog {...completion.completeDialogProps} />
+            </MountOnFirstOpen>
         </div>
     );
 }

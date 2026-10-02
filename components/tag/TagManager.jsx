@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTagsQuery } from '@/hooks/useTagsQuery';
-import { toast } from 'sonner';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { removeRowFromCache } from '@/lib/query-cache';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
@@ -24,7 +25,9 @@ import { deleteTag, deleteAllTagsInSpace } from '@/actions/tag-actions';
 function TagRow({ tag, onDeleteRequest }) {
     return (
         <div className="flex items-center gap-3 py-2.5 px-3 border-b border-border last:border-b-0">
-            <span className="flex-1 text-sm text-foreground">{tag.name}</span>
+            <span className="flex-1 text-sm text-foreground min-w-0 [overflow-wrap:anywhere]">
+                {tag.name}
+            </span>
             <Button
                 variant="ghost"
                 size="icon"
@@ -48,9 +51,9 @@ function TagRow({ tag, onDeleteRequest }) {
 export default function TagManager({ spaceId }) {
     const queryClient = useQueryClient();
     const [deleteTarget, setDeleteTarget] = useState(null);
-    const [deleting, setDeleting] = useState(false);
     const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false);
-    const [wiping, setWiping] = useState(false);
+    const deleteConfirm = useConfirmAction(Boolean(deleteTarget));
+    const wipeConfirm = useConfirmAction(wipeConfirmOpen);
 
     const { data: tags = [], isLoading } = useTagsQuery(spaceId);
 
@@ -60,56 +63,37 @@ export default function TagManager({ spaceId }) {
         bustPageCache({ prefixes: ['/lists/'] });
     }
 
-    async function handleConfirmDelete() {
+    function handleConfirmDelete() {
         if (!deleteTarget) return;
+        const deletedTagId = deleteTarget.id;
 
-        setDeleting(true);
-        const toastId = toast.loading('Deleting tag...');
-
-        let result;
-        try {
-            result = await deleteTag(deleteTarget.id);
-        } catch {
-            setDeleting(false);
-            setDeleteTarget(null);
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        setDeleting(false);
-        setDeleteTarget(null);
-
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
-        } else {
-            await invalidateAfterChange();
-            toast.success('Tag deleted', { id: toastId });
-        }
+        return deleteConfirm.runConfirmedAction({
+            entityKey: `tag-delete:${deletedTagId}`,
+            loadingMessage: 'Deleting tag...',
+            successMessage: 'Tag deleted',
+            action: () => deleteTag(deletedTagId),
+            // The row leaves the list at once, so the popup closes onto the final screen; the reload is quiet.
+            onSuccess: () => {
+                removeRowFromCache(queryClient, ['tags', spaceId], deletedTagId);
+                invalidateAfterChange();
+            },
+            close: () => setDeleteTarget(null),
+        });
     }
 
-    async function handleConfirmWipe() {
-        setWiping(true);
-        const toastId = toast.loading('Deleting all tags...');
-
-        let result;
-        try {
-            result = await deleteAllTagsInSpace(spaceId);
-        } catch {
-            setWiping(false);
-            setWipeConfirmOpen(false);
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        setWiping(false);
-        setWipeConfirmOpen(false);
-
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
-        } else {
-            await invalidateAfterChange();
-            toast.success(`Deleted ${result.count} tag${result.count === 1 ? '' : 's'}`, {
-                id: toastId,
-            });
-        }
+    function handleConfirmWipe() {
+        return wipeConfirm.runConfirmedAction({
+            entityKey: `tags-wipe:${spaceId}`,
+            loadingMessage: 'Deleting all tags...',
+            successMessage: (wipeResult) =>
+                `Deleted ${wipeResult.count} tag${wipeResult.count === 1 ? '' : 's'}`,
+            action: () => deleteAllTagsInSpace(spaceId),
+            onSuccess: () => {
+                queryClient.setQueryData(['tags', spaceId], []);
+                invalidateAfterChange();
+            },
+            close: () => setWipeConfirmOpen(false),
+        });
     }
 
     return (
@@ -151,20 +135,25 @@ export default function TagManager({ spaceId }) {
             <ModalShell
                 open={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
+                isBusy={deleteConfirm.isPending}
+                errorMessage={deleteConfirm.errorMessage}
                 variant="alert"
                 title={<>Delete &ldquo;{deleteTarget?.name}&rdquo;?</>}
                 description="This removes the tag from every task in this space. This cannot be undone."
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setDeleteTarget(null)}
+                            disabled={deleteConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDelete}
-                            disabled={deleting}
+                            disabled={deleteConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleting && <Loader size="xs" />}
+                            {deleteConfirm.isPending && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
                     </>
@@ -174,20 +163,25 @@ export default function TagManager({ spaceId }) {
             <ModalShell
                 open={wipeConfirmOpen}
                 onClose={() => setWipeConfirmOpen(false)}
+                isBusy={wipeConfirm.isPending}
+                errorMessage={wipeConfirm.errorMessage}
                 variant="alert"
                 title="Delete all tags?"
                 description={`This removes all ${tags.length} tag${tags.length === 1 ? '' : 's'} from every task in this space. This cannot be undone.`}
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setWipeConfirmOpen(false)}>
+                        <AlertDialogCancel
+                            onClick={() => setWipeConfirmOpen(false)}
+                            disabled={wipeConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmWipe}
-                            disabled={wiping}
+                            disabled={wipeConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {wiping && <Loader size="xs" />}
+                            {wipeConfirm.isPending && <Loader size="xs" />}
                             Delete all
                         </AlertDialogAction>
                     </>

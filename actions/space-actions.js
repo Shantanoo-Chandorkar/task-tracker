@@ -1,6 +1,7 @@
 'use server';
 
 import { getNextPosition } from '@/lib/position';
+import { readClientId, findOwnRowById, insertRowOnce } from '@/lib/idempotent-create';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
@@ -11,6 +12,7 @@ import { SPACE_SETTINGS_OWNER_ONLY, SPACE_SUBTASK_CAP_INVALID } from '@/lib/erro
  * Creates a new space. Appends it after the last existing space.
  *
  * @param {object} fields
+ * @param {string} [fields.id] - Optional client-made UUID; a retry with the same id returns the first try's row
  * @param {string} fields.name - Required space name
  * @param {string} [fields.color] - Hex color string, defaults to grey
  * @returns {{ data: object|null, error: string|null }}
@@ -19,6 +21,17 @@ export const createSpace = withAuthenticatedAction(
     '[spaces] create',
     'Unexpected error creating space',
     async (user, supabase, fields) => {
+        const clientId = readClientId(fields);
+        if (clientId.failure) return { data: null, ...clientId.failure };
+        const replayedSpace = await findOwnRowById(
+            supabase,
+            'spaces',
+            clientId.id,
+            'owner_id',
+            user.id,
+        );
+        if (replayedSpace) return { data: replayedSpace, error: null };
+
         const name = sanitizeString(fields.name, true);
         if (!name) {
             return { data: null, error: 'Space name is required' };
@@ -28,16 +41,17 @@ export const createSpace = withAuthenticatedAction(
 
         const position = await getNextPosition(supabase, 'spaces', {});
 
-        const { data: createdSpace, error } = await supabase
-            .from('spaces')
-            .insert({
+        const { data: createdSpace, error } = await insertRowOnce(
+            supabase,
+            'spaces',
+            {
                 name,
                 color: fields.color ?? '#6b7280',
                 position,
                 owner_id: user.id,
-            })
-            .select()
-            .single();
+            },
+            { clientId: clientId.id, ownerColumn: 'owner_id', userId: user.id },
+        );
 
         if (error) {
             const guestLimitResult = toGuestLimitResult(error);

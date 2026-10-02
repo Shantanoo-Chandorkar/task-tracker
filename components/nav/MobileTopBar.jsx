@@ -57,7 +57,7 @@ export default function MobileTopBar({ initialSpaces, initialLists, initialProfi
                 {currentList ? (
                     <>
                         {currentSpace && (
-                            <div className="text-[11px] text-muted-foreground truncate">
+                            <div className="text-xs text-muted-foreground truncate">
                                 {currentSpace.name}
                             </div>
                         )}
@@ -75,7 +75,7 @@ export default function MobileTopBar({ initialSpaces, initialLists, initialProfi
             <button
                 onClick={openSearch}
                 aria-label="Search"
-                className="press-feedback flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+                className="hit-area [--hit-size:44px] press-feedback flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
             >
                 <Search className="h-4.5 w-4.5" />
             </button>

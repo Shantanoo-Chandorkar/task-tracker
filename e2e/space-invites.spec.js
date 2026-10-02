@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { test, expect, loginAs } from './fixtures/test.js';
 import { adminClient, createTestUser, deleteTestUser } from './fixtures/test-users.js';
 import { waitForEmailTo, clearInbox } from './fixtures/mailpit.js';
+import { maskEmail } from '../lib/mask-email.js';
 import {
     createSpace,
     spaceSection,
@@ -195,7 +196,7 @@ test.describe('space invites', () => {
                 await wrongPage.getByRole('button', { name: 'Request to join' }).click();
                 await expect(
                     wrongPage.getByText(
-                        `This invite was sent to ${invitedUser.email}. You are signed in as ${wrongUser.email}.`,
+                        `This invite was sent to ${maskEmail(invitedUser.email)}. You are signed in as ${wrongUser.email}.`,
                     ),
                 ).toBeVisible();
             } finally {

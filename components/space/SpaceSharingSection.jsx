@@ -17,6 +17,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { removeRowFromCache } from '@/lib/query-cache';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
+import { runExclusively } from '@/lib/in-flight-entities';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';
 import { useCollaboratorsQuery } from '@/hooks/useCollaboratorsQuery';
 import { usePendingInvitesQuery } from '@/hooks/usePendingInvitesQuery';
@@ -73,7 +76,8 @@ export default function SpaceSharingSection({ space }) {
     );
     // { action: 'reject'|'remove'|'revoke-invite', targetId, label } while a confirm dialog is open, else null.
     const [confirmTarget, setConfirmTarget] = useState(null);
-    const [confirming, setConfirming] = useState(false);
+    const sharingConfirm = useConfirmAction(Boolean(confirmTarget));
+    const [busyRowKeys, setBusyRowKeys] = useState(() => new Set());
     const [inviteEmail, setInviteEmail] = useState('');
     const [sendingInvite, setSendingInvite] = useState(false);
     const [inviteError, setInviteError] = useState('');
@@ -114,84 +118,117 @@ export default function SpaceSharingSection({ space }) {
         await refetch();
     }
 
-    async function handleApprove(requestId) {
-        const toastId = toast.loading('Approving...');
-        let approveResult;
-        try {
-            approveResult = await approveJoinRequest({ requestId });
-        } catch {
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        if (approveResult.error) {
-            toast.error(approveResult.error, { id: toastId });
-            return;
-        }
-        toast.success('Request approved', { id: toastId });
-        await refetch();
+    /**
+     * Runs one row's action once at a time and marks that row busy while it works.
+     *
+     * @param {string} rowKey - Key such as `approve:<requestId>`, also used to disable that row's control.
+     * @param {() => Promise<*>} work - The row's async action.
+     * @returns {Promise<*>} What `work` returned, or undefined when the row was already busy.
+     */
+    async function runRowAction(rowKey, work) {
+        return runExclusively(rowKey, async () => {
+            setBusyRowKeys((current) => new Set(current).add(rowKey));
+            try {
+                return await work();
+            } finally {
+                setBusyRowKeys((current) => {
+                    const remaining = new Set(current);
+                    remaining.delete(rowKey);
+                    return remaining;
+                });
+            }
+        });
     }
 
-    async function handleConfirm() {
+    function handleApprove(requestId) {
+        return runRowAction(`approve:${requestId}`, async () => {
+            const toastId = toast.loading('Approving...');
+            let approveResult;
+            try {
+                approveResult = await approveJoinRequest({ requestId });
+            } catch {
+                toast.error('Could not reach the server. Try again.', { id: toastId });
+                return;
+            }
+            if (approveResult.error) {
+                toast.error(approveResult.error, { id: toastId });
+                return;
+            }
+            toast.success('Request approved', { id: toastId });
+            // Awaited so the button keeps spinning until the person shows up in the collaborators list.
+            await refetch();
+        });
+    }
+
+    function handleConfirm() {
         if (!confirmTarget) return;
         const { action, targetId } = confirmTarget;
-
-        setConfirming(true);
-        const loadingLabelByAction = {
-            reject: 'Rejecting...',
-            remove: 'Removing...',
-            'revoke-invite': 'Revoking...',
+        const actionByName = {
+            reject: {
+                loadingMessage: 'Rejecting...',
+                successMessage: 'Request rejected',
+                run: () => rejectJoinRequest({ requestId: targetId }),
+            },
+            remove: {
+                loadingMessage: 'Removing...',
+                successMessage: 'Collaborator removed',
+                run: () => removeCollaborator({ collaboratorId: targetId }),
+            },
+            'revoke-invite': {
+                loadingMessage: 'Revoking...',
+                successMessage: 'Invite revoked',
+                run: () => revokeSpaceInvite({ inviteId: targetId }),
+            },
         };
-        const toastId = toast.loading(loadingLabelByAction[action]);
+        const chosenAction = actionByName[action];
 
-        let actionResult;
-        try {
-            if (action === 'reject') {
-                actionResult = await rejectJoinRequest({ requestId: targetId });
-            } else if (action === 'remove') {
-                actionResult = await removeCollaborator({ collaboratorId: targetId });
-            } else {
-                actionResult = await revokeSpaceInvite({ inviteId: targetId });
-            }
-        } catch {
-            setConfirming(false);
-            setConfirmTarget(null);
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        setConfirming(false);
-        setConfirmTarget(null);
-
-        if (actionResult.error) {
-            toast.error(actionResult.error, { id: toastId });
-            return;
-        }
-        const successLabelByAction = {
-            reject: 'Request rejected',
-            remove: 'Collaborator removed',
-            'revoke-invite': 'Invite revoked',
-        };
-        toast.success(successLabelByAction[action], { id: toastId });
-        await refetch();
+        return sharingConfirm.runConfirmedAction({
+            entityKey: `${action}:${targetId}`,
+            loadingMessage: chosenAction.loadingMessage,
+            successMessage: chosenAction.successMessage,
+            action: chosenAction.run,
+            // The row leaves the list at once, so the popup closes onto the final screen; the reload is quiet.
+            onSuccess: () => {
+                removeRowFromCache(queryClient, ['space-collaborators', space.id], targetId);
+                removeRowFromCache(queryClient, ['space-invites', space.id], targetId);
+                refetch();
+            },
+            close: () => setConfirmTarget(null),
+        });
     }
 
-    async function handlePermissionChange(collaboratorId, newPermissionLevel) {
-        const toastId = toast.loading('Updating permission...');
-        let permissionResult;
-        try {
-            permissionResult = await updateCollaboratorPermission({
-                collaboratorId,
-                permissionLevel: newPermissionLevel,
-            });
-        } catch {
-            toast.error('Could not reach the server. Try again.', { id: toastId });
-            return;
-        }
-        if (permissionResult.error) {
-            toast.error(permissionResult.error, { id: toastId });
-            return;
-        }
-        toast.success('Permission updated', { id: toastId });
-        await refetch();
+    function handlePermissionChange(collaboratorId, newPermissionLevel) {
+        return runRowAction(`permission:${collaboratorId}`, async () => {
+            const toastId = toast.loading('Updating permission...');
+            let permissionResult;
+            try {
+                permissionResult = await updateCollaboratorPermission({
+                    collaboratorId,
+                    permissionLevel: newPermissionLevel,
+                });
+            } catch {
+                toast.error('Could not reach the server. Try again.', { id: toastId });
+                return;
+            }
+            if (permissionResult.error) {
+                toast.error(permissionResult.error, { id: toastId });
+                return;
+            }
+            toast.success('Permission updated', { id: toastId });
+            // The Select shows the new level at once; the reload only reconciles in the background.
+            queryClient.setQueriesData(
+                { queryKey: ['space-collaborators', space.id] },
+                (cachedRows) =>
+                    Array.isArray(cachedRows)
+                        ? cachedRows.map((row) =>
+                              row.id === collaboratorId
+                                  ? { ...row, permission_level: newPermissionLevel }
+                                  : row,
+                          )
+                        : cachedRows,
+            );
+            refetch();
+        });
     }
 
     return (
@@ -318,9 +355,14 @@ export default function SpaceSharingSection({ space }) {
                                         size="icon"
                                         className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
                                         aria-label="Approve request"
+                                        disabled={busyRowKeys.has(`approve:${request.id}`)}
                                         onClick={() => handleApprove(request.id)}
                                     >
-                                        <Check className="h-4 w-4" />
+                                        {busyRowKeys.has(`approve:${request.id}`) ? (
+                                            <Loader size="xs" />
+                                        ) : (
+                                            <Check className="h-4 w-4" />
+                                        )}
                                     </Button>
                                     <Button
                                         variant="ghost"
@@ -361,6 +403,7 @@ export default function SpaceSharingSection({ space }) {
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                     <Select
                                         value={collaborator.permission_level}
+                                        disabled={busyRowKeys.has(`permission:${collaborator.id}`)}
                                         onValueChange={(newPermissionLevel) =>
                                             handlePermissionChange(
                                                 collaborator.id,
@@ -409,6 +452,8 @@ export default function SpaceSharingSection({ space }) {
             <ModalShell
                 open={!!confirmTarget}
                 onClose={() => setConfirmTarget(null)}
+                isBusy={sharingConfirm.isPending}
+                errorMessage={sharingConfirm.errorMessage}
                 variant="alert"
                 title={
                     {
@@ -426,15 +471,18 @@ export default function SpaceSharingSection({ space }) {
                 }
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setConfirmTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setConfirmTarget(null)}
+                            disabled={sharingConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirm}
-                            disabled={confirming}
+                            disabled={sharingConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {confirming && <Loader size="xs" />}
+                            {sharingConfirm.isPending && <Loader size="xs" />}
                             {
                                 { reject: 'Reject', remove: 'Remove', 'revoke-invite': 'Revoke' }[
                                     confirmTarget?.action

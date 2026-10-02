@@ -68,11 +68,18 @@ export default function RecurrenceBuilder({ value, onChange }) {
     const previewLabel = humanReadableLabel(buildRule(freq, interval, endCondition, count, until));
 
     return (
-        <div className="space-y-3 p-3 rounded-md border border-border bg-muted/20">
+        <div
+            role="group"
+            aria-label="Recurrence"
+            className="space-y-3 p-3 rounded-md border border-border bg-muted/20"
+        >
             {/* Frequency + interval row */}
             <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground flex-shrink-0">Every</span>
+                <span aria-hidden="true" className="text-xs text-muted-foreground flex-shrink-0">
+                    Every
+                </span>
                 <Input
+                    aria-label="Repeat every"
                     type="number"
                     min={1}
                     value={interval}
@@ -80,7 +87,7 @@ export default function RecurrenceBuilder({ value, onChange }) {
                     className="w-16 h-7 text-xs"
                 />
                 <Select value={freq} onValueChange={setFreq}>
-                    <SelectTrigger className="h-7 text-xs flex-1">
+                    <SelectTrigger aria-label="Frequency" className="h-7 text-xs flex-1">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -95,9 +102,11 @@ export default function RecurrenceBuilder({ value, onChange }) {
 
             {/* End condition */}
             <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground flex-shrink-0">Ends</span>
+                <span aria-hidden="true" className="text-xs text-muted-foreground flex-shrink-0">
+                    Ends
+                </span>
                 <Select value={endCondition} onValueChange={setEndCondition}>
-                    <SelectTrigger className="h-7 text-xs flex-1">
+                    <SelectTrigger aria-label="Ends" className="h-7 text-xs flex-1">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -111,6 +120,7 @@ export default function RecurrenceBuilder({ value, onChange }) {
 
                 {endCondition === 'after' && (
                     <Input
+                        aria-label="Number of occurrences"
                         type="number"
                         min={1}
                         value={count}
@@ -122,6 +132,7 @@ export default function RecurrenceBuilder({ value, onChange }) {
 
                 {endCondition === 'on' && (
                     <Input
+                        aria-label="End date"
                         type="date"
                         value={until}
                         onChange={(e) => setUntil(e.target.value)}
@@ -132,7 +143,9 @@ export default function RecurrenceBuilder({ value, onChange }) {
 
             {/* Human-readable preview */}
             {previewLabel && (
-                <p className="text-xs text-muted-foreground italic">Repeats {previewLabel}</p>
+                <p aria-live="polite" className="text-xs text-muted-foreground italic">
+                    Repeats {previewLabel}
+                </p>
             )}
         </div>
     );

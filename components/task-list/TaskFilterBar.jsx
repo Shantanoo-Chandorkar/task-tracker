@@ -82,7 +82,7 @@ export default function TaskFilterBar({ spaceId, statuses, onOpenSheet }) {
                 <Filter className="h-3.5 w-3.5" />
                 Filters
                 {activeCount > 0 && (
-                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-medium text-primary-foreground">
                         {activeCount}
                     </span>
                 )}
@@ -104,7 +104,7 @@ export default function TaskFilterBar({ spaceId, statuses, onOpenSheet }) {
                                 type="button"
                                 onClick={() => toggleFilter(group.dimension, chip.value)}
                                 aria-label={`Remove ${chip.label} filter`}
-                                className="hover:text-destructive"
+                                className="hit-area hover:text-destructive"
                             >
                                 <X className="h-3 w-3" />
                             </button>

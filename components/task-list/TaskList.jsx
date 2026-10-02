@@ -1,7 +1,7 @@
 'use client';
 
-import { Fragment, useState, useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Fragment, useCallback, useId, useRef, useState, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
     closestCenter,
@@ -19,40 +19,50 @@ import {
     arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronRight, GripVertical, Plus, MoreHorizontal } from 'lucide-react';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { ChevronDown, ChevronRight, GripVertical, Plus } from 'lucide-react';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/ui/modal-shell';
-import { flatToTree, findDescendantIds, isStartOfUnprioritisedTier } from '@/lib/tree';
-import { useUIState } from '@/providers/UIStateProvider';
+import {
+    createStableIdsReader,
+    createStableTreeBuilder,
+    buildDescendantIdsByTaskId,
+    isStartOfUnprioritisedTier,
+    countSublistTasks,
+} from '@/lib/tree';
+import { toggleFlag as toggleGroup, useUIFlags } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
+import { useTasksQuery } from '@/hooks/useTasksQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
 import { useSpaceById } from '@/hooks/useSpaceById';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
 import { taskMatchesFilters } from '@/lib/task-filters';
-import { duplicateTask } from '@/actions/task-actions';
+import { getMoveTargets } from '@/lib/move-targets';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
+import { useDuplicateTask } from '@/hooks/useDuplicateTask';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
-import TaskFormDialog from '@/components/task-form/TaskFormDialog';
+import TaskFormDialog, { scheduleEditorPrefetch } from '@/components/task-form/TaskFormDialog';
 import SublistFormDialog from '@/components/space/SublistFormDialog';
 import TaskFilterSheet from './TaskFilterSheet';
 import TaskFilterBar from './TaskFilterBar';
 import VelocityMeter from './VelocityMeter';
 import ListHeader from './ListHeader';
 import { Button } from '@/components/ui/button';
+import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
 import { Loader } from '@/components/ui/loader';
 import { bustPageCache } from '@/lib/service-worker-cache';
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
+import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
+// Ctrl/Cmd+D inside these keeps the browser's own meaning instead of duplicating the remembered row.
+const TYPING_OR_DIALOG_SELECTOR =
+    'input, textarea, select, [contenteditable="true"], [role="dialog"]';
 const MOUSE_ACTIVATION = { distance: 5 };
 const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
 
@@ -95,7 +105,6 @@ function siblingScopedCollisionDetection(args) {
  * @param {number} [props.count] - Displayed count including subtasks (`tasks.length` is root-only)
  * @param {boolean} props.isCollapsed
  * @param {Function} props.onToggle
- * @param {object[]} props.flatList
  * @param {string} props.listId
  * @param {Function} props.onAddTask - Called to open task creation for this status
  * @param {Function} props.onFocusTask - Called with a task's id when its row is clicked
@@ -103,6 +112,8 @@ function siblingScopedCollisionDetection(args) {
  * @param {string|null} props.currentUserId - Caller's user id, for row-level ownership checks
  * @param {'owner'|'full'|'restricted'|'read_only'|null} props.myPermission - Caller's tier for this space
  * @param {number|null} [props.maxSubtasksPerParent] - Space's direct-subtask cap, or null for no limit
+ * @param {(taskId: string, neighbourId: string) => void} [props.onMoveTask] - Moves a task next to a neighbour
+ * @param {boolean} [props.isInSublist] - True when a sublist heading sits above, so this heading is one level lower
  */
 function StatusGroup({
     status,
@@ -110,7 +121,6 @@ function StatusGroup({
     count,
     isCollapsed,
     onToggle,
-    flatList,
     listId,
     onAddTask,
     onFocusTask,
@@ -118,40 +128,56 @@ function StatusGroup({
     currentUserId,
     myPermission,
     maxSubtasksPerParent,
+    onMoveTask,
+    isInSublist = false,
 }) {
+    const headingId = useId();
+    // Same array while the ids are unchanged, or SortableContext re-renders every row on each list render
+    const [readStableIds] = useState(createStableIdsReader);
+    const taskIds = readStableIds(tasks);
     if (tasks.length === 0) return null;
+    const Heading = isInSublist ? 'h3' : 'h2';
 
     return (
-        <section className="space-y-0.5 pl-4 md:pl-8 [--row-indent:8px] md:[--row-indent:24px]">
-            <button
-                className="flex items-center gap-2 w-full py-2 text-left group/header"
-                onClick={onToggle}
-            >
-                {isCollapsed ? (
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-                {status && (
-                    <span
-                        className="h-2 w-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: status.color }}
-                    />
-                )}
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {status ? status.name : 'No Status'}
-                </span>
-                <span className="text-xs text-muted-foreground/60">({count ?? tasks.length})</span>
-            </button>
+        <section
+            aria-labelledby={headingId}
+            className="space-y-0.5 pl-4 md:pl-8 [--row-indent:8px] md:[--row-indent:24px]"
+        >
+            <Heading id={headingId}>
+                <button
+                    className="flex items-center gap-2 w-full py-2 text-left group/header"
+                    onClick={onToggle}
+                    aria-expanded={!isCollapsed}
+                >
+                    {isCollapsed ? (
+                        <ChevronRight
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    ) : (
+                        <ChevronDown
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    )}
+                    {status && (
+                        <span
+                            className="h-2 w-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: status.color }}
+                        />
+                    )}
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {status ? status.name : 'No Status'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">({count ?? tasks.length})</span>
+                </button>
+            </Heading>
 
             <div className="border-b border-border/50 mb-2" />
 
             {!isCollapsed && (
                 <>
-                    <SortableContext
-                        items={tasks.map((task) => task.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
+                    <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
                         {tasks.map((task, taskIndex) => (
                             <Fragment key={task.id}>
                                 {isStartOfUnprioritisedTier(tasks, taskIndex) && (
@@ -161,11 +187,12 @@ function StatusGroup({
                                     <TaskRow
                                         task={task}
                                         depth={0}
-                                        flatList={flatList}
                                         listId={listId}
                                         currentUserId={currentUserId}
                                         myPermission={myPermission}
                                         maxSubtasksPerParent={maxSubtasksPerParent}
+                                        siblingTasks={tasks}
+                                        onMoveTask={onMoveTask}
                                     />
                                 </div>
                             </Fragment>
@@ -174,7 +201,7 @@ function StatusGroup({
 
                     {canWrite && (
                         <button
-                            className="flex items-center gap-1.5 px-8 py-1.5 rounded-md text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted motion-safe:transition-colors w-full text-left"
+                            className="flex items-center gap-1.5 px-8 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-safe:transition-colors w-full text-left"
                             onClick={onAddTask}
                         >
                             <Plus className="h-3 w-3" />
@@ -214,6 +241,8 @@ function describeBucketBreakdown(countsByStatusId, statuses) {
  * @param {Function} props.onToggle
  * @param {Function} props.onEdit
  * @param {Function} props.onDelete
+ * @param {{ previousId: string|null, nextId: string|null }} props.moveTargets - Neighbouring sublists for Move up/down
+ * @param {(sublistId: string, neighbourId: string) => void} props.onMoveSublist - Moves a sublist next to a neighbour
  */
 function SublistHeader({
     sublist,
@@ -224,6 +253,8 @@ function SublistHeader({
     onEdit,
     onDelete,
     onAddTask,
+    moveTargets,
+    onMoveSublist,
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: sublist.id,
@@ -245,28 +276,40 @@ function SublistHeader({
             <button
                 {...listeners}
                 {...attributes}
-                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 p-3 -m-3"
-                aria-label="Drag to reorder"
+                className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0 p-3 -m-3"
+                aria-label={`Drag to reorder ${sublist.name}`}
             >
                 <GripVertical className="h-3.5 w-3.5" />
             </button>
-            <button className="flex items-center gap-2 flex-1 min-w-0 text-left" onClick={onToggle}>
-                {isCollapsed ? (
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-                <span
-                    className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: sublist.color }}
-                />
-                <span className="text-sm font-semibold text-foreground truncate">
-                    {sublist.name}
-                </span>
-                <span className="text-xs text-muted-foreground/60 flex-shrink-0">
-                    ({taskCount})
-                </span>
-            </button>
+            <h2 className="flex min-w-0 flex-1">
+                <button
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    onClick={onToggle}
+                    aria-expanded={!isCollapsed}
+                >
+                    {isCollapsed ? (
+                        <ChevronRight
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    ) : (
+                        <ChevronDown
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                        />
+                    )}
+                    <span
+                        className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: sublist.color }}
+                    />
+                    <span className="text-sm font-semibold text-foreground truncate">
+                        {sublist.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                        ({taskCount})
+                    </span>
+                </button>
+            </h2>
 
             {breakdownText && (
                 <span className="hidden sm:block flex-shrink-0 text-xs text-muted-foreground">
@@ -274,29 +317,24 @@ function SublistHeader({
                 </span>
             )}
 
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                        aria-label="Sublist actions"
-                    >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-40">
-                    <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
-                    <DropdownMenuItem onClick={onAddTask}>Add task</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        onClick={onDelete}
-                        className="text-destructive focus:text-destructive"
-                    >
-                        Delete
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <RowActionsMenu label={`Sublist actions for ${sublist.name}`}>
+                <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+                <DropdownMenuItem onClick={onAddTask}>Add task</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <MoveMenuItems
+                    canMoveUp={Boolean(moveTargets.previousId)}
+                    canMoveDown={Boolean(moveTargets.nextId)}
+                    onMoveUp={() => onMoveSublist(sublist.id, moveTargets.previousId)}
+                    onMoveDown={() => onMoveSublist(sublist.id, moveTargets.nextId)}
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    onClick={onDelete}
+                    className="text-destructive focus:text-destructive"
+                >
+                    Delete
+                </DropdownMenuItem>
+            </RowActionsMenu>
         </div>
     );
 }
@@ -324,6 +362,7 @@ export default function TaskList({
     currentUserId,
 }) {
     const queryClient = useQueryClient();
+    const { duplicateTaskById } = useDuplicateTask(listId);
 
     // Every mutation below only ever affects this one page - one shared bust target.
     function bustThisListPage() {
@@ -336,21 +375,18 @@ export default function TaskList({
         parentId: null,
         sublistId: null,
     });
-    const { flags: collapsedGroups, toggleFlag: toggleGroup } = useUIState();
+    useEffect(() => scheduleEditorPrefetch(), []);
+
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [sublistDialog, setSublistDialog] = useState({ open: false, sublist: null });
-    const [deleteSublistTarget, setDeleteSublistTarget] = useState(null);
-    const [deletingSublist, setDeletingSublist] = useState(false);
+    const {
+        deleteTarget: deleteSublistTarget,
+        setDeleteTarget: setDeleteSublistTarget,
+        requestDelete: requestDeleteSublistConfirm,
+    } = useDeleteConfirm();
+    const deleteSublistConfirm = useConfirmAction(Boolean(deleteSublistTarget));
 
-    const { data: flatList = [] } = useQuery({
-        queryKey: ['tasks', listId],
-        queryFn: async () => {
-            const response = await fetch(`/api/tasks?list_id=${listId}`);
-            if (!response.ok) throw new Error('Failed to fetch tasks');
-            return response.json();
-        },
-        initialData: initialTasks,
-    });
+    const { data: flatList = [] } = useTasksQuery(listId, { initialData: initialTasks });
 
     const spaceId = useSpaceIdForList(listId, { initialData: initialLists });
     const { data: statuses = [] } = useStatusesQuery(spaceId, { initialData: initialStatuses });
@@ -363,8 +399,9 @@ export default function TaskList({
     const maxSubtasksPerParent =
         useSpaceById(spaceId, { initialData: initialSpaces })?.max_subtasks_per_parent ?? null;
 
-    const tree = useMemo(() => flatToTree(flatList), [flatList]);
-    const rootTasks = tree; // flatToTree already returns only root nodes
+    // Reuses nodes whose task did not change, so memoized rows are skipped when another task is edited
+    const [buildStableTree] = useState(createStableTreeBuilder);
+    const rootTasks = useMemo(() => buildStableTree(flatList), [buildStableTree, flatList]);
 
     // Counts include every depth, not just root tasks - a subtask's status can differ from its parent's.
     const countsByStatusId = useMemo(() => {
@@ -385,15 +422,18 @@ export default function TaskList({
     // Grouped via a single Map pass per bucket instead of a filter-per-status - O(n), not O(n·statuses).
     const buckets = useMemo(() => {
         const hasActiveFilters = activeCount > 0;
+        // Built once, so each root looks its subtree up instead of rescanning the whole list
+        const descendantIdsByTaskId = buildDescendantIdsByTaskId(flatList);
+        const tasksById = new Map(flatList.map((task) => [task.id, task]));
 
         function rootMatchesFilters(rootTask) {
             if (!hasActiveFilters) return true;
             const context = { doneStatusId: doneStatus?.id ?? null };
             if (taskMatchesFilters(rootTask, filters, context)) return true;
-            const descendantIds = findDescendantIds(rootTask.id, flatList);
-            return flatList.some(
-                (task) => descendantIds.has(task.id) && taskMatchesFilters(task, filters, context),
-            );
+            for (const descendantId of descendantIdsByTaskId.get(rootTask.id)) {
+                if (taskMatchesFilters(tasksById.get(descendantId), filters, context)) return true;
+            }
+            return false;
         }
 
         function groupByStatus(tasks) {
@@ -416,11 +456,9 @@ export default function TaskList({
             }
             for (const rootTask of rootTasksInBucket) {
                 tally(rootTask);
-                const descendantIds = findDescendantIds(rootTask.id, flatList);
+                const descendantIds = descendantIdsByTaskId.get(rootTask.id);
                 total += descendantIds.size;
-                for (const task of flatList) {
-                    if (descendantIds.has(task.id)) tally(task);
-                }
+                for (const descendantId of descendantIds) tally(tasksById.get(descendantId));
             }
             return { total, countsByStatusId };
         }
@@ -457,6 +495,18 @@ export default function TaskList({
         ];
     }, [rootTasks, sublists, flatList, doneStatus, activeCount, filters]);
 
+    // Only the group headers' flags, so expanding one task row does not re-render the whole list
+    const groupFlagKeys = useMemo(
+        () =>
+            buckets.flatMap((bucket) => [
+                ...(bucket.sublist ? [`sublist:${bucket.sublist.id}`] : []),
+                ...statuses.map((status) => `${bucket.key}:${status.id}`),
+                `${bucket.key}:none`,
+            ]),
+        [buckets, statuses],
+    );
+    const collapsedGroups = useUIFlags(groupFlagKeys);
+
     const sensors = useSensors(
         useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
         // Touch needs its own sensor (not PointerSensor, which would race with it): a short
@@ -491,53 +541,63 @@ export default function TaskList({
         const isMovingToStart = newIndex === 0;
         const afterSiblingId = oldIndex < newIndex ? over.id : (siblingIds[newIndex - 1] ?? null);
 
-        // Optimistic reorder - lands in the new slot immediately, without waiting on the persist round-trip.
-        const reorderedSiblingIds = arrayMove(siblingIds, oldIndex, newIndex);
-        queryClient.setQueryData(['tasks', listId], (current) => {
-            const currentTasks = current ?? flatList;
-            const tasksById = new Map(currentTasks.map((task) => [task.id, task]));
-            const reorderedSiblings = reorderedSiblingIds.map((taskId) => tasksById.get(taskId));
-            let siblingCursor = 0;
-            return currentTasks.map((task) =>
-                task.parent_id === activeTask.parent_id &&
-                (task.sublist_id ?? null) === (activeTask.sublist_id ?? null)
-                    ? reorderedSiblings[siblingCursor++]
-                    : task,
-            );
-        });
+        return runExclusively(
+            `reorder:tasks:${listId}`,
+            async () => {
+                // A reload still in flight would overwrite the new order, so stop it first
+                await queryClient.cancelQueries({ queryKey: ['tasks', listId] });
+                // Optimistic reorder - lands in the new slot immediately, without waiting on the persist round-trip.
+                const reorderedSiblingIds = arrayMove(siblingIds, oldIndex, newIndex);
+                queryClient.setQueryData(['tasks', listId], (current) => {
+                    const currentTasks = current ?? flatList;
+                    const tasksById = new Map(currentTasks.map((task) => [task.id, task]));
+                    const reorderedSiblings = reorderedSiblingIds.map((taskId) =>
+                        tasksById.get(taskId),
+                    );
+                    let siblingCursor = 0;
+                    return currentTasks.map((task) =>
+                        task.parent_id === activeTask.parent_id &&
+                        (task.sublist_id ?? null) === (activeTask.sublist_id ?? null)
+                            ? reorderedSiblings[siblingCursor++]
+                            : task,
+                    );
+                });
 
-        const toastId = toast.loading('Saving order...');
+                const toastId = toast.loading('Saving order...');
 
-        try {
-            const response = await fetch(`/api/tasks/${active.id}/move`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    newParentId: activeTask.parent_id ?? null,
-                    sublistId: activeTask.parent_id ? undefined : (activeTask.sublist_id ?? null),
-                    afterSiblingId,
-                    shouldPrependToStart: isMovingToStart,
-                    listId,
-                }),
-            });
+                try {
+                    const response = await fetch(`/api/tasks/${active.id}/move`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            newParentId: activeTask.parent_id ?? null,
+                            sublistId: activeTask.parent_id
+                                ? undefined
+                                : (activeTask.sublist_id ?? null),
+                            afterSiblingId,
+                            shouldPrependToStart: isMovingToStart,
+                            listId,
+                        }),
+                    });
 
-            if (!response.ok) {
-                console.error('Drag reorder failed');
-                toast.error('Failed to reorder task', { id: toastId });
-                await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-                bustThisListPage();
-                return;
-            }
+                    if (!response.ok) {
+                        toast.error('Failed to reorder task', { id: toastId });
+                        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                        bustThisListPage();
+                        return;
+                    }
 
-            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-            bustThisListPage();
-            toast.success('Order updated', { id: toastId });
-        } catch (caughtError) {
-            console.error('Drag reorder failed:', caughtError);
-            toast.error('Failed to reorder task', { id: toastId });
-            await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-            bustThisListPage();
-        }
+                    await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                    bustThisListPage();
+                    toast.success('Order updated', { id: toastId });
+                } catch {
+                    toast.error('Failed to reorder task', { id: toastId });
+                    await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
+                    bustThisListPage();
+                }
+            },
+            () => toast.info(REORDER_BUSY_MESSAGE),
+        );
     }
 
     async function handleSublistDragEnd({ active, over }) {
@@ -545,36 +605,67 @@ export default function TaskList({
         const newIndex = sublists.findIndex((sublist) => sublist.id === over.id);
         if (oldIndex === -1 || newIndex === -1) return;
 
-        const reordered = arrayMove(sublists, oldIndex, newIndex);
-        queryClient.setQueryData(['sublists', listId], reordered);
+        return runExclusively(
+            `reorder:sublists:${listId}`,
+            async () => {
+                await queryClient.cancelQueries({ queryKey: ['sublists', listId] });
+                const reordered = arrayMove(sublists, oldIndex, newIndex);
+                queryClient.setQueryData(['sublists', listId], reordered);
 
-        const toastId = toast.loading('Saving order...');
-        try {
-            const results = await Promise.all(
-                reordered
-                    .map((sublist, newPosition) => ({ sublist, newPosition }))
-                    .filter(({ sublist, newPosition }) => sublist.position !== newPosition)
-                    .map(({ sublist, newPosition }) =>
-                        updateSublist(sublist.id, { position: newPosition }),
-                    ),
-            );
-            const failed = results.find((updateOutcome) => updateOutcome.error);
-            if (failed) {
-                toast.error(failed.error, { id: toastId });
-                await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-                bustThisListPage();
-                return;
-            }
-            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-            bustThisListPage();
-            toast.success('Order updated', { id: toastId });
-        } catch (caughtError) {
-            console.error('Sublist reorder failed:', caughtError);
-            toast.error('Failed to reorder sublist', { id: toastId });
-            await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-            bustThisListPage();
-        }
+                const toastId = toast.loading('Saving order...');
+                try {
+                    const results = await Promise.all(
+                        reordered
+                            .map((sublist, newPosition) => ({ sublist, newPosition }))
+                            .filter(({ sublist, newPosition }) => sublist.position !== newPosition)
+                            .map(({ sublist, newPosition }) =>
+                                updateSublist(sublist.id, { position: newPosition }),
+                            ),
+                    );
+                    const failed = results.find((updateOutcome) => updateOutcome.error);
+                    if (failed) {
+                        toast.error(failed.error, { id: toastId });
+                        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                        bustThisListPage();
+                        return;
+                    }
+                    await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                    bustThisListPage();
+                    toast.success('Order updated', { id: toastId });
+                } catch {
+                    toast.error('Failed to reorder sublist', { id: toastId });
+                    await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
+                    bustThisListPage();
+                }
+            },
+            () => toast.info(REORDER_BUSY_MESSAGE),
+        );
     }
+
+    /** Move up / Move down: the same save path as a drag, so the same guards and the same optimistic update apply. */
+    function moveTaskNextTo(taskId, neighbourId) {
+        return handleTaskDragEnd({ active: { id: taskId }, over: { id: neighbourId } });
+    }
+
+    // A stable wrapper, since a new handler on every list change would re-render every memoized row
+    const moveTaskNextToRef = useRef(moveTaskNextTo);
+    useEffect(() => {
+        moveTaskNextToRef.current = moveTaskNextTo;
+    });
+    const onMoveTask = useCallback(
+        (taskId, neighbourId) => moveTaskNextToRef.current(taskId, neighbourId),
+        [],
+    );
+
+    function moveSublistNextTo(sublistId, neighbourId) {
+        return handleSublistDragEnd({ active: { id: sublistId }, over: { id: neighbourId } });
+    }
+
+    const announcements = buildAnnouncements(
+        (rowId) =>
+            flatList.find((task) => task.id === rowId)?.title ??
+            sublists.find((sublist) => sublist.id === rowId)?.name,
+    );
 
     function handleDragEnd({ active, over }) {
         if (!over || active.id === over.id) return;
@@ -590,64 +681,57 @@ export default function TaskList({
             const isCtrl = keyboardEvent.ctrlKey || keyboardEvent.metaKey;
             if (!isCtrl || keyboardEvent.key !== 'd' || !focusedTaskId) return;
 
+            // The remembered row must not capture the key while the user types or works inside a dialog
+            if (keyboardEvent.target.closest?.(TYPING_OR_DIALOG_SELECTOR)) return;
+
             keyboardEvent.preventDefault();
-            duplicateTask(focusedTaskId).then(({ error }) => {
-                if (error) {
-                    toast.error(error);
-                    return;
-                }
-                queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-                queryClient.invalidateQueries({ queryKey: ['lists'] });
-                bustPageCache({ urls: [`/lists/${listId}`] });
-                toast.success('Task duplicated');
-            });
+            if (keyboardEvent.repeat) return;
+            duplicateTaskById(focusedTaskId);
         }
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [focusedTaskId, listId, queryClient]);
+    }, [focusedTaskId, duplicateTaskById]);
 
-    async function requestDeleteSublist(sublist) {
-        const response = await fetch(`/api/sublists/${sublist.id}`);
-        const counts = await response.json();
-        setDeleteSublistTarget({
-            id: sublist.id,
-            name: sublist.name,
-            taskCount: response.ok ? counts.task_count : null,
-        });
+    function requestDeleteSublist(sublist) {
+        requestDeleteSublistConfirm(
+            {
+                id: sublist.id,
+                name: sublist.name,
+                // Counted from the loaded tasks, since the sublist's own task_count skips nested subtasks.
+                taskCount: countSublistTasks(sublist.id, flatList),
+            },
+            {
+                countsUrl: `/api/sublists/${sublist.id}`,
+                withFreshCounts: (openTarget, fetched) => ({
+                    ...openTarget,
+                    taskCount: fetched.task_count,
+                }),
+            },
+        );
     }
 
-    async function handleConfirmDeleteSublist() {
+    function handleConfirmDeleteSublist() {
         if (!deleteSublistTarget) return;
+        const sublistId = deleteSublistTarget.id;
 
-        setDeletingSublist(true);
-        const toastId = toast.loading('Deleting sublist...');
-
-        let result;
-        try {
-            result = await deleteSublist(deleteSublistTarget.id);
-        } catch {
-            setDeletingSublist(false);
-            setDeleteSublistTarget(null);
-            toast.error('Could not reach the server. Check your connection and try again.', {
-                id: toastId,
-            });
-            return;
-        }
-        setDeletingSublist(false);
-        setDeleteSublistTarget(null);
-
-        if (result.error) {
-            toast.error(result.error, { id: toastId });
-            return;
-        }
-
-        await queryClient.invalidateQueries({ queryKey: ['sublists', listId] });
-        await queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
-        // Deleting a sublist cascades to delete all its tasks, changing the list's total count.
-        queryClient.invalidateQueries({ queryKey: ['lists'] });
-        bustThisListPage();
-        toast.success('Sublist deleted', { id: toastId });
+        return deleteSublistConfirm.runConfirmedAction({
+            entityKey: `sublist-delete:${sublistId}`,
+            loadingMessage: 'Deleting sublist...',
+            successMessage: 'Sublist deleted',
+            action: () => deleteSublist(sublistId),
+            // Its tasks go with it, so the popup waits for both reloads instead of showing them regrouped.
+            onSuccess: async () => {
+                await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ['sublists', listId] }),
+                    queryClient.invalidateQueries({ queryKey: ['tasks', listId] }),
+                ]);
+                // Deleting a sublist cascades to delete all its tasks, changing the list's total count.
+                queryClient.invalidateQueries({ queryKey: ['lists'] });
+                bustThisListPage();
+            },
+            close: () => setDeleteSublistTarget(null),
+        });
     }
 
     if (flatList.length === 0 && sublists.length === 0) {
@@ -691,6 +775,7 @@ export default function TaskList({
             sensors={sensors}
             collisionDetection={siblingScopedCollisionDetection}
             onDragEnd={handleDragEnd}
+            accessibility={{ announcements, screenReaderInstructions: SCREEN_READER_INSTRUCTIONS }}
         >
             <div className="space-y-6">
                 <ListHeader
@@ -732,6 +817,8 @@ export default function TaskList({
                                 <div key={bucket.key}>
                                     <SublistHeader
                                         sublist={bucket.sublist}
+                                        moveTargets={getMoveTargets(sublists, bucket.sublist.id)}
+                                        onMoveSublist={moveSublistNextTo}
                                         taskCount={0}
                                         isCollapsed={isCollapsed}
                                         onToggle={() => toggleGroup(`sublist:${bucket.sublist.id}`)}
@@ -752,7 +839,7 @@ export default function TaskList({
                                     />
                                     {!isCollapsed && canWrite && (
                                         <button
-                                            className="flex items-center gap-1.5 ml-4 md:ml-8 mr-2 my-0.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted motion-safe:transition-colors"
+                                            className="flex items-center gap-1.5 ml-4 md:ml-8 mr-2 my-0.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-safe:transition-colors"
                                             onClick={() =>
                                                 setCreateDialog({
                                                     open: true,
@@ -779,6 +866,8 @@ export default function TaskList({
                                 {bucket.sublist && (
                                     <SublistHeader
                                         sublist={bucket.sublist}
+                                        moveTargets={getMoveTargets(sublists, bucket.sublist.id)}
+                                        onMoveSublist={moveSublistNextTo}
                                         taskCount={bucket.allDepthCount}
                                         breakdownText={describeBucketBreakdown(
                                             bucket.allDepthCountsByStatusId,
@@ -807,6 +896,7 @@ export default function TaskList({
                                         {statuses.map((status) => (
                                             <StatusGroup
                                                 key={status.id}
+                                                isInSublist={Boolean(bucket.sublist)}
                                                 status={status}
                                                 tasks={bucket.tasksByStatusId.get(status.id) ?? []}
                                                 count={
@@ -820,7 +910,6 @@ export default function TaskList({
                                                 onToggle={() =>
                                                     toggleGroup(`${bucket.key}:${status.id}`)
                                                 }
-                                                flatList={flatList}
                                                 listId={listId}
                                                 onFocusTask={setFocusedTaskId}
                                                 onAddTask={() =>
@@ -835,15 +924,16 @@ export default function TaskList({
                                                 currentUserId={currentUserId}
                                                 myPermission={myPermission}
                                                 maxSubtasksPerParent={maxSubtasksPerParent}
+                                                onMoveTask={onMoveTask}
                                             />
                                         ))}
                                         <StatusGroup
+                                            isInSublist={Boolean(bucket.sublist)}
                                             status={null}
                                             tasks={bucket.tasksByStatusId.get('none') ?? []}
                                             count={bucket.allDepthCountsByStatusId.get('none') ?? 0}
                                             isCollapsed={collapsedGroups[`${bucket.key}:none`]}
                                             onToggle={() => toggleGroup(`${bucket.key}:none`)}
-                                            flatList={flatList}
                                             listId={listId}
                                             onFocusTask={setFocusedTaskId}
                                             onAddTask={() =>
@@ -857,6 +947,7 @@ export default function TaskList({
                                             currentUserId={currentUserId}
                                             myPermission={myPermission}
                                             maxSubtasksPerParent={maxSubtasksPerParent}
+                                            onMoveTask={onMoveTask}
                                         />
                                     </>
                                 )}
@@ -899,6 +990,8 @@ export default function TaskList({
             <ModalShell
                 open={!!deleteSublistTarget}
                 onClose={() => setDeleteSublistTarget(null)}
+                isBusy={deleteSublistConfirm.isPending}
+                errorMessage={deleteSublistConfirm.errorMessage}
                 variant="alert"
                 title={<>Delete &ldquo;{deleteSublistTarget?.name}&rdquo;?</>}
                 description={
@@ -908,15 +1001,18 @@ export default function TaskList({
                 }
                 footer={
                     <>
-                        <AlertDialogCancel onClick={() => setDeleteSublistTarget(null)}>
+                        <AlertDialogCancel
+                            onClick={() => setDeleteSublistTarget(null)}
+                            disabled={deleteSublistConfirm.isPending}
+                        >
                             Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleConfirmDeleteSublist}
-                            disabled={deletingSublist}
+                            disabled={deleteSublistConfirm.isPending}
                             className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deletingSublist && <Loader size="xs" />}
+                            {deleteSublistConfirm.isPending && <Loader size="xs" />}
                             Delete
                         </AlertDialogAction>
                     </>

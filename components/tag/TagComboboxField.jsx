@@ -66,8 +66,12 @@ export default function TagComboboxField({
     return (
         <div className="flex flex-wrap items-center gap-1.5">
             {tags.map((tag) => (
-                <Badge key={tag.key} variant="tag" className={`gap-1 pr-1 ${badgeSizeClass}`}>
-                    {tag.name}
+                <Badge
+                    key={tag.key}
+                    variant="tag"
+                    className={`max-w-full gap-1 pr-1 ${badgeSizeClass}`}
+                >
+                    <span className="min-w-0 truncate">{tag.name}</span>
                     <button
                         type="button"
                         onClick={() => onRemove(tag.key)}
@@ -85,7 +89,7 @@ export default function TagComboboxField({
                     <button
                         type="button"
                         disabled={addPending}
-                        className={`flex items-center gap-1 border border-dashed border-input text-muted-foreground dark:bg-input/30 hover:text-foreground hover:border-foreground/40 ${addButtonSizeClass}`}
+                        className={`flex items-center gap-1 border border-dashed border-field text-muted-foreground dark:bg-input/30 hover:text-foreground hover:border-foreground/40 ${addButtonSizeClass}`}
                     >
                         {addPending ? <Loader size="xs" /> : <Plus className="h-3 w-3" />}
                         Tag

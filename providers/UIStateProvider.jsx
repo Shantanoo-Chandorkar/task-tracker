@@ -1,6 +1,6 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 
 // Module-level singleton (not React state) so useUIFlag subscribers can skip unrelated toggles.
 let flags = {};
@@ -47,17 +47,26 @@ export function UIStateProvider({ children }) {
 }
 
 /**
- * Reads/writes the shared UI flag store, subscribed to every key (use `useUIFlag` for just one).
+ * Reads a fixed set of UI flags, re-rendering only when one of those keys changes, not any other flag.
  *
- * @returns {{flags: Object<string, boolean>, toggleFlag: Function, setFlag: Function}}
+ * @param {string[]} keys - The flags' namespaced keys; pass a memoized array so the result stays stable.
+ * @returns {Object<string, boolean>} Each key mapped to its current value.
  */
-export function useUIState() {
-    const snapshot = useSyncExternalStore(
+export function useUIFlags(keys) {
+    // A string snapshot compares by value, so unrelated flag changes leave it equal and skip the render
+    const flagStatesSignature = useSyncExternalStore(
         subscribe,
-        () => flags,
-        () => flags,
+        () => keys.map((key) => (flags[key] ? '1' : '0')).join(''),
+        () => '0'.repeat(keys.length),
     );
-    return { flags: snapshot, toggleFlag, setFlag };
+
+    return useMemo(
+        () =>
+            Object.fromEntries(
+                keys.map((key, keyIndex) => [key, flagStatesSignature[keyIndex] === '1']),
+            ),
+        [keys, flagStatesSignature],
+    );
 }
 
 /**

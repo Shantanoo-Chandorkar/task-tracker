@@ -20,7 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-    title: 'Task Tracker',
+    // Pages set only their own name; the template adds the app name so every tab title is distinct
+    title: { default: 'Task Tracker', template: '%s - Task Tracker' },
     description: 'Nested task management',
     // 'default' keeps the iOS status bar solid, so no content ever sits under it.
     appleWebApp: { capable: true, title: 'Task Tracker', statusBarStyle: 'default' },
@@ -73,8 +74,11 @@ export default async function RootLayout({ children }) {
                     <UIStateProvider>{children}</UIStateProvider>
                 </QueryProvider>
                 {/* Mobile offset matches the app layout's 5rem bottom padding, so toasts clear the nav and FAB. */}
+                {/* Errors are often the only failure feedback, so toasts outlive the 4s default; hover pauses them */}
                 <Toaster
                     richColors
+                    duration={10000}
+                    closeButton
                     position="bottom-right"
                     mobileOffset={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
                 />

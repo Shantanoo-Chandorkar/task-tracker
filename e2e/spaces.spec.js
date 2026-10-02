@@ -17,7 +17,10 @@ test.describe('spaces', () => {
         const spaceName = await createSpace(page);
         const newName = uniqueName('Renamed space');
 
-        await spaceSection(page, spaceName).getByRole('button', { name: 'Edit space' }).click();
+        await spaceSection(page, spaceName)
+            .getByRole('button', { name: `More actions for ${spaceName}`, exact: true })
+            .click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
         await page.getByRole('dialog').getByPlaceholder('Space name').fill(newName);
         await page.getByRole('dialog').getByRole('button', { name: 'Save changes' }).click();
         await expect(page.getByRole('dialog')).toBeHidden();
@@ -32,7 +35,10 @@ test.describe('spaces', () => {
         const spaceName = await createSpace(page);
         const listName = await createList(page, spaceName);
 
-        await spaceSection(page, spaceName).getByRole('button', { name: 'Delete space' }).click();
+        await spaceSection(page, spaceName)
+            .getByRole('button', { name: `More actions for ${spaceName}`, exact: true })
+            .click();
+        await page.getByRole('menuitem', { name: 'Delete' }).click();
         await expect(
             page.getByText('This deletes 1 list and 0 tasks. This cannot be undone.'),
         ).toBeVisible();

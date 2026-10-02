@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { ListChecks, LayoutGrid } from 'lucide-react';
 import {
     CommandDialog,
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/command';
 import { Loader } from '@/components/ui/loader';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { fetchJson } from '@/lib/fetch-json';
 
 const listeners = new Set();
 let isOpenState = false;
@@ -43,6 +45,8 @@ function closeSearch() {
 }
 
 const EMPTY_RESULTS = { tasks: [], lists: [], spaces: [] };
+const SEARCH_STALE_TIME_MS = 30 * 1000;
+const SEARCH_UNAVAILABLE_MESSAGE = 'Search is unavailable. Check your connection and try again.';
 
 /**
  * Global search palette - tasks, lists, and spaces, searched server-side via `/api/search`.
@@ -51,8 +55,6 @@ export default function GlobalSearch() {
     const open = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
     const router = useRouter();
     const [query, setQuery] = useState('');
-    const [results, setResults] = useState(EMPTY_RESULTS);
-    const [completedQuery, setCompletedQuery] = useState(null);
     const trimmedQuery = query.trim();
     const debouncedQuery = useDebouncedValue(trimmedQuery, 250);
 
@@ -78,25 +80,16 @@ export default function GlobalSearch() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // `cancelled` guards against a slower earlier response landing after a later one.
-    useEffect(() => {
-        if (!open || !debouncedQuery) return;
-
-        let cancelled = false;
-
-        fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`)
-            .then((response) => (response.ok ? response.json() : EMPTY_RESULTS))
-            .catch(() => EMPTY_RESULTS)
-            .then((data) => {
-                if (cancelled) return;
-                setResults(data);
-                setCompletedQuery(debouncedQuery);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [debouncedQuery, open]);
+    // Each keystroke's query key aborts the previous request, so a slow old answer can never replace a newer one.
+    const searchResultsQuery = useQuery({
+        queryKey: ['search', debouncedQuery],
+        queryFn: ({ signal }) =>
+            fetchJson(`/api/search?q=${encodeURIComponent(debouncedQuery)}`, { signal }),
+        enabled: open && Boolean(debouncedQuery),
+        staleTime: SEARCH_STALE_TIME_MS,
+        // Typing another character is the retry the user expects
+        retry: false,
+    });
 
     function handleSelect(href) {
         closeSearch();
@@ -105,13 +98,29 @@ export default function GlobalSearch() {
 
     // Covers the debounce gap too, not just the fetch, so results are never shown stale.
     const isLoading =
-        Boolean(trimmedQuery) &&
-        (trimmedQuery !== debouncedQuery || debouncedQuery !== completedQuery);
-    const displayResults = trimmedQuery && !isLoading ? results : EMPTY_RESULTS;
+        Boolean(trimmedQuery) && (trimmedQuery !== debouncedQuery || searchResultsQuery.isPending);
+    const hasFailed = Boolean(trimmedQuery) && !isLoading && searchResultsQuery.isError;
+    const displayResults =
+        trimmedQuery && !isLoading && !hasFailed
+            ? (searchResultsQuery.data ?? EMPTY_RESULTS)
+            : EMPTY_RESULTS;
     const hasResults =
         displayResults.tasks.length > 0 ||
         displayResults.lists.length > 0 ||
         displayResults.spaces.length > 0;
+
+    const resultCount =
+        displayResults.tasks.length + displayResults.lists.length + displayResults.spaces.length;
+    // Screen-reader twin of the visible result list, spoken once per change
+    const statusMessage = !trimmedQuery
+        ? ''
+        : isLoading
+          ? 'Searching'
+          : hasFailed
+            ? SEARCH_UNAVAILABLE_MESSAGE
+            : hasResults
+              ? `${resultCount} ${resultCount === 1 ? 'result' : 'results'}`
+              : 'No results';
 
     return (
         <CommandDialog
@@ -120,12 +129,16 @@ export default function GlobalSearch() {
             title="Search"
             description="Search tasks, lists, and spaces"
         >
-            <Command shouldFilter={false}>
+            {/* cmdk names the input from this label; an aria-label on the input is ignored */}
+            <Command shouldFilter={false} label="Search tasks, lists, spaces">
                 <CommandInput
                     placeholder="Search tasks, lists, spaces"
                     value={query}
                     onValueChange={setQuery}
                 />
+                <div role="status" className="sr-only">
+                    {statusMessage}
+                </div>
                 <CommandList>
                     {!hasResults && isLoading && (
                         <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
@@ -136,7 +149,11 @@ export default function GlobalSearch() {
 
                     {!hasResults && !isLoading && (
                         <CommandEmpty>
-                            {trimmedQuery ? 'No results.' : 'Type to search'}
+                            {hasFailed
+                                ? SEARCH_UNAVAILABLE_MESSAGE
+                                : trimmedQuery
+                                  ? 'No results.'
+                                  : 'Type to search'}
                         </CommandEmpty>
                     )}
 
