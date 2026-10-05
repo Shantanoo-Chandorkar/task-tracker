@@ -8,11 +8,11 @@ const LIST_ID = 'list-1';
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
-vi.mock('@/actions/task-actions', () => ({
+vi.mock('@/actions/task-delete-actions', () => ({
     deleteTask: vi.fn(),
     deleteTaskAndReparentChildren: vi.fn(),
-    updateTask: vi.fn(),
 }));
+vi.mock('@/actions/task-update-actions', () => ({ updateTask: vi.fn() }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 

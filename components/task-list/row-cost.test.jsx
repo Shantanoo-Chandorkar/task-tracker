@@ -25,10 +25,12 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
-vi.mock('@/actions/task-actions', () => ({
+vi.mock('@/actions/task-delete-actions', () => ({
     deleteTask: vi.fn(),
     deleteTaskAndReparentChildren: vi.fn(),
-    updateTask: vi.fn(),
+}));
+vi.mock('@/actions/task-update-actions', () => ({ updateTask: vi.fn() }));
+vi.mock('@/actions/task-completion-actions', () => ({
     completeTaskAndDescendants: vi.fn(),
     uncompleteTaskAndDescendants: vi.fn(),
 }));

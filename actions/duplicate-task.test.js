@@ -61,7 +61,7 @@ describe('duplicateTask with a client-made id for the copy', () => {
     it('fails cleanly and copies nothing when the list read for the depth check fails', async () => {
         listReadError = { code: '57014', message: 'timeout detail' };
         vi.spyOn(console, 'error').mockImplementation(() => {});
-        const { duplicateTask } = await import('./task-actions');
+        const { duplicateTask } = await import('./task-duplicate-action');
 
         const duplicateResult = await duplicateTask('task-1', NEW_ROOT_ID);
 
@@ -70,7 +70,7 @@ describe('duplicateTask with a client-made id for the copy', () => {
     });
 
     it('passes the id to the database function so the copy gets that id', async () => {
-        const { duplicateTask } = await import('./task-actions');
+        const { duplicateTask } = await import('./task-duplicate-action');
 
         const { error } = await duplicateTask('task-1', NEW_ROOT_ID);
 
@@ -81,7 +81,7 @@ describe('duplicateTask with a client-made id for the copy', () => {
 
     it('reports success on a retry and copies nothing when the copy already exists', async () => {
         lookupRow = { id: NEW_ROOT_ID, created_by: USER_ID };
-        const { duplicateTask } = await import('./task-actions');
+        const { duplicateTask } = await import('./task-duplicate-action');
 
         const { error } = await duplicateTask('task-1', NEW_ROOT_ID);
 
@@ -92,7 +92,7 @@ describe('duplicateTask with a client-made id for the copy', () => {
     it("does not treat someone else's row with that id as a finished copy", async () => {
         lookupRow = { id: NEW_ROOT_ID, created_by: 'user-2' };
         rpcResult = { error: { code: '23505', message: 'duplicate key' } };
-        const { duplicateTask } = await import('./task-actions');
+        const { duplicateTask } = await import('./task-duplicate-action');
 
         const { error } = await duplicateTask('task-1', NEW_ROOT_ID);
 
@@ -101,7 +101,7 @@ describe('duplicateTask with a client-made id for the copy', () => {
 
     it("treats a key clash from a simultaneous request as success when the copy is the caller's own", async () => {
         rpcResult = { error: { code: '23505', message: 'duplicate key' } };
-        const { duplicateTask } = await import('./task-actions');
+        const { duplicateTask } = await import('./task-duplicate-action');
         lookupRow = null;
 
         const firstAttempt = await duplicateTask('task-1', NEW_ROOT_ID);
@@ -113,7 +113,7 @@ describe('duplicateTask with a client-made id for the copy', () => {
     });
 
     it('rejects an id that is not a UUID with a stable code and copies nothing', async () => {
-        const { duplicateTask } = await import('./task-actions');
+        const { duplicateTask } = await import('./task-duplicate-action');
 
         const result = await duplicateTask('task-1', 'not-a-uuid');
 
@@ -122,7 +122,7 @@ describe('duplicateTask with a client-made id for the copy', () => {
     });
 
     it('still duplicates without an id, so the menu and other callers keep working', async () => {
-        const { duplicateTask } = await import('./task-actions');
+        const { duplicateTask } = await import('./task-duplicate-action');
 
         const { error } = await duplicateTask('task-1');
 

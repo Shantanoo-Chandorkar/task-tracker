@@ -42,7 +42,7 @@ describe('subtask cap check when creating a subtask', () => {
 
     it('says the parent task was not found instead of skipping the check', async () => {
         fake = createFakeSupabase({ tables: buildTables(), getCallerId: () => OWNER_ID });
-        const { createTask } = await import('./task-actions');
+        const { createTask } = await import('./task-create-actions');
 
         const createResult = await createTask({
             title: 'Child',
@@ -66,7 +66,7 @@ describe('subtask cap check when creating a subtask', () => {
             depth: 1,
         });
         fake = createFakeSupabase({ tables, getCallerId: () => OWNER_ID });
-        const { createTask } = await import('./task-actions');
+        const { createTask } = await import('./task-create-actions');
 
         const createResult = await createTask({
             title: 'Second child',

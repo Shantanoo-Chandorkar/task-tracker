@@ -1,4 +1,5 @@
-import { updateTask, deleteTask } from '@/actions/task-actions';
+import { deleteTask } from '@/actions/task-delete-actions';
+import { updateTask } from '@/actions/task-update-actions';
 import { withApiErrorHandling, actionResponse, apiErrorResponse } from '@/lib/api-response';
 import { TASK_UPDATE_EMPTY } from '@/lib/error-codes';
 

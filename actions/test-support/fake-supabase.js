@@ -11,17 +11,45 @@ const MAX_ROWS = 1000;
  * @param {Record<string, object[]>} options.tables - Rows per table name
  * @param {(args: object) => object} [options.moveRpcResult] - Builds the `move_task_subtree` reply from its args
  * @param {() => string} [options.getCallerId] - Id the database would read from the login token (`auth.uid()`)
- * @returns {{ client: object, rpcCalls: object[], queries: object[], updates: object[] }} The client, plus records for assertions
+ * @param {Record<string, object|((args: object) => object)>} [options.rpcResults] - Replies for other rpc names
+ * @param {object} [options.insertError] - Error every insert answers with, instead of storing the row
+ * @param {object} [options.updateError] - Error every update answers with, instead of changing rows
+ * @param {object} [options.deleteError] - Error every delete answers with, instead of removing rows
+ * @returns {{ client: object, rpcCalls: object[], queries: object[], updates: object[], inserts: object[],
+ *   deletes: object[] }}
+ *   The client, plus records for assertions
  */
-export function createFakeSupabase({ tables, moveRpcResult, getCallerId = () => null }) {
+export function createFakeSupabase({
+    tables,
+    moveRpcResult,
+    getCallerId = () => null,
+    rpcResults = {},
+    insertError = null,
+    updateError = null,
+    deleteError = null,
+}) {
     const rpcCalls = [];
     const queries = [];
     const updates = [];
+    const inserts = [];
+    const deletes = [];
+    let insertedRowCount = 0;
 
     function attachJoins(tableName, selectColumns, row) {
         if (tableName === 'tasks' && selectColumns?.includes('lists(')) {
             const list = tables.lists.find((candidate) => candidate.id === row.list_id);
-            return { ...row, lists: list ? { space_id: list.space_id } : null };
+            const space = tables.spaces?.find((candidate) => candidate.id === list?.space_id);
+            return {
+                ...row,
+                lists: list
+                    ? {
+                          space_id: list.space_id,
+                          ...(selectColumns.includes('spaces(') && {
+                              spaces: { require_due_date: space?.require_due_date ?? false },
+                          }),
+                      }
+                    : null,
+            };
         }
         return row;
     }
@@ -35,6 +63,8 @@ export function createFakeSupabase({ tables, moveRpcResult, getCallerId = () => 
         let rangeStart = null;
         let rangeEnd = null;
         let pendingUpdate = null;
+        let pendingInsert = null;
+        let isDeleting = false;
 
         function addFilter(operator, column, value) {
             filters.push({ operator, column, value });
@@ -89,6 +119,16 @@ export function createFakeSupabase({ tables, moveRpcResult, getCallerId = () => 
                 return builder;
             },
             single: async () => {
+                if (pendingInsert) {
+                    if (insertError) return { data: null, error: insertError };
+                    insertedRowCount += 1;
+                    const insertedRow = {
+                        id: `${tableName}-new-${insertedRowCount}`,
+                        ...pendingInsert,
+                    };
+                    (tables[tableName] ??= []).push(insertedRow);
+                    return { data: insertedRow, error: null };
+                }
                 const rows = matchingRows();
                 return rows.length === 1
                     ? { data: rows[0], error: null }
@@ -99,13 +139,29 @@ export function createFakeSupabase({ tables, moveRpcResult, getCallerId = () => 
                 updates.push({ tableName, values });
                 return builder;
             },
+            insert(values) {
+                pendingInsert = values;
+                inserts.push({ tableName, values });
+                return builder;
+            },
+            delete() {
+                isDeleting = true;
+                deletes.push({ tableName, filters });
+                return builder;
+            },
             maybeSingle: async () => {
+                if (pendingUpdate && updateError) return { data: null, error: updateError };
+                if (isDeleting && deleteError) return { data: null, error: deleteError };
                 const row = matchingRows()[0] ?? null;
                 if (pendingUpdate && row) Object.assign(row, pendingUpdate);
+                if (isDeleting && row) tables[tableName].splice(tables[tableName].indexOf(row), 1);
                 return { data: row, error: null };
             },
             then(resolve) {
+                if (pendingUpdate && updateError)
+                    return resolve({ data: null, error: updateError });
                 const rows = matchingRows();
+                if (pendingUpdate) rows.forEach((row) => Object.assign(row, pendingUpdate));
                 if (selectOptions?.head)
                     return resolve({ data: null, count: rows.length, error: null });
                 return resolve({ data: rows, error: null });
@@ -131,11 +187,17 @@ export function createFakeSupabase({ tables, moveRpcResult, getCallerId = () => 
             return Promise.resolve({ data: permissionLevelFor(args.target_space_id), error: null });
         }
         rpcCalls.push({ functionName, args });
-        const reply = moveRpcResult
-            ? moveRpcResult(args)
-            : { data: { id: args.p_task_id }, error: null };
-        return { single: async () => reply };
+        const namedReply = rpcResults[functionName];
+        const reply =
+            namedReply !== undefined
+                ? typeof namedReply === 'function'
+                    ? namedReply(args)
+                    : namedReply
+                : moveRpcResult
+                  ? moveRpcResult(args)
+                  : { data: { id: args.p_task_id }, error: null };
+        return Object.assign(Promise.resolve(reply), { single: async () => reply });
     }
 
-    return { client: { from, rpc }, rpcCalls, queries, updates };
+    return { client: { from, rpc }, rpcCalls, queries, updates, inserts, deletes };
 }

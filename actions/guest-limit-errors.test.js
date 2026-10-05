@@ -12,7 +12,7 @@ const { createSpace } = await import('./space-actions');
 const { createList } = await import('./list-actions');
 const { createSublist } = await import('./sublist-actions');
 const { createStatus } = await import('./status-actions');
-const { createTask } = await import('./task-actions');
+const { createTask } = await import('./task-create-actions');
 const { addTagToTask } = await import('./tag-actions');
 const { GUEST_ERROR_CODES } = await import('@/lib/guest/guest-error-codes');
 

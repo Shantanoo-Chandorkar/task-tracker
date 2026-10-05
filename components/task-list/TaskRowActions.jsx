@@ -10,7 +10,7 @@ import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdow
 import RowActionsMenu, { MoveMenuItems } from '@/components/custom/RowActionsMenu';
 import ModalShell from '@/components/custom/ModalShell';
 import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
-import { deleteTask, deleteTaskAndReparentChildren } from '@/actions/task-actions';
+import { deleteTask, deleteTaskAndReparentChildren } from '@/actions/task-delete-actions';
 import { useDuplicateTask } from '@/hooks/useDuplicateTask';
 import { buildMoveGroups } from '@/lib/tasks/move-groups';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';

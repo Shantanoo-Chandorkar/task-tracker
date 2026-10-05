@@ -29,7 +29,7 @@ describe('createTaskWithTags on a retried create', () => {
             error: 'Tag is already assigned to the task',
             code: 'TAG_ALREADY_ON_TASK',
         });
-        const { createTaskWithTags } = await import('./task-actions');
+        const { createTaskWithTags } = await import('./task-create-actions');
 
         const { data, tagErrors } = await createTaskWithTags({
             id: CLIENT_ID,
@@ -44,7 +44,7 @@ describe('createTaskWithTags on a retried create', () => {
 
     it('still reports a tag that genuinely failed', async () => {
         addTagToTask.mockResolvedValue({ data: null, error: 'Failed to create tag' });
-        const { createTaskWithTags } = await import('./task-actions');
+        const { createTaskWithTags } = await import('./task-create-actions');
 
         const { tagErrors } = await createTaskWithTags({
             id: CLIENT_ID,

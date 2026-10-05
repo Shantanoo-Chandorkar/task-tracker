@@ -7,10 +7,10 @@ import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { findCompletedDescendants, findIncompleteDescendants } from '@/lib/tasks/task-completion';
 import {
-    updateTask,
     completeTaskAndDescendants,
     uncompleteTaskAndDescendants,
-} from '@/actions/task-actions';
+} from '@/actions/task-completion-actions';
+import { updateTask } from '@/actions/task-update-actions';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
 import { withSavedRow, withStatusDisplay } from '@/lib/cache/query-cache';

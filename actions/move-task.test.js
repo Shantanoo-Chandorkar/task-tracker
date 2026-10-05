@@ -64,7 +64,7 @@ async function moveTaskWith(taskId, fields, tablesOptions) {
         tables: buildTables(tablesOptions),
         getCallerId: () => currentUserId,
     });
-    const { moveTask } = await import('./task-actions');
+    const { moveTask } = await import('./task-move-action');
     return moveTask(taskId, fields);
 }
 
@@ -240,7 +240,7 @@ describe('moveTask', () => {
             position: 1,
         });
         fake = createFakeSupabase({ tables, getCallerId: () => currentUserId });
-        const { moveTask } = await import('./task-actions');
+        const { moveTask } = await import('./task-move-action');
 
         const moveResult = await moveTask('task-a', { newParentId: 'zz-deep-child' });
 
@@ -256,7 +256,7 @@ describe('moveTask', () => {
                 error: { code: 'P0001', message: 'TASK_MOVE_CYCLE raised internally' },
             }),
         });
-        const { moveTask } = await import('./task-actions');
+        const { moveTask } = await import('./task-move-action');
 
         const moveResult = await moveTask('task-d', { newParentId: 'task-a' });
 

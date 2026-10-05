@@ -32,7 +32,7 @@ function buildTables({ isRecurring = true, spawnedCount = 3 } = {}) {
 
 async function updateTaskWith(fields, tablesOptions) {
     fake = createFakeSupabase({ tables: buildTables(tablesOptions), getCallerId: () => OWNER_ID });
-    const { updateTask } = await import('./task-actions');
+    const { updateTask } = await import('./task-update-actions');
     const updateResult = await updateTask('task-1', fields);
     return {
         updateResult,

@@ -64,7 +64,7 @@ const createActionCases = [
     },
     {
         name: 'createTask',
-        module: './task-actions',
+        module: './task-create-actions',
         ownerColumn: 'created_by',
         fields: { title: 'Buy milk', list_id: 'list-1' },
     },
