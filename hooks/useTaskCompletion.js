@@ -112,7 +112,9 @@ export function useTaskCompletion(listId) {
                 }
                 queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
                 bustPageCache({ urls: [`/lists/${listId}`] });
-                toast.dismiss(toastId);
+                // A completed task leaves for the collapsed Done group, so say it worked instead of vanishing silently
+                if (isComplete) toast.success('Marked complete', { id: toastId });
+                else toast.dismiss(toastId);
             } finally {
                 releaseInFlight();
             }

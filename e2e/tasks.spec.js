@@ -24,6 +24,18 @@ function collectServerActionRequests(page) {
     return serverActionRequests;
 }
 
+/**
+ * Opens the Done group, which starts collapsed. Exactly one caller owns this toggle per test; a second click closes it.
+ *
+ * @param {import('@playwright/test').Page} page - Page showing the list.
+ * @returns {Promise<void>} Resolves once the group is open.
+ */
+async function expandDoneGroup(page) {
+    const doneToggle = page.getByRole('button', { name: /^Done \(\d+\)$/ });
+    await doneToggle.click();
+    await expect(doneToggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 test.describe('tasks', () => {
     let listId;
 
@@ -129,6 +141,9 @@ test.describe('tasks', () => {
         await expect(page.getByText('This will also mark 1 subtask as complete.')).toBeVisible();
         await page.getByRole('button', { name: 'Mark complete' }).click();
 
+        // The completed task leaves for the collapsed Done group; the toast is the signal that the save finished.
+        await expect(page.getByText('Marked complete', { exact: true })).toBeVisible();
+        await expandDoneGroup(page);
         // Checks status text, not the menu - reopening it right after a dialog closes is flaky (see e2e-test-quality.md).
         await expect(taskRow(page, parentTitle).getByText('Done', { exact: true })).toBeVisible();
         await expect(taskRow(page, childTitle).getByText('Done', { exact: true })).toBeVisible();
@@ -144,6 +159,8 @@ test.describe('tasks', () => {
         await taskRow(page, parentTitle).getByRole('button', { name: 'More actions' }).click();
         await page.getByRole('menuitem', { name: 'Mark as complete' }).click();
         await page.getByRole('button', { name: 'Mark complete' }).click();
+        await expect(page.getByText('Marked complete', { exact: true })).toBeVisible();
+        await expandDoneGroup(page);
         await expect(taskRow(page, parentTitle).getByText('Done', { exact: true })).toBeVisible();
         // The confirm dialog's close animation must finish before the dropdown trigger below will reopen it.
         await expect(page.getByText(`Mark “${parentTitle}” complete?`)).toBeHidden();

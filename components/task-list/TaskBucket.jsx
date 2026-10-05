@@ -3,6 +3,7 @@
 import { Plus } from 'lucide-react';
 import { getMoveTargets } from '@/lib/tasks/move-neighbours';
 import { describeBucketBreakdown } from '@/lib/tasks/task-buckets';
+import { getStatusGroupFlagKey, isStatusGroupCollapsed } from '@/lib/tasks/status-group-collapse';
 import StatusGroup from './StatusGroup';
 import SublistHeader from './SublistHeader';
 
@@ -15,7 +16,7 @@ import SublistHeader from './SublistHeader';
  * @param {object} props.bucket - Bucket from `buildTaskBuckets`
  * @param {object[]} props.statuses - The space's statuses, in display order
  * @param {object[]} props.sublists - All sublists of the list, for the Move up / Move down neighbours
- * @param {Object<string, boolean>} props.collapsedGroups - Collapsed flag per group key
+ * @param {Object<string, boolean>} props.groupFlags - UI flag per group key, from `useUIFlags`
  * @param {string} props.listId - The list this bucket belongs to
  * @param {boolean} props.canWrite - Whether the caller may create tasks
  * @param {string|null} props.currentUserId - Caller's user id, for row-level ownership checks
@@ -33,7 +34,7 @@ export default function TaskBucket({
     bucket,
     statuses,
     sublists,
-    collapsedGroups,
+    groupFlags,
     listId,
     canWrite,
     currentUserId,
@@ -49,7 +50,7 @@ export default function TaskBucket({
 }) {
     const { sublist } = bucket;
     const sublistFlagKey = sublist ? `sublist:${sublist.id}` : null;
-    const isSublistCollapsed = sublist ? collapsedGroups[sublistFlagKey] : false;
+    const isSublistCollapsed = sublist ? groupFlags[sublistFlagKey] : false;
     const sublistId = sublist?.id ?? null;
 
     function renderSublistHeader(headerProps) {
@@ -116,8 +117,10 @@ export default function TaskBucket({
                             status={status}
                             tasks={bucket.tasksByStatusId.get(status.id) ?? []}
                             count={bucket.allDepthCountsByStatusId.get(status.id) ?? 0}
-                            isCollapsed={collapsedGroups[`${bucket.key}:${status.id}`]}
-                            onToggle={() => onToggleGroup(`${bucket.key}:${status.id}`)}
+                            isCollapsed={isStatusGroupCollapsed(groupFlags, bucket.key, status)}
+                            onToggle={() =>
+                                onToggleGroup(getStatusGroupFlagKey(bucket.key, status))
+                            }
                             onAddTask={() => onAddTask({ sublistId, statusId: status.id })}
                         />
                     ))}
@@ -126,8 +129,8 @@ export default function TaskBucket({
                         status={null}
                         tasks={bucket.tasksByStatusId.get('none') ?? []}
                         count={bucket.allDepthCountsByStatusId.get('none') ?? 0}
-                        isCollapsed={collapsedGroups[`${bucket.key}:none`]}
-                        onToggle={() => onToggleGroup(`${bucket.key}:none`)}
+                        isCollapsed={isStatusGroupCollapsed(groupFlags, bucket.key, null)}
+                        onToggle={() => onToggleGroup(getStatusGroupFlagKey(bucket.key, null))}
                         onAddTask={() => onAddTask({ sublistId })}
                     />
                 </>

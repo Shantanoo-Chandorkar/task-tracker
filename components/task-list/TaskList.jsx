@@ -6,6 +6,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus } from 'lucide-react';
 import { buildTaskBuckets, countTasksByStatusId } from '@/lib/tasks/task-buckets';
 import { createStableTreeBuilder } from '@/lib/tasks/task-tree';
+import { getStatusGroupFlagKey } from '@/lib/tasks/status-group-collapse';
 import { toggleFlag as toggleGroup, useUIFlags } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
@@ -104,12 +105,12 @@ export default function TaskList({
         () =>
             buckets.flatMap((bucket) => [
                 ...(bucket.sublist ? [`sublist:${bucket.sublist.id}`] : []),
-                ...statuses.map((status) => `${bucket.key}:${status.id}`),
-                `${bucket.key}:none`,
+                ...statuses.map((status) => getStatusGroupFlagKey(bucket.key, status)),
+                getStatusGroupFlagKey(bucket.key, null),
             ]),
         [buckets, statuses],
     );
-    const collapsedGroups = useUIFlags(groupFlagKeys);
+    const groupFlags = useUIFlags(groupFlagKeys);
 
     const { dndContextProps, onMoveTask, onMoveSublist } = useListDragAndDrop(
         listId,
@@ -170,7 +171,7 @@ export default function TaskList({
                             bucket={bucket}
                             statuses={statuses}
                             sublists={sublists}
-                            collapsedGroups={collapsedGroups}
+                            groupFlags={groupFlags}
                             listId={listId}
                             canWrite={canWrite}
                             currentUserId={currentUserId}

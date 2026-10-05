@@ -217,7 +217,13 @@ beforeEach(() => {
     state.duplicateTaskById = vi.fn();
     globalThis.fetch = vi.fn(async () => ({ ok: true }));
     seedStandardList();
-    for (const flagKey of ['direct:st-todo', 'direct:st-done', 's1:st-todo', 'sublist:s1']) {
+    for (const flagKey of [
+        'direct:st-todo',
+        'direct:st-done:expanded',
+        's1:st-todo',
+        's1:st-done:expanded',
+        'sublist:s1',
+    ]) {
         setFlag(flagKey, false);
     }
 });
@@ -282,6 +288,52 @@ describe('TaskList grouping', () => {
 
         fireEvent.click(todoToggle);
         expect(screen.getByTestId('row-a')).toBeTruthy();
+    });
+
+    it('starts the Done group collapsed, with its count still showing', () => {
+        renderTaskList();
+        const doneHeading = screen.getByRole('heading', { name: /Done/ });
+
+        expect(within(doneHeading).getByRole('button').getAttribute('aria-expanded')).toBe('false');
+        expect(doneHeading.textContent).toContain('(1)');
+        expect(screen.queryByTestId('row-d')).toBeNull();
+    });
+
+    it('expands the Done group from its heading and collapses it again', () => {
+        renderTaskList();
+        const doneToggle = within(screen.getByRole('heading', { name: /Done/ })).getByRole(
+            'button',
+        );
+
+        fireEvent.click(doneToggle);
+        expect(screen.getByTestId('row-d')).toBeTruthy();
+        expect(doneToggle.getAttribute('aria-expanded')).toBe('true');
+
+        fireEvent.click(doneToggle);
+        expect(screen.queryByTestId('row-d')).toBeNull();
+    });
+
+    it('leaves every other status group expanded', () => {
+        renderTaskList();
+
+        expect(screen.getByTestId('row-a')).toBeTruthy();
+        expect(screen.getByTestId('row-b')).toBeTruthy();
+        expect(screen.getAllByRole('heading', { name: /To do/ })[0].textContent).toContain('(3)');
+    });
+
+    it('keeps the Done group of a sublist apart from the Done group of the main list', () => {
+        state.tasks = [...state.tasks, buildTask('f', { sublist_id: 's1', status_id: 'st-done' })];
+        renderTaskList();
+        expect(screen.queryByTestId('row-d')).toBeNull();
+        expect(screen.queryByTestId('row-f')).toBeNull();
+
+        const [mainDoneToggle] = screen
+            .getAllByRole('heading', { name: /Done/ })
+            .map((doneHeading) => within(doneHeading).getByRole('button'));
+        fireEvent.click(mainDoneToggle);
+
+        expect(screen.getByTestId('row-d')).toBeTruthy();
+        expect(screen.queryByTestId('row-f')).toBeNull();
     });
 
     it('collapses a whole sublist from its header', () => {
