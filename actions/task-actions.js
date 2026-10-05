@@ -8,7 +8,7 @@ import {
     exceedsMaxDepthAfterMove,
     resolveRootAncestorSublistId,
 } from '@/lib/move-task-checks';
-import { computeNextOccurrence } from '@/lib/recurrence';
+import { computeNextOccurrence, recurrenceRulesMatch } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
 import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
@@ -313,7 +313,9 @@ export const updateTask = withAuthenticatedAction(
 
         const { data: existingTask } = await supabase
             .from('tasks')
-            .select('created_by, lists(space_id, spaces(require_due_date))')
+            .select(
+                'created_by, is_recurring, recurrence_rule, recurrence_spawned_count, lists(space_id, spaces(require_due_date))',
+            )
             .eq('id', taskId)
             .maybeSingle();
         if (!existingTask) return { data: null, error: 'Task not found' };
@@ -421,7 +423,16 @@ export const updateTask = withAuthenticatedAction(
         }
 
         if (updates.is_recurring && updates.recurrence_rule) {
-            const nextDate = computeNextOccurrence(updates.recurrence_rule);
+            // A new or edited schedule starts its count again; an unrelated edit must not extend a limited series
+            const isNewSchedule =
+                !existingTask.is_recurring ||
+                !recurrenceRulesMatch(existingTask.recurrence_rule, updates.recurrence_rule);
+            if (isNewSchedule) updates.recurrence_spawned_count = 0;
+
+            const nextDate = computeNextOccurrence(
+                updates.recurrence_rule,
+                updates.recurrence_spawned_count ?? existingTask.recurrence_spawned_count ?? 0,
+            );
             updates.next_occurrence = nextDate ? nextDate.toISOString() : null;
         } else if (updates.is_recurring === false) {
             updates.next_occurrence = null;

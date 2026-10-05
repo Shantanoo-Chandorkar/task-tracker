@@ -10,11 +10,12 @@ const MAX_ROWS = 1000;
  * @param {object} options
  * @param {Record<string, object[]>} options.tables - Rows per table name
  * @param {(args: object) => object} [options.moveRpcResult] - Builds the `move_task_subtree` reply from its args
- * @returns {{ client: object, rpcCalls: object[], queries: object[] }} The client, plus records for assertions
+ * @returns {{ client: object, rpcCalls: object[], queries: object[], updates: object[] }} The client, plus records for assertions
  */
 export function createFakeSupabase({ tables, moveRpcResult }) {
     const rpcCalls = [];
     const queries = [];
+    const updates = [];
 
     function attachJoins(tableName, selectColumns, row) {
         if (tableName === 'tasks' && selectColumns?.includes('lists(')) {
@@ -32,6 +33,7 @@ export function createFakeSupabase({ tables, moveRpcResult }) {
         let isAscending = true;
         let rangeStart = null;
         let rangeEnd = null;
+        let pendingUpdate = null;
 
         function addFilter(operator, column, value) {
             filters.push({ operator, column, value });
@@ -91,7 +93,16 @@ export function createFakeSupabase({ tables, moveRpcResult }) {
                     ? { data: rows[0], error: null }
                     : { data: null, error: { code: 'PGRST116', message: 'no single row' } };
             },
-            maybeSingle: async () => ({ data: matchingRows()[0] ?? null, error: null }),
+            update(values) {
+                pendingUpdate = values;
+                updates.push({ tableName, values });
+                return builder;
+            },
+            maybeSingle: async () => {
+                const row = matchingRows()[0] ?? null;
+                if (pendingUpdate && row) Object.assign(row, pendingUpdate);
+                return { data: row, error: null };
+            },
             then(resolve) {
                 const rows = matchingRows();
                 if (selectOptions?.head)
@@ -110,5 +121,5 @@ export function createFakeSupabase({ tables, moveRpcResult }) {
         return { single: async () => reply };
     }
 
-    return { client: { from, rpc }, rpcCalls, queries };
+    return { client: { from, rpc }, rpcCalls, queries, updates };
 }
