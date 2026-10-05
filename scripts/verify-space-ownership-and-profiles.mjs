@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Usage: node --env-file=.env.local scripts/verify-bucket1.mjs <email> <password>
+// Usage: node --env-file=.env.local scripts/verify-space-ownership-and-profiles.mjs <email> <password>
 // Credentials are passed as args, not hardcoded here, so this tracked file never carries them.
 
 const [email, password] = process.argv.slice(2);
 if (!email || !password) {
     console.error(
-        'Usage: node --env-file=.env.local scripts/verify-bucket1.mjs <email> <password>',
+        'Usage: node --env-file=.env.local scripts/verify-space-ownership-and-profiles.mjs <email> <password>',
     );
     process.exit(1);
 }

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Usage: node --env-file=.env.local scripts/verify-bucket4.mjs <ownerEmail> <ownerPassword> <memberEmail> <memberPassword>
+// Usage: node --env-file=.env.local scripts/verify-space-collaborators-rls.mjs <ownerEmail> <ownerPassword> <memberEmail> <memberPassword>
 // Both accounts must already exist (sign up first if needed). Credentials are passed as args,
 // not hardcoded here, so this tracked file never carries them.
 //
@@ -11,7 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 const [ownerEmail, ownerPassword, memberEmail, memberPassword] = process.argv.slice(2);
 if (!ownerEmail || !ownerPassword || !memberEmail || !memberPassword) {
     console.error(
-        'Usage: node --env-file=.env.local scripts/verify-bucket4.mjs <ownerEmail> <ownerPassword> <memberEmail> <memberPassword>',
+        'Usage: node --env-file=.env.local scripts/verify-space-collaborators-rls.mjs <ownerEmail> <ownerPassword> <memberEmail> <memberPassword>',
     );
     process.exit(1);
 }

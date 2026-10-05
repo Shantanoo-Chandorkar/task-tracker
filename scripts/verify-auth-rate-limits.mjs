@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Usage: node --env-file=.env.local scripts/verify-bucket3.mjs <email> <password>
+// Usage: node --env-file=.env.local scripts/verify-auth-rate-limits.mjs <email> <password>
 // Credentials are passed as args, not hardcoded here, so this tracked file never carries them.
 //
 // Proves the auth_rate_limits table, its RLS shape, and the lock/record/reset cycle work
@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 const [email, password] = process.argv.slice(2);
 if (!email || !password) {
     console.error(
-        'Usage: node --env-file=.env.local scripts/verify-bucket3.mjs <email> <password>',
+        'Usage: node --env-file=.env.local scripts/verify-auth-rate-limits.mjs <email> <password>',
     );
     process.exit(1);
 }
