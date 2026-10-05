@@ -28,6 +28,18 @@ describe('useTasksQuery', () => {
         expect(fetchMock.mock.calls[0][0]).toBe('/api/tasks?list_id=list-1');
     });
 
+    it('keeps loaded tasks fresh for five minutes so a tab return does not refetch the whole list', async () => {
+        fetchMock.mockResolvedValue({ ok: true, json: async () => [{ id: 't1' }] });
+        vi.stubGlobal('fetch', fetchMock);
+        const queryClient = new QueryClient();
+
+        const { result } = renderTasksQuery(queryClient);
+        await waitFor(() => expect(result.current.data).toBeDefined());
+
+        const tasksQuery = queryClient.getQueryCache().find({ queryKey: ['tasks', 'list-1'] });
+        expect(tasksQuery.observers[0].options.staleTime).toBe(5 * 60 * 1000);
+    });
+
     it('aborts the request in flight when the query is cancelled, as a drag reorder does', async () => {
         let requestSignal;
         fetchMock.mockImplementation((_url, { signal }) => {

@@ -1,13 +1,11 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getCurrentUser } from '@/lib/auth/session';
 import { isUuid } from '@/lib/validation';
 import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 import TaskList from '@/components/task-list/TaskList';
-import { attachTaskCounts } from '@/lib/list-task-counts';
-import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
 import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
 import { loadListName } from '@/lib/page-titles';
+import { loadRequestUser, loadShellData } from '@/lib/app-shell-data';
 import { fetchListTasks } from '@/lib/list-tasks';
 
 /**
@@ -31,35 +29,26 @@ export default async function ListPage({ params }) {
     // A malformed id would make Postgres error instead of returning no row, which must not look like an outage.
     if (!isUuid(listId)) notFound();
     const supabase = await createClient();
-    const user = await getCurrentUser();
+    const user = await loadRequestUser();
 
-    const [listResult, tasksResult, spacesResult, listsResult, sublistsResult] = await Promise.all([
+    // Spaces, lists and counts are the layout's reads for this same request, so they are shared, not repeated
+    const [listResult, tasksResult, sublistsResult, shellData] = await Promise.all([
         supabase.from('lists').select('id, space_id').eq('id', listId).maybeSingle(),
         fetchListTasks(supabase, listId),
-        supabase.from('spaces').select('*').order('position', { ascending: true }),
-        supabase.from('lists').select('*').order('position', { ascending: true }),
         supabase
             .from('sublists')
             .select('*')
             .eq('list_id', listId)
             .order('position', { ascending: true }),
+        loadShellData(),
     ]);
-    throwIfQueryFailed(
-        '[list-page]',
-        listResult,
-        tasksResult,
-        spacesResult,
-        listsResult,
-        sublistsResult,
-    );
+    throwIfQueryFailed('[list-page]', listResult, tasksResult, sublistsResult);
 
     const { data: list } = listResult;
     // RLS returns null for a list the user cannot see, so "deleted" and "not yours" look identical here.
     if (!list) notFound();
 
     const { data: tasks } = tasksResult;
-    const { data: spaces } = spacesResult;
-    const { data: lists } = listsResult;
     const { data: sublists } = sublistsResult;
 
     const statusesResult = await supabase
@@ -70,12 +59,8 @@ export default async function ListPage({ params }) {
     throwIfQueryFailed('[list-page]', statusesResult);
     const { data: statuses } = statusesResult;
 
-    // Matches /api/lists' computation, so the client refetch never hydration-mismatches this field.
-    const listsWithCounts = await attachTaskCounts(supabase, lists || []);
     // Matches /api/spaces' computation, so the client refetch never hydration-mismatches this field.
-    const spacesWithPermission = await attachOwnerDisplayName(
-        await attachMyPermissionLevel(supabase, spaces || [], user?.id ?? null),
-    );
+    const spacesWithPermission = await attachOwnerDisplayName(shellData.initialSpaces);
 
     return (
         <div className="px-4 md:px-8 py-6">
@@ -84,7 +69,7 @@ export default async function ListPage({ params }) {
                 initialTasks={tasks}
                 initialStatuses={statuses || []}
                 initialSpaces={spacesWithPermission}
-                initialLists={listsWithCounts}
+                initialLists={shellData.initialLists}
                 initialSublists={sublists || []}
                 currentUserId={user?.id ?? null}
             />
