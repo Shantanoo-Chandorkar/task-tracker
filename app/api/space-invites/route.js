@@ -1,6 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { withApiErrorHandling, requireAuthResponse } from '@/lib/api-response';
+import {
+    withApiErrorHandling,
+    requireAuthResponse,
+    apiErrorResponse,
+    queryFailedResponse,
+} from '@/lib/api-response';
+import { INVITES_SPACE_ID_REQUIRED, INVITES_LOAD_FAILED } from '@/lib/error-codes';
 
 /**
  * GET /api/space-invites?space_id=<id>
@@ -13,7 +19,7 @@ export const GET = withApiErrorHandling(async function GET(request) {
 
     const spaceId = request.nextUrl.searchParams.get('space_id');
     if (!spaceId) {
-        return NextResponse.json({ error: 'space_id is required' }, { status: 400 });
+        return apiErrorResponse('space_id is required', INVITES_SPACE_ID_REQUIRED, 400);
     }
 
     const supabase = await createClient();
@@ -26,7 +32,12 @@ export const GET = withApiErrorHandling(async function GET(request) {
         .order('created_at', { ascending: true });
 
     if (error) {
-        return NextResponse.json({ error: 'Failed to fetch invites' }, { status: 500 });
+        return queryFailedResponse(
+            '[api/space-invites]',
+            error,
+            'Failed to fetch invites',
+            INVITES_LOAD_FAILED,
+        );
     }
 
     return NextResponse.json(invites || []);

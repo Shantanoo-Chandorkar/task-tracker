@@ -1,6 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { withApiErrorHandling, requireAuthResponse } from '@/lib/api-response';
+import {
+    withApiErrorHandling,
+    requireAuthResponse,
+    apiErrorResponse,
+    queryFailedResponse,
+} from '@/lib/api-response';
+import { TAG_SPACE_ID_REQUIRED, TAGS_LOAD_FAILED } from '@/lib/error-codes';
 
 /**
  * GET /api/tags?space_id=<id>
@@ -13,7 +19,7 @@ export const GET = withApiErrorHandling(async function GET(request) {
 
     const spaceId = request.nextUrl.searchParams.get('space_id');
     if (!spaceId) {
-        return NextResponse.json({ error: 'space_id is required' }, { status: 400 });
+        return apiErrorResponse('space_id is required', TAG_SPACE_ID_REQUIRED, 400);
     }
 
     const supabase = await createClient();
@@ -25,7 +31,7 @@ export const GET = withApiErrorHandling(async function GET(request) {
         .order('name', { ascending: true });
 
     if (error) {
-        return NextResponse.json({ error: 'Failed to fetch tags' }, { status: 500 });
+        return queryFailedResponse('[api/tags]', error, 'Failed to fetch tags', TAGS_LOAD_FAILED);
     }
 
     return NextResponse.json(tags || []);

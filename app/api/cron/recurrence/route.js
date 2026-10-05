@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/admin';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { NextResponse } from 'next/server';
+import { apiErrorResponse, queryFailedResponse } from '@/lib/api-response';
+import { CRON_UNAUTHORIZED, RECURRENCE_LOAD_FAILED, INTERNAL_ERROR } from '@/lib/error-codes';
 
 /**
  * POST /api/cron/recurrence
@@ -19,7 +21,7 @@ export async function GET(request) {
     const expectedSecret = `Bearer ${process.env.CRON_SECRET}`;
 
     if (!process.env.CRON_SECRET || authHeader !== expectedSecret) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        return apiErrorResponse('Unauthorized', CRON_UNAUTHORIZED, 401);
     }
 
     try {
@@ -32,7 +34,12 @@ export async function GET(request) {
             .lte('next_occurrence', new Date().toISOString());
 
         if (fetchError) {
-            return NextResponse.json({ error: 'Failed to fetch recurring tasks' }, { status: 500 });
+            return queryFailedResponse(
+                '[cron/recurrence]',
+                fetchError,
+                'Failed to fetch recurring tasks',
+                RECURRENCE_LOAD_FAILED,
+            );
         }
 
         if (!dueTasks || dueTasks.length === 0) {
@@ -120,7 +127,8 @@ export async function GET(request) {
         }
 
         return NextResponse.json({ processed });
-    } catch {
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    } catch (thrown) {
+        console.error('[cron/recurrence] unhandled error', { detail: thrown?.message });
+        return apiErrorResponse('Internal server error', INTERNAL_ERROR, 500);
     }
 }

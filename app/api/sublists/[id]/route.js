@@ -1,7 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
-import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
+import {
+    withApiErrorHandling,
+    actionResponse,
+    requireAuthResponse,
+    apiErrorResponse,
+} from '@/lib/api-response';
+import { SUBLIST_NOT_FOUND } from '@/lib/error-codes';
 import { countSublistTasks } from '@/lib/tree';
 
 /**
@@ -22,7 +28,7 @@ export const GET = withApiErrorHandling(async function GET(request, { params }) 
         .single();
 
     if (error) {
-        return NextResponse.json({ error: 'Sublist not found' }, { status: 404 });
+        return apiErrorResponse('Sublist not found', SUBLIST_NOT_FOUND, 404);
     }
 
     const { data: listTasks, error: tasksError } = await supabase

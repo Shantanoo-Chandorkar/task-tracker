@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
 import { updateTask, deleteTask } from '@/actions/task-actions';
-import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
+import { withApiErrorHandling, actionResponse, apiErrorResponse } from '@/lib/api-response';
+import { TASK_UPDATE_EMPTY } from '@/lib/error-codes';
 
 /**
  * PATCH /api/tasks/[id]
@@ -12,7 +12,7 @@ export const PATCH = withApiErrorHandling(async function PATCH(request, { params
     const body = await request.json();
 
     if (Object.keys(body).length === 0) {
-        return NextResponse.json({ error: 'No fields provided to update' }, { status: 400 });
+        return apiErrorResponse('No fields provided to update', TASK_UPDATE_EMPTY, 400);
     }
 
     return actionResponse(await updateTask(id, body));
