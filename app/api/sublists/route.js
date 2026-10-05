@@ -1,9 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { createSublist } from '@/actions/sublist-actions';
 import {
     withApiErrorHandling,
-    actionResponse,
     requireAuthResponse,
     apiErrorResponse,
     queryFailedResponse,
@@ -59,13 +57,4 @@ export const GET = withApiErrorHandling(async function GET(request) {
     }));
 
     return NextResponse.json(sublistsWithCounts);
-});
-
-/**
- * POST /api/sublists
- * Creates a new sublist under a list. Appends it to the end of that list's sublists.
- */
-export const POST = withApiErrorHandling(async function POST(request) {
-    const body = await request.json();
-    return actionResponse(await createSublist(body), 201);
 });

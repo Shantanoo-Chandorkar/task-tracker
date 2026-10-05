@@ -1,12 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { createList } from '@/actions/list-actions';
-import {
-    withApiErrorHandling,
-    actionResponse,
-    requireAuthResponse,
-    queryFailedResponse,
-} from '@/lib/api-response';
+import { withApiErrorHandling, requireAuthResponse, queryFailedResponse } from '@/lib/api-response';
 import { LISTS_LOAD_FAILED } from '@/lib/error-codes';
 import { attachTaskCounts } from '@/lib/tasks/list-task-counts';
 
@@ -38,13 +32,4 @@ export const GET = withApiErrorHandling(async function GET(request) {
     }
 
     return NextResponse.json(await attachTaskCounts(supabase, lists || []));
-});
-
-/**
- * POST /api/lists
- * Creates a new list under a space. Appends it to the end of that space's lists.
- */
-export const POST = withApiErrorHandling(async function POST(request) {
-    const body = await request.json();
-    return actionResponse(await createList(body), 201);
 });

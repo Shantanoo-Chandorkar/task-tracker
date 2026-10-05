@@ -1,9 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { createStatus } from '@/actions/status-actions';
 import {
     withApiErrorHandling,
-    actionResponse,
     requireAuthResponse,
     apiErrorResponse,
     queryFailedResponse,
@@ -42,13 +40,4 @@ export const GET = withApiErrorHandling(async function GET(request) {
     }
 
     return NextResponse.json(statuses || []);
-});
-
-/**
- * POST /api/statuses
- * Creates a new status. Appends it to the end of the status list.
- */
-export const POST = withApiErrorHandling(async function POST(request) {
-    const body = await request.json();
-    return actionResponse(await createStatus(body), 201);
 });
