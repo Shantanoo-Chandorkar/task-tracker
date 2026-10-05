@@ -10,7 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import StatusBadge from './StatusBadge';
 import { useGetTasks } from '@/hooks/useTasksQuery';
 import { bustPageCache } from '@/lib/service-worker-cache';

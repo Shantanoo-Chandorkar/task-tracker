@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import { requestPasswordResetAction } from '@/actions/auth-actions';
 
 const GENERIC_SENT_MESSAGE = 'If an account exists for that email, a reset link is on its way.';

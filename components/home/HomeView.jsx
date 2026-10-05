@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { LayoutGrid, ListChecks, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import { openSearch } from '@/components/nav/GlobalSearch';
 import { useHomeQuery } from '@/hooks/useHomeQuery';

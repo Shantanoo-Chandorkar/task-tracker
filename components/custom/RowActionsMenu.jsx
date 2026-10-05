@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import {
     DropdownMenu,
     DropdownMenuContent,

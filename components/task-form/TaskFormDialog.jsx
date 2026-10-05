@@ -7,11 +7,11 @@ import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSpaceById } from '@/hooks/useSpaceById';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import CharLimitField from '@/components/ui/CharLimitField';
-import FormError from '@/components/ui/FormError';
+import CharLimitField from '@/components/custom/CharLimitField';
+import FormError from '@/components/custom/FormError';
 import {
     Select,
     SelectContent,
@@ -22,11 +22,11 @@ import {
 import RecurrenceBuilder from './RecurrenceBuilder';
 import StagedTagPicker from './StagedTagPicker';
 import TaskTagPicker from '@/components/task-detail/TaskTagPicker';
-import LabeledField from '@/components/ui/LabeledField';
+import LabeledField from '@/components/custom/LabeledField';
 import { createTaskWithTags, updateTask } from '@/actions/task-actions';
 import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
-import { Loader } from '@/components/ui/loader';
-import EditorErrorBoundary from '@/components/ui/EditorErrorBoundary';
+import { Loader } from '@/components/custom/Loader';
+import EditorErrorBoundary from '@/components/custom/EditorErrorBoundary';
 import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
@@ -36,7 +36,7 @@ const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 10000;
 
 // Tiptap is heavy and only needed once this dialog actually opens - keeps it out of the list page's initial bundle.
-const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor'), {
+const RichTextEditor = dynamic(() => import('@/components/custom/RichTextEditor'), {
     ssr: false,
     loading: () => (
         <div className="flex min-h-[200px] items-center justify-center">
@@ -57,7 +57,7 @@ export function scheduleEditorPrefetch() {
     if (typeof window === 'undefined' || navigator.connection?.saveData) return () => {};
 
     // A failed warm-up is harmless: the dialog loads the editor itself when it opens
-    const prefetchEditor = () => import('@/components/ui/RichTextEditor').catch(() => {});
+    const prefetchEditor = () => import('@/components/custom/RichTextEditor').catch(() => {});
 
     if (window.requestIdleCallback) {
         const idleHandle = window.requestIdleCallback(prefetchEditor);

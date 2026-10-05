@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import PasswordInput from '@/components/auth/PasswordInput';
 import { updatePasswordAction } from '@/actions/auth-actions';
 import { clearAllCaches } from '@/lib/clear-client-caches';

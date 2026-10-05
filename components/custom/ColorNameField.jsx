@@ -1,6 +1,6 @@
 'use client';
 
-import CharLimitField from '@/components/ui/CharLimitField';
+import CharLimitField from '@/components/custom/CharLimitField';
 import { Input } from '@/components/ui/input';
 
 /**

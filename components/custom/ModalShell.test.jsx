@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ModalShell from './modal-shell';
+import ModalShell from './ModalShell';
 
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 

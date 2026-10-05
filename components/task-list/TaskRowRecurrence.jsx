@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { humanReadableLabel, recurrenceFrequencyLabel } from '@/lib/recurrence';
 
 /**

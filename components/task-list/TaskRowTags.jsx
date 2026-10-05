@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import ModalShell from '@/components/ui/modal-shell';
-import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
+import ModalShell from '@/components/custom/ModalShell';
+import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
 
 const TAG_DISPLAY_MAX = 15;
 

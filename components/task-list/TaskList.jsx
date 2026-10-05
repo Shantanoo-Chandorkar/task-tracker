@@ -23,7 +23,7 @@ import { ChevronDown, ChevronRight, GripVertical, Plus } from 'lucide-react';
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import {
     createStableIdsReader,
     createStableTreeBuilder,
@@ -52,8 +52,8 @@ import TaskFilterBar from './TaskFilterBar';
 import VelocityMeter from './VelocityMeter';
 import ListHeader from './ListHeader';
 import { Button } from '@/components/ui/button';
-import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
-import { Loader } from '@/components/ui/loader';
+import RowActionsMenu, { MoveMenuItems } from '@/components/custom/RowActionsMenu';
+import { Loader } from '@/components/custom/Loader';
 import { bustPageCache } from '@/lib/service-worker-cache';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
 import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';

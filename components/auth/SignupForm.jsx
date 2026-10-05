@@ -4,9 +4,9 @@ import { useId, useState } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
-import CharLimitField from '@/components/ui/CharLimitField';
-import FormError from '@/components/ui/FormError';
+import { Loader } from '@/components/custom/Loader';
+import CharLimitField from '@/components/custom/CharLimitField';
+import FormError from '@/components/custom/FormError';
 import PasswordInput from '@/components/auth/PasswordInput';
 import { signUpAction } from '@/actions/auth-actions';
 

@@ -6,9 +6,9 @@ import { toast } from 'sonner';
 import { Copy, Check, X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import {
     Select,
     SelectContent,

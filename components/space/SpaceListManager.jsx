@@ -25,11 +25,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
+import RowActionsMenu, { MoveMenuItems } from '@/components/custom/RowActionsMenu';
 import { Badge } from '@/components/ui/badge';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { updateSpace, deleteSpace } from '@/actions/space-actions';
 import { updateList, deleteList } from '@/actions/list-actions';
 import { leaveSpace } from '@/actions/collaboration-actions';

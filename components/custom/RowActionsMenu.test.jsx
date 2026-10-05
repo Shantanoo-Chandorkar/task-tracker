@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import RowActionsMenu, { MoveMenuItems } from './RowActionsMenu';
-import { DropdownMenuItem, DropdownMenuSeparator } from './dropdown-menu';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 
 // Radix positions the menu with a ResizeObserver, which jsdom does not provide
 beforeAll(() => {

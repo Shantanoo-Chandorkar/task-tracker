@@ -12,7 +12,7 @@ import TaskRowRecurrence from './TaskRowRecurrence';
 import TaskRowActions from './TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import CompleteTaskDialog from './CompleteTaskDialog';
-import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
+import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
 import LimitWarning from './LimitWarning';
 import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/nesting-depth';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';

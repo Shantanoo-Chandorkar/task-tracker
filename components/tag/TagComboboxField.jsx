@@ -12,7 +12,7 @@ import {
     CommandList,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 
 const TAG_NAME_MAX = 50;
 

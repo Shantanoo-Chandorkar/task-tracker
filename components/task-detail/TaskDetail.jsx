@@ -10,7 +10,7 @@ import { humanReadableLabel } from '@/lib/recurrence';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
-import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
+import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
 import CompleteTaskDialog from '@/components/task-list/CompleteTaskDialog';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSpaceById } from '@/hooks/useSpaceById';
@@ -21,7 +21,7 @@ import LimitWarning from '@/components/task-list/LimitWarning';
 import TaskFormDialog, { scheduleEditorPrefetch } from '@/components/task-form/TaskFormDialog';
 import SubtaskTree from './SubtaskTree';
 import { Button } from '@/components/ui/button';
-import RichTextRenderer from '@/components/ui/RichTextRenderer';
+import RichTextRenderer from '@/components/custom/RichTextRenderer';
 
 /**
  * Task detail page content - title, status, description, recurrence, and the subtask tree.

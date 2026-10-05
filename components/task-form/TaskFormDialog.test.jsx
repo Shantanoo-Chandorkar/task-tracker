@@ -18,7 +18,7 @@ vi.mock('@/actions/task-actions', () => ({
 const editorLoadTracker = vi.hoisted(() => ({ loadCount: 0 }));
 
 vi.mock('next/dynamic', () => ({ default: () => () => null }));
-vi.mock('@/components/ui/RichTextEditor', () => {
+vi.mock('@/components/custom/RichTextEditor', () => {
     editorLoadTracker.loadCount += 1;
     return { default: () => null };
 });

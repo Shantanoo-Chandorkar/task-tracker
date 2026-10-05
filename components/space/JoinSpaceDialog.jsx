@@ -2,12 +2,12 @@
 
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader } from '@/components/ui/loader';
-import LabeledField from '@/components/ui/LabeledField';
-import FormError from '@/components/ui/FormError';
+import { Loader } from '@/components/custom/Loader';
+import LabeledField from '@/components/custom/LabeledField';
+import FormError from '@/components/custom/FormError';
 import { requestToJoinSpace } from '@/actions/collaboration-actions';
 
 /**

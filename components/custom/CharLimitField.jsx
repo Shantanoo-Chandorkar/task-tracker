@@ -1,7 +1,7 @@
 'use client';
 
 import { useId } from 'react';
-import FormError from '@/components/ui/FormError';
+import FormError from '@/components/custom/FormError';
 
 /**
  * Wraps any input with a label, live character counter and inline error, so every capped field looks the same.

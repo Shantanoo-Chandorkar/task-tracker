@@ -6,7 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { Bold, Italic, Strikethrough, List, ListOrdered, Link2, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import LinkDialog from '@/components/ui/LinkDialog';
+import LinkDialog from '@/components/custom/LinkDialog';
 
 /**
  * Icon-only toolbar button that tells screen readers its name and, for toggles, whether it is on.

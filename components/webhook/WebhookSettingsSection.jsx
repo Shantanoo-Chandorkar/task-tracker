@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWebhookEndpointsQuery } from '@/hooks/useWebhookEndpointsQuery';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import WebhookEndpointCard from '@/components/webhook/WebhookEndpointCard';
 import WebhookEndpointForm from '@/components/webhook/WebhookEndpointForm';
 import WebhookSecretReveal from '@/components/webhook/WebhookSecretReveal';

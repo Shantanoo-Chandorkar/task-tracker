@@ -2,10 +2,10 @@
 
 import { useId } from 'react';
 import { useColorNameForm } from '@/hooks/useColorNameForm';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
-import ColorNameField from '@/components/ui/ColorNameField';
+import { Loader } from '@/components/custom/Loader';
+import ColorNameField from '@/components/custom/ColorNameField';
 import { createStatus, updateStatus } from '@/actions/status-actions';
 
 const STATUS_NAME_MAX = 50;

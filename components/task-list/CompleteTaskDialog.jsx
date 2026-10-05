@@ -1,8 +1,8 @@
 'use client';
 
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import ModalShell from '@/components/ui/modal-shell';
-import { Loader } from '@/components/ui/loader';
+import ModalShell from '@/components/custom/ModalShell';
+import { Loader } from '@/components/custom/Loader';
 
 /**
  * Confirms cascading a task's complete/incomplete status to its descendants before applying it.

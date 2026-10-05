@@ -2,10 +2,10 @@
 
 import { useId, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 import { useTaskFilterOptions } from '@/hooks/useTaskFilterOptions';
 import { useTaskFilters } from '@/hooks/useTaskFilters';

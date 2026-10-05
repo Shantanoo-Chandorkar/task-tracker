@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { normalizeLinkUrl } from '@/lib/validation';
 
 const LINK_TEXT_MAX_LENGTH = 300;

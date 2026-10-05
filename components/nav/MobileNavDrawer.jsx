@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Menu } from 'lucide-react';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import SidebarNav from './SidebarNav';
 
 /**

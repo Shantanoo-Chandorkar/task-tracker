@@ -26,10 +26,10 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import RowActionsMenu, { MoveMenuItems } from '@/components/ui/RowActionsMenu';
-import { Loader } from '@/components/ui/loader';
+import RowActionsMenu, { MoveMenuItems } from '@/components/custom/RowActionsMenu';
+import { Loader } from '@/components/custom/Loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
 import { getMoveTargets } from '@/lib/move-targets';

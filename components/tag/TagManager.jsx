@@ -8,9 +8,9 @@ import { bustPageCache } from '@/lib/service-worker-cache';
 import { removeRowFromCache } from '@/lib/query-cache';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { deleteTag, deleteAllTagsInSpace } from '@/actions/tag-actions';
 
 /**

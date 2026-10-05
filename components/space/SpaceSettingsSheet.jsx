@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import StatusManager from '@/components/status/StatusManager';
 import TagManager from '@/components/tag/TagManager';
 import SpacePreferencesSection from '@/components/space/SpacePreferencesSection';
