@@ -16,8 +16,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { bustPageCache } from '@/lib/service-worker-cache';
-import { removeRowFromCache } from '@/lib/query-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
+import { removeRowFromCache } from '@/lib/cache/query-cache';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { runExclusively } from '@/lib/in-flight-entities';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';

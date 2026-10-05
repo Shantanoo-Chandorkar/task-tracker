@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { cn } from '@/lib/class-names';
+import { cn } from '@/lib/ui/class-names';
 
 function Textarea({ className, ...props }) {
     return (

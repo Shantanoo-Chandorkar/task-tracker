@@ -1,4 +1,4 @@
-import { THEME_BACKGROUND_COLORS } from '@/lib/theme-colors';
+import { THEME_BACKGROUND_COLORS } from '@/lib/ui/theme-colors';
 
 /**
  * Next.js native manifest route - generates and auto-links /manifest.webmanifest.

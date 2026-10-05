@@ -21,7 +21,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { cn } from '@/lib/class-names';
+import { cn } from '@/lib/ui/class-names';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 
 const FOOTER_CLASSES =

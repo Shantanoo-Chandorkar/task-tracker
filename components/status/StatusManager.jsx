@@ -6,7 +6,7 @@ import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { toast } from 'sonner';
-import { bustPageCache } from '@/lib/service-worker-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import {
     DndContext,
     closestCenter,
@@ -32,8 +32,8 @@ import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dial
 import ModalShell from '@/components/custom/ModalShell';
 import { updateStatus, deleteStatus } from '@/actions/status-actions';
 import StatusFormDialog from './StatusFormDialog';
-import { getMoveTargets } from '@/lib/move-targets';
-import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
+import { getMoveTargets } from '@/lib/tasks/move-neighbours';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/ui/dnd-announcements';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };

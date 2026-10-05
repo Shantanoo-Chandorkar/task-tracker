@@ -40,14 +40,14 @@ import ListFormDialog from './ListFormDialog';
 import JoinSpaceDialog from './JoinSpaceDialog';
 import SpaceSharingSection from './SpaceSharingSection';
 import SpaceSettingsSheet from './SpaceSettingsSheet';
-import { bustPageCache } from '@/lib/service-worker-cache';
-import { removeRowFromCache } from '@/lib/query-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
+import { removeRowFromCache } from '@/lib/cache/query-cache';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
 import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { countSpaceContents } from '@/lib/cached-delete-counts';
-import { getMoveTargets } from '@/lib/move-targets';
-import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
+import { countSpaceContents } from '@/lib/cache/cached-delete-counts';
+import { getMoveTargets } from '@/lib/tasks/move-neighbours';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/ui/dnd-announcements';
 
 // Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
 const MOUSE_ACTIVATION = { distance: 5 };

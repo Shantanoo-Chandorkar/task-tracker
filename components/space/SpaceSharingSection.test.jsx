@@ -27,7 +27,7 @@ vi.mock('@/hooks/useCollaboratorsQuery', () => ({
 vi.mock('@/hooks/usePendingInvitesQuery', () => ({
     usePendingInvitesQuery: () => ({ data: [], isLoading: false }),
 }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), dismiss: vi.fn() },

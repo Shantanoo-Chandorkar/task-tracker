@@ -40,7 +40,7 @@ vi.mock('sonner', () => ({
         dismiss: vi.fn(),
     },
 }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('./SpaceFormDialog', () => ({ default: () => null }));
 vi.mock('./ListFormDialog', () => ({ default: () => null }));

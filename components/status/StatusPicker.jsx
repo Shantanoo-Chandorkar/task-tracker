@@ -13,7 +13,7 @@ import {
 import { Loader } from '@/components/custom/Loader';
 import StatusBadge from './StatusBadge';
 import { useGetTasks } from '@/hooks/useTasksQuery';
-import { bustPageCache } from '@/lib/service-worker-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 
 /**
  * Inline status dropdown for changing a task's status directly from the task row.

@@ -19,8 +19,8 @@ import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 import { useTaskPriority } from '@/hooks/useTaskPriority';
 import { useGetTasks } from '@/hooks/useTasksQuery';
-import { isStartOfUnprioritisedTier } from '@/lib/tree';
-import { getMoveTargets } from '@/lib/move-targets';
+import { isStartOfUnprioritisedTier } from '@/lib/tasks/task-tree';
+import { getMoveTargets } from '@/lib/tasks/move-neighbours';
 
 /**
  * Plain line between the prioritised and unprioritised tier, named so it is not an anonymous separator.

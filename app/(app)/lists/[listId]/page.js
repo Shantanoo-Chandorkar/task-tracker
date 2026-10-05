@@ -6,7 +6,7 @@ import TaskList from '@/components/task-list/TaskList';
 import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
 import { loadListName } from '@/lib/page-titles';
 import { loadRequestUser, loadShellData } from '@/lib/app-shell-data';
-import { fetchListTasks } from '@/lib/list-tasks';
+import { fetchListTasks } from '@/lib/tasks/list-tasks';
 
 /**
  * Tab title: the list's name, or a generic one when the id is malformed or the list is not visible.

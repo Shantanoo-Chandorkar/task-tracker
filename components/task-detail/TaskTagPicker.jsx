@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { runExclusively } from '@/lib/in-flight-entities';
 import { useTagsQuery } from '@/hooks/useTagsQuery';
 import { addTagToTask, removeTagFromTask } from '@/actions/tag-actions';
-import { bustPageCache } from '@/lib/service-worker-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import TagComboboxField from '@/components/tag/TagComboboxField';
 
 /**

@@ -9,7 +9,7 @@ import {
     queryFailedResponse,
 } from '@/lib/api-response';
 import { TASKS_LIST_ID_REQUIRED, TASKS_LOAD_FAILED } from '@/lib/error-codes';
-import { fetchListTasks } from '@/lib/list-tasks';
+import { fetchListTasks } from '@/lib/tasks/list-tasks';
 
 /**
  * GET /api/tasks?list_id=<id>

@@ -7,7 +7,7 @@ const updateTask = vi.fn();
 const toastError = vi.fn();
 
 vi.mock('@/actions/task-actions', () => ({ updateTask: (...args) => updateTask(...args) }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { error: (...args) => toastError(...args) } }));
 
 function renderPriorityHook(queryClient) {

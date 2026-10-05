@@ -3,7 +3,7 @@ import {
     PILL_TEXT_TARGET_COLORS,
     parseHexColor,
     readableTextColor,
-} from '@/lib/color-contrast';
+} from '@/lib/ui/color-contrast';
 
 // Matches the colour the server gives a status that was created without one
 const DEFAULT_STATUS_COLOR = '#6b7280';

@@ -8,7 +8,7 @@ const fetchMock = vi.fn();
 const callOrder = [];
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ marker: 'query-client' }) }));
-vi.mock('@/lib/clear-client-caches', () => ({
+vi.mock('@/lib/cache/clear-client-caches', () => ({
     clearAllCaches: (...args) => clearAllCaches(...args),
 }));
 

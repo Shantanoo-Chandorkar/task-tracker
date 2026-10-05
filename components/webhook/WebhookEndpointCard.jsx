@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { removeRowFromCache } from '@/lib/query-cache';
+import { removeRowFromCache } from '@/lib/cache/query-cache';
 import {
     deleteWebhookEndpoint,
     rotateWebhookSecret,

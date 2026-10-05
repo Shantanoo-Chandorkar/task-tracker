@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown, ChevronRight, Circle } from 'lucide-react';
-import { isMoveTargetSelectable } from '@/lib/tree';
+import { isMoveTargetSelectable } from '@/lib/tasks/move-target-tree';
 
 /**
  * One row of the Move To accordion plus, when expanded, its children.

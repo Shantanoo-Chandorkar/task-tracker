@@ -13,7 +13,7 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('next/link', () => ({ default: ({ children, href }) => <a href={href}>{children}</a> }));
 vi.mock('@/actions/auth-actions', () => ({ signInAction: (...args) => signInAction(...args) }));
-vi.mock('@/lib/clear-client-caches', () => ({
+vi.mock('@/lib/cache/clear-client-caches', () => ({
     clearAllCaches: (...args) => clearAllCaches(...args),
 }));
 vi.mock('@/components/auth/GuestEntryButton', () => ({ default: () => null }));

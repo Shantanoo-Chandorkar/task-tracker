@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import ModalShell from '@/components/custom/ModalShell';
-import { humanReadableLabel, recurrenceFrequencyLabel } from '@/lib/recurrence';
+import { humanReadableLabel, recurrenceFrequencyLabel } from '@/lib/tasks/recurrence';
 
 /**
  * Recurrence summary for a task row: a frequency pill that opens the full schedule on tap (no hover on mobile).

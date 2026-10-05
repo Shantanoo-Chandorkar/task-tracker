@@ -4,7 +4,7 @@ import { useLayoutEffect, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
 import { Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { THEME_BACKGROUND_COLORS } from '@/lib/theme-colors';
+import { THEME_BACKGROUND_COLORS } from '@/lib/ui/theme-colors';
 
 const listeners = new Set();
 

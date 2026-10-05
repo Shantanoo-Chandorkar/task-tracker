@@ -8,7 +8,7 @@ import {
     apiErrorResponse,
 } from '@/lib/api-response';
 import { SUBLIST_NOT_FOUND } from '@/lib/error-codes';
-import { countSublistTasks } from '@/lib/tree';
+import { countSublistTasks } from '@/lib/tasks/task-relations';
 
 /**
  * GET /api/sublists/[id]

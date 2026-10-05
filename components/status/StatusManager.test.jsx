@@ -19,7 +19,7 @@ vi.mock('@/actions/status-actions', () => ({
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('./StatusFormDialog', () => ({ default: () => null }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 

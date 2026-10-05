@@ -28,8 +28,8 @@ import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
 import { Loader } from '@/components/custom/Loader';
 import EditorErrorBoundary from '@/components/custom/EditorErrorBoundary';
 import { toast } from 'sonner';
-import { bustPageCache } from '@/lib/service-worker-cache';
-import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
+import { withSavedRow, withStatusDisplay } from '@/lib/cache/query-cache';
 import { createClientId } from '@/lib/client-id';
 
 const TITLE_MAX = 200;

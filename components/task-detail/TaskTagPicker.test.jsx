@@ -11,7 +11,7 @@ vi.mock('@/actions/tag-actions', () => ({
     removeTagFromTask: vi.fn(),
 }));
 vi.mock('@/hooks/useTagsQuery', () => ({ useTagsQuery: () => ({ data: [] }) }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), info: (...args) => toastInfo(...args) } }));
 // The real combobox is replaced by a button that adds one tag, so the test is about the picker's own guard
 vi.mock('@/components/tag/TagComboboxField', () => ({

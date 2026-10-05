@@ -24,13 +24,12 @@ import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdow
 import { toast } from 'sonner';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/custom/ModalShell';
+import { buildDescendantIdsByTaskId, countSublistTasks } from '@/lib/tasks/task-relations';
 import {
     createStableIdsReader,
     createStableTreeBuilder,
-    buildDescendantIdsByTaskId,
     isStartOfUnprioritisedTier,
-    countSublistTasks,
-} from '@/lib/tree';
+} from '@/lib/tasks/task-tree';
 import { toggleFlag as toggleGroup, useUIFlags } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
@@ -39,9 +38,9 @@ import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
 import { useSpaceById } from '@/hooks/useSpaceById';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
-import { taskMatchesFilters } from '@/lib/task-filters';
-import { getMoveTargets } from '@/lib/move-targets';
-import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
+import { taskMatchesFilters } from '@/lib/tasks/task-filters';
+import { getMoveTargets } from '@/lib/tasks/move-neighbours';
+import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/ui/dnd-announcements';
 import { useDuplicateTask } from '@/hooks/useDuplicateTask';
 import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
@@ -54,7 +53,7 @@ import ListHeader from './ListHeader';
 import { Button } from '@/components/ui/button';
 import RowActionsMenu, { MoveMenuItems } from '@/components/custom/RowActionsMenu';
 import { Loader } from '@/components/custom/Loader';
-import { bustPageCache } from '@/lib/service-worker-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
 import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { useConfirmAction } from '@/hooks/useConfirmAction';

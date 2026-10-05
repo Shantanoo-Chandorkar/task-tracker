@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/admin';
-import { computeNextOccurrence } from '@/lib/recurrence';
+import { computeNextOccurrence } from '@/lib/tasks/recurrence';
 import { NextResponse } from 'next/server';
 import { apiErrorResponse, queryFailedResponse } from '@/lib/api-response';
 import { CRON_UNAUTHORIZED, RECURRENCE_LOAD_FAILED, INTERNAL_ERROR } from '@/lib/error-codes';

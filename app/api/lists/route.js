@@ -8,7 +8,7 @@ import {
     queryFailedResponse,
 } from '@/lib/api-response';
 import { LISTS_LOAD_FAILED } from '@/lib/error-codes';
-import { attachTaskCounts } from '@/lib/list-task-counts';
+import { attachTaskCounts } from '@/lib/tasks/list-task-counts';
 
 /**
  * GET /api/lists

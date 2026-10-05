@@ -8,7 +8,7 @@ const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
 vi.mock('@/actions/task-actions', () => ({ duplicateTask: (...args) => duplicateTask(...args) }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 // Counts up so each "new id" is visibly different; `unavailable` mimics a browser without crypto.randomUUID
 const clientIds = vi.hoisted(() => ({ counter: 0, unavailable: false }));
 vi.mock('@/lib/client-id', () => ({

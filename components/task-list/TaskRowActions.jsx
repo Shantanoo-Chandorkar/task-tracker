@@ -12,11 +12,11 @@ import ModalShell from '@/components/custom/ModalShell';
 import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
 import { deleteTask, deleteTaskAndReparentChildren } from '@/actions/task-actions';
 import { useDuplicateTask } from '@/hooks/useDuplicateTask';
-import { buildMoveGroups } from '@/lib/move-groups';
+import { buildMoveGroups } from '@/lib/tasks/move-groups';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
-import { bustPageCache } from '@/lib/service-worker-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 

@@ -7,12 +7,12 @@ import {
     wouldCreateCycle,
     exceedsMaxDepthAfterMove,
     resolveRootAncestorSublistId,
-} from '@/lib/move-task-checks';
-import { computeNextOccurrence, recurrenceRulesMatch } from '@/lib/recurrence';
+} from '@/lib/tasks/move-task-checks';
+import { computeNextOccurrence, recurrenceRulesMatch } from '@/lib/tasks/recurrence';
 import { NESTING_MODE, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/nesting-depth';
-import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tree';
-import { getPositionBetween } from '@/lib/fractional-index';
-import { getNextPosition } from '@/lib/append-position';
+import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tasks/task-relations';
+import { getPositionBetween } from '@/lib/tasks/fractional-index';
+import { getNextPosition } from '@/lib/tasks/append-position';
 import {
     readClientId,
     findOwnRowById,
@@ -24,11 +24,11 @@ import {
     getDefaultStatusId,
     getDoneStatusId,
     getTaskListTree,
-} from '@/lib/task-completion';
+} from '@/lib/tasks/task-completion';
 import { getCurrentUser } from '@/lib/auth/session';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
-import { toTaskRateLimitResult } from '@/lib/task-rate-limit';
+import { toTaskRateLimitResult } from '@/lib/tasks/task-rate-limit';
 import {
     NOT_AUTHENTICATED,
     TASK_INVALID_PRIORITY,

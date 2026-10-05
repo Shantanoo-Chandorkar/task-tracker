@@ -11,7 +11,7 @@ vi.mock('@/actions/task-actions', () => ({
     completeTaskAndDescendants: (...args) => completeTaskAndDescendants(...args),
     uncompleteTaskAndDescendants: vi.fn(),
 }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useSpaceIdForList', () => ({ useSpaceIdForList: () => 'space-1' }));
 vi.mock('@/hooks/useStatusesQuery', () => ({
     useStatusesQuery: () => ({

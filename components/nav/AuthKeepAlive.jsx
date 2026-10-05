@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { clearAllCaches } from '@/lib/clear-client-caches';
+import { clearAllCaches } from '@/lib/cache/clear-client-caches';
 import { NOT_AUTHENTICATED } from '@/lib/error-codes';
 import { GUEST_ERROR_CODES } from '@/lib/guest/guest-error-codes';
 

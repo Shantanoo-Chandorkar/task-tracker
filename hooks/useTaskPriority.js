@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { updateTask } from '@/actions/task-actions';
-import { bustPageCache } from '@/lib/service-worker-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { runExclusively } from '@/lib/in-flight-entities';
 
 /**

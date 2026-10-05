@@ -13,7 +13,7 @@ vi.mock('@/actions/task-actions', () => ({
     deleteTaskAndReparentChildren: vi.fn(),
     updateTask: vi.fn(),
 }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
 // Radix positions menus with a ResizeObserver, which jsdom does not provide

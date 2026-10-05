@@ -27,7 +27,7 @@ vi.mock('@/hooks/useSublistsQuery', () => ({ useSublistsQuery: () => ({ data: []
 vi.mock('@/hooks/useSpaceIdForList', () => ({ useSpaceIdForList: () => 'space-1' }));
 vi.mock('@/hooks/useSpaceById', () => ({ useSpaceById: () => ({ require_due_date: false }) }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('./RecurrenceBuilder', () => ({ default: () => null }));
 vi.mock('./StagedTagPicker', () => ({ default: () => null }));
 vi.mock('@/components/task-detail/TaskTagPicker', () => ({ default: () => null }));

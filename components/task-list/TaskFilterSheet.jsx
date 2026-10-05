@@ -15,7 +15,7 @@ import {
     CREATED_BUCKETS,
     countActiveFilters,
     filtersToSearchString,
-} from '@/lib/task-filters';
+} from '@/lib/tasks/task-filters';
 
 /**
  * One checkbox row inside a filter section.
