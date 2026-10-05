@@ -19,7 +19,7 @@ const { GUEST_ERROR_CODES } = await import('@/lib/guest/guest-error-codes');
 const GUEST_USER_ID = 'guest-1';
 
 /**
- * Fake Supabase client - `spaces` reads resolve the caller as owner, since every create action
+ * Fake Supabase client - the permission lookup answers 'owner', since every create action
  * checks permission before reaching the insert, which is rigged to fail with the given error.
  *
  * @param {{ message: string, code?: string }} insertError - Error the insert returns.
@@ -68,6 +68,7 @@ function makeClientWhoseInsertFails(insertError) {
     };
     const readChainByTable = { spaces: spacesReadChain, tasks: tasksReadChain };
     return {
+        rpc: async () => ({ data: 'owner', error: null }),
         from: (table) => ({
             ...(readChainByTable[table] ?? readChain),
             insert: () => insertChain,

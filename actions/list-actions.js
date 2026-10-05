@@ -48,7 +48,7 @@ export const createList = withAuthenticatedAction(
             return { data: null, error: 'A space is required' };
         }
 
-        const permissionLevel = await resolveSpacePermission(supabase, fields.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(supabase, fields.space_id);
         const permissionBlock = blockCreateForPermission(permissionLevel);
         if (permissionBlock) return { data: null, ...permissionBlock };
 
@@ -104,11 +104,7 @@ export const updateList = withAuthenticatedAction(
             .maybeSingle();
         if (!existingList) return { data: null, error: 'List not found' };
 
-        const permissionLevel = await resolveSpacePermission(
-            supabase,
-            existingList.space_id,
-            user.id,
-        );
+        const permissionLevel = await resolveSpacePermission(supabase, existingList.space_id);
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingList.created_by === user.id,
         });
@@ -157,11 +153,7 @@ export const deleteList = withAuthenticatedAction(
             .maybeSingle();
         if (!existingList) return { error: 'List not found' };
 
-        const permissionLevel = await resolveSpacePermission(
-            supabase,
-            existingList.space_id,
-            user.id,
-        );
+        const permissionLevel = await resolveSpacePermission(supabase, existingList.space_id);
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingList.created_by === user.id,
         });

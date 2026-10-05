@@ -60,7 +60,10 @@ function buildTables({ maxSubtasksPerParent = null } = {}) {
 }
 
 async function moveTaskWith(taskId, fields, tablesOptions) {
-    fake = createFakeSupabase({ tables: buildTables(tablesOptions) });
+    fake = createFakeSupabase({
+        tables: buildTables(tablesOptions),
+        getCallerId: () => currentUserId,
+    });
     const { moveTask } = await import('./task-actions');
     return moveTask(taskId, fields);
 }
@@ -236,7 +239,7 @@ describe('moveTask', () => {
             depth: 3,
             position: 1,
         });
-        fake = createFakeSupabase({ tables });
+        fake = createFakeSupabase({ tables, getCallerId: () => currentUserId });
         const { moveTask } = await import('./task-actions');
 
         const moveResult = await moveTask('task-a', { newParentId: 'zz-deep-child' });
@@ -247,6 +250,7 @@ describe('moveTask', () => {
     it('passes a database failure through as a stable move code without leaking detail', async () => {
         fake = createFakeSupabase({
             tables: buildTables(),
+            getCallerId: () => currentUserId,
             moveRpcResult: () => ({
                 data: null,
                 error: { code: 'P0001', message: 'TASK_MOVE_CYCLE raised internally' },

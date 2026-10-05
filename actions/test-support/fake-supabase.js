@@ -10,9 +10,10 @@ const MAX_ROWS = 1000;
  * @param {object} options
  * @param {Record<string, object[]>} options.tables - Rows per table name
  * @param {(args: object) => object} [options.moveRpcResult] - Builds the `move_task_subtree` reply from its args
+ * @param {() => string} [options.getCallerId] - Id the database would read from the login token (`auth.uid()`)
  * @returns {{ client: object, rpcCalls: object[], queries: object[], updates: object[] }} The client, plus records for assertions
  */
-export function createFakeSupabase({ tables, moveRpcResult }) {
+export function createFakeSupabase({ tables, moveRpcResult, getCallerId = () => null }) {
     const rpcCalls = [];
     const queries = [];
     const updates = [];
@@ -113,7 +114,22 @@ export function createFakeSupabase({ tables, moveRpcResult }) {
         return builder;
     }
 
+    // Mirrors the SQL function RLS uses: owner first, then an accepted collaborator's tier.
+    function permissionLevelFor(spaceId) {
+        const callerId = getCallerId();
+        const space = (tables.spaces ?? []).find((candidate) => candidate.id === spaceId);
+        if (space?.owner_id === callerId) return 'owner';
+        const collaborator = (tables.space_collaborators ?? []).find(
+            (row) =>
+                row.space_id === spaceId && row.user_id === callerId && row.status === 'accepted',
+        );
+        return collaborator?.permission_level ?? null;
+    }
+
     function rpc(functionName, args) {
+        if (functionName === 'get_space_permission_level') {
+            return Promise.resolve({ data: permissionLevelFor(args.target_space_id), error: null });
+        }
         rpcCalls.push({ functionName, args });
         const reply = moveRpcResult
             ? moveRpcResult(args)

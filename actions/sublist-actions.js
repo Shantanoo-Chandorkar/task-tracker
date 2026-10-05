@@ -49,7 +49,7 @@ export const createSublist = withAuthenticatedAction(
         }
 
         const spaceId = await getSpaceIdForList(supabase, fields.list_id);
-        const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
+        const permissionLevel = await resolveSpacePermission(supabase, spaceId);
         const permissionBlock = blockCreateForPermission(permissionLevel);
         if (permissionBlock) return { data: null, ...permissionBlock };
 
@@ -108,7 +108,6 @@ export const updateSublist = withAuthenticatedAction(
         const permissionLevel = await resolveSpacePermission(
             supabase,
             existingSublist.lists?.space_id,
-            user.id,
         );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingSublist.created_by === user.id,
@@ -160,7 +159,6 @@ export const deleteSublist = withAuthenticatedAction(
         const permissionLevel = await resolveSpacePermission(
             supabase,
             existingSublist.lists?.space_id,
-            user.id,
         );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingSublist.created_by === user.id,

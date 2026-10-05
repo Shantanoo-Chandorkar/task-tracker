@@ -78,7 +78,7 @@ export const addTagToTask = withAuthenticatedAction(
             .maybeSingle();
 
         // Gated like editing the task itself, not like creating a new row - tagging changes the task.
-        const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
+        const permissionLevel = await resolveSpacePermission(supabase, spaceId);
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: task?.created_by === user.id,
         });
@@ -140,7 +140,7 @@ export const removeTagFromTask = withAuthenticatedAction(
             .eq('id', fields.taskId)
             .maybeSingle();
 
-        const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
+        const permissionLevel = await resolveSpacePermission(supabase, spaceId);
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: task?.created_by === user.id,
         });
@@ -181,7 +181,7 @@ export const deleteTag = withAuthenticatedAction(
 
         if (!target) return { error: 'Tag not found', code: TAG_NOT_FOUND };
 
-        const permissionLevel = await resolveSpacePermission(supabase, target.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(supabase, target.space_id);
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: target.created_by === user.id,
         });
@@ -218,7 +218,7 @@ export const deleteAllTagsInSpace = withAuthenticatedAction(
             return { count: 0, error: 'Space ID is required', code: TAG_SPACE_ID_REQUIRED };
         }
 
-        const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
+        const permissionLevel = await resolveSpacePermission(supabase, spaceId);
         const permissionBlock = blockCreateForPermission(permissionLevel);
         if (permissionBlock) return { count: 0, ...permissionBlock };
 

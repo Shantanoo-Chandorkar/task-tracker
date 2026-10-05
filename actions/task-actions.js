@@ -70,12 +70,11 @@ function snapshotMaxRelativeDepth(node) {
  *
  * @param {object} supabase - Request-scoped Supabase client
  * @param {string} spaceId - Space the new row would be created in
- * @param {string} userId - Caller's user id
  * @returns {Promise<{ error: string, code: string }|null>} A refusal, or null to proceed
  * @throws {Error} Generic SERVER_LOAD_FAILED error when the permission read fails
  */
-async function blockCreateInSpace(supabase, spaceId, userId) {
-    const permissionLevel = await resolveSpacePermission(supabase, spaceId, userId);
+async function blockCreateInSpace(supabase, spaceId) {
+    const permissionLevel = await resolveSpacePermission(supabase, spaceId);
     return blockCreateForPermission(permissionLevel);
 }
 
@@ -90,7 +89,7 @@ async function blockCreateInSpace(supabase, spaceId, userId) {
  * @throws {Error} Generic SERVER_LOAD_FAILED error when the permission read fails
  */
 async function blockWriteInSpace(supabase, spaceId, userId, rowCreatedBy) {
-    const permissionLevel = await resolveSpacePermission(supabase, spaceId, userId);
+    const permissionLevel = await resolveSpacePermission(supabase, spaceId);
     return blockWriteForPermission(permissionLevel, { isOwnRow: rowCreatedBy === userId });
 }
 
@@ -187,7 +186,7 @@ export const createTask = withAuthenticatedAction(
         }
 
         const spaceId = await getSpaceIdForList(supabase, fields.list_id);
-        const permissionBlock = await blockCreateInSpace(supabase, spaceId, user.id);
+        const permissionBlock = await blockCreateInSpace(supabase, spaceId);
         if (permissionBlock) return { data: null, ...permissionBlock };
 
         const { data: space } = await supabase
@@ -749,7 +748,7 @@ export async function duplicateTask(taskId, newRootId) {
         if (taskError || !task) return { error: 'Task not found' };
 
         // Duplicating creates new rows, so this is a create-permission check, not row ownership.
-        const permissionBlock = await blockCreateInSpace(supabase, task.lists?.space_id, user.id);
+        const permissionBlock = await blockCreateInSpace(supabase, task.lists?.space_id);
         if (permissionBlock) return permissionBlock;
 
         // Depth check needs only ids and parents; paged so a list past 1000 rows is not cut short.

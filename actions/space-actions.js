@@ -99,7 +99,7 @@ export const updateSpace = withAuthenticatedAction(
 
         // RLS already blocks this at the DB level - this just avoids a confusing silent no-op.
         if ('require_due_date' in fields || 'max_subtasks_per_parent' in fields) {
-            const permissionLevel = await resolveSpacePermission(supabase, id, user.id);
+            const permissionLevel = await resolveSpacePermission(supabase, id);
             if (permissionLevel !== 'owner') {
                 return {
                     data: null,

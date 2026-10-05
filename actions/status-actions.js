@@ -47,7 +47,7 @@ export const createStatus = withAuthenticatedAction(
             return { data: null, error: 'A space is required' };
         }
 
-        const permissionLevel = await resolveSpacePermission(supabase, fields.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(supabase, fields.space_id);
         const permissionBlock = blockCreateForPermission(permissionLevel);
         if (permissionBlock) return { data: null, ...permissionBlock };
 
@@ -114,11 +114,7 @@ export const updateStatus = withAuthenticatedAction(
             .maybeSingle();
         if (!existingStatus) return { data: null, error: 'Status not found' };
 
-        const permissionLevel = await resolveSpacePermission(
-            supabase,
-            existingStatus.space_id,
-            user.id,
-        );
+        const permissionLevel = await resolveSpacePermission(supabase, existingStatus.space_id);
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingStatus.created_by === user.id,
         });
@@ -159,7 +155,7 @@ export const deleteStatus = withAuthenticatedAction(
 
         if (!target) return { error: 'Status not found' };
 
-        const permissionLevel = await resolveSpacePermission(supabase, target.space_id, user.id);
+        const permissionLevel = await resolveSpacePermission(supabase, target.space_id);
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: target.created_by === user.id,
         });
