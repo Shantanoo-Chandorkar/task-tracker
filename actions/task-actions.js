@@ -2,6 +2,12 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows';
+import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
+import {
+    wouldCreateCycle,
+    exceedsMaxDepthAfterMove,
+    resolveRootAncestorSublistId,
+} from '@/lib/move-task-checks';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
 import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tree';
@@ -65,23 +71,28 @@ function snapshotMaxRelativeDepth(node) {
  * @param {object} supabase - Request-scoped Supabase client
  * @param {string} parentId - Task that would receive a new direct child
  * @returns {Promise<{ error: string, code: string }|null>} A refusal, or null to proceed
+ * @throws {Error} Generic SERVER_LOAD_FAILED error when a read fails
  */
 async function blockIfSubtaskCapReached(supabase, parentId) {
     const spaceId = await getSpaceIdForTask(supabase, parentId);
-    const { data: space } = await supabase
+    if (!spaceId) return { error: 'Parent task not found', code: TASK_NOT_FOUND };
+
+    const spaceResult = await supabase
         .from('spaces')
         .select('max_subtasks_per_parent')
         .eq('id', spaceId)
         .maybeSingle();
-    const maxSubtasksPerParent = space?.max_subtasks_per_parent;
+    throwIfQueryFailed('[tasks] subtask cap', spaceResult);
+    const maxSubtasksPerParent = spaceResult.data?.max_subtasks_per_parent;
     if (!maxSubtasksPerParent) return null;
 
-    const { count } = await supabase
+    const countResult = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
         .eq('parent_id', parentId);
+    throwIfQueryFailed('[tasks] subtask cap', countResult);
 
-    if ((count ?? 0) >= maxSubtasksPerParent) {
+    if ((countResult.count ?? 0) >= maxSubtasksPerParent) {
         return {
             error: `This task already has the maximum of ${maxSubtasksPerParent} subtasks`,
             code: TASK_SUBTASK_CAP_REACHED,
@@ -843,19 +854,29 @@ export const moveTask = withAuthenticatedAction(
         });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
+        // Read at most once, and only if a check below needs the whole list
+        let listTaskLinksPromise;
+        const loadListTaskLinks = () => {
+            listTaskLinksPromise ??= fetchAllRows(({ from, to }) =>
+                supabase
+                    .from('tasks')
+                    .select('id, parent_id, depth, sublist_id')
+                    .eq('list_id', task.list_id)
+                    .order('id', { ascending: true })
+                    .range(from, to),
+            ).then((listTaskLinksResult) => {
+                throwIfQueryFailed('[tasks] move', listTaskLinksResult);
+                return listTaskLinksResult.data;
+            });
+            return listTaskLinksPromise;
+        };
+
         // Defense in depth - a self/descendant reparent creates a cycle that hangs every tree walker.
         if (newParentId === taskId) {
             return { data: null, error: 'A task cannot be its own parent' };
         }
-        if (newParentId) {
-            const { data: allTasksInList } = await supabase
-                .from('tasks')
-                .select('id, parent_id')
-                .eq('list_id', task.list_id);
-            const descendantIds = findDescendantIds(taskId, allTasksInList || []);
-            if (descendantIds.has(newParentId)) {
-                return { data: null, error: 'Cannot move a task into its own descendant' };
-            }
+        if (newParentId && wouldCreateCycle(taskId, newParentId, await loadListTaskLinks())) {
+            return { data: null, error: 'Cannot move a task into its own descendant' };
         }
 
         if (newParentId && newParentId !== task.parent_id) {
@@ -885,18 +906,13 @@ export const moveTask = withAuthenticatedAction(
         // MAX_DEPTH_CONSTANT
         const nestingMode = await getNestingMode();
         if (nestingMode === 'finite' && depthDelta > 0) {
-            const { data: allTasksForDepthCheck } = await supabase
-                .from('tasks')
-                .select('id, parent_id, depth')
-                .eq('list_id', task.list_id);
-            const descendantIds = findDescendantIds(taskId, allTasksForDepthCheck || []);
-            const descendantDepths = [...descendantIds].map(
-                (descendantId) =>
-                    allTasksForDepthCheck.find((listTask) => listTask.id === descendantId)?.depth ??
-                    task.depth,
-            );
-            const maxCurrentDepth = Math.max(task.depth, ...descendantDepths);
-            if (maxCurrentDepth + depthDelta > FINITE_MAX_DEPTH) {
+            const depthExceeded = exceedsMaxDepthAfterMove({
+                task,
+                depthDelta,
+                listTaskLinks: await loadListTaskLinks(),
+                maxDepth: FINITE_MAX_DEPTH,
+            });
+            if (depthExceeded) {
                 return { data: null, error: 'Move would exceed maximum nesting depth' };
             }
         }
@@ -907,13 +923,7 @@ export const moveTask = withAuthenticatedAction(
             if (sublistId !== undefined) {
                 resolvedSublistId = sublistId ?? null;
             } else if (task.parent_id) {
-                const { data: allTasksInList } = await supabase
-                    .from('tasks')
-                    .select('id, parent_id, sublist_id')
-                    .eq('list_id', task.list_id);
-                const ancestors = findAncestors(taskId, allTasksInList || []);
-                const rootAncestor = ancestors[ancestors.length - 1];
-                resolvedSublistId = rootAncestor?.sublist_id ?? null;
+                resolvedSublistId = resolveRootAncestorSublistId(taskId, await loadListTaskLinks());
             } else {
                 resolvedSublistId = task.sublist_id ?? null;
             }
