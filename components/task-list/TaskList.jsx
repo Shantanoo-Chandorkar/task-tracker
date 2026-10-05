@@ -406,10 +406,9 @@ export default function TaskList({
     // Counts include every depth, not just root tasks - a subtask's status can differ from its parent's.
     const countsByStatusId = useMemo(() => {
         const nextCountsByStatusId = {};
-        for (const status of statuses) {
-            nextCountsByStatusId[status.id] = flatList.filter(
-                (task) => task.status_id === status.id,
-            ).length;
+        for (const status of statuses) nextCountsByStatusId[status.id] = 0;
+        for (const task of flatList) {
+            if (task.status_id in nextCountsByStatusId) nextCountsByStatusId[task.status_id] += 1;
         }
         return nextCountsByStatusId;
     }, [statuses, flatList]);

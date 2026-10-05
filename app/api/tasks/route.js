@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { createTask } from '@/actions/task-actions';
 import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
+import { fetchListTasks } from '@/lib/list-tasks';
 
 /**
  * GET /api/tasks?list_id=<id>
@@ -19,26 +20,18 @@ export const GET = withApiErrorHandling(async function GET(request) {
         return NextResponse.json({ error: 'list_id is required' }, { status: 400 });
     }
 
-    const { data: tasks, error } = await supabase
-        .from('tasks')
-        .select('*, statuses(id, name, color, is_default, position), task_tags(tags(id, name))')
-        .eq('list_id', listId)
-        .order('depth', { ascending: true })
-        .order('position', { ascending: true });
+    const { data: tasks, error } = await fetchListTasks(supabase, listId);
 
     if (error) {
+        console.error('[api/tasks] load failed', {
+            listId,
+            code: error.code,
+            detail: error.message,
+        });
         return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
     }
 
-    // Flattens the statuses and task_tags joins so callers don't need to know either's structure.
-    const normalized = (tasks || []).map((task) => ({
-        ...task,
-        status_name: task.statuses?.name ?? null,
-        status_color: task.statuses?.color ?? null,
-        tags: (task.task_tags || []).map((taskTagRow) => taskTagRow.tags),
-    }));
-
-    return NextResponse.json(normalized);
+    return NextResponse.json(tasks);
 });
 
 /**

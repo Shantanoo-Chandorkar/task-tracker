@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows';
 import { computeNextOccurrence } from '@/lib/recurrence';
 import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
 import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tree';
@@ -709,12 +710,26 @@ export async function duplicateTask(taskId, newRootId) {
         const permissionBlock = blockCreateForPermission(permissionLevel);
         if (permissionBlock) return permissionBlock;
 
-        const { data: listTasks } = await supabase
-            .from('tasks')
-            .select('*')
-            .eq('list_id', task.list_id);
+        // Depth check needs only ids and parents; paged so a list past 1000 rows is not cut short.
+        const { data: listTaskLinks, error: listTaskLinksError } = await fetchAllRows(
+            ({ from, to }) =>
+                supabase
+                    .from('tasks')
+                    .select('id, parent_id')
+                    .eq('list_id', task.list_id)
+                    .order('id', { ascending: true })
+                    .range(from, to),
+        );
+        if (listTaskLinksError) {
+            console.error('[duplicateTask] subtree read failed', {
+                taskId,
+                code: listTaskLinksError.code,
+                detail: listTaskLinksError.message,
+            });
+            return { error: 'Failed to duplicate task' };
+        }
 
-        const snapshot = deepCloneSubtree(taskId, listTasks || []);
+        const snapshot = deepCloneSubtree(taskId, listTaskLinks);
         if (!snapshot) return { error: 'Task not found' };
 
         // MAX_DEPTH_CONSTANT - duplicate lands at the same depth as the original, but a deep

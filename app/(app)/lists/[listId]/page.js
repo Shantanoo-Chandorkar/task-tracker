@@ -8,6 +8,7 @@ import { attachTaskCounts } from '@/lib/list-task-counts';
 import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
 import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
 import { loadListName } from '@/lib/page-titles';
+import { fetchListTasks } from '@/lib/list-tasks';
 
 /**
  * Tab title: the list's name, or a generic one when the id is malformed or the list is not visible.
@@ -34,12 +35,7 @@ export default async function ListPage({ params }) {
 
     const [listResult, tasksResult, spacesResult, listsResult, sublistsResult] = await Promise.all([
         supabase.from('lists').select('id, space_id').eq('id', listId).maybeSingle(),
-        supabase
-            .from('tasks')
-            .select('*, statuses(id, name, color, is_default, position), task_tags(tags(id, name))')
-            .eq('list_id', listId)
-            .order('depth', { ascending: true })
-            .order('position', { ascending: true }),
+        fetchListTasks(supabase, listId),
         supabase.from('spaces').select('*').order('position', { ascending: true }),
         supabase.from('lists').select('*').order('position', { ascending: true }),
         supabase
@@ -66,14 +62,6 @@ export default async function ListPage({ params }) {
     const { data: lists } = listsResult;
     const { data: sublists } = sublistsResult;
 
-    // Flatten the statuses join and the task_tags join so callers don't need to know either's structure.
-    const normalizedTasks = (tasks || []).map((task) => ({
-        ...task,
-        status_name: task.statuses?.name ?? null,
-        status_color: task.statuses?.color ?? null,
-        tags: (task.task_tags || []).map((taskTagRow) => taskTagRow.tags),
-    }));
-
     const statusesResult = await supabase
         .from('statuses')
         .select('*')
@@ -93,7 +81,7 @@ export default async function ListPage({ params }) {
         <div className="px-4 md:px-8 py-6">
             <TaskList
                 listId={listId}
-                initialTasks={normalizedTasks}
+                initialTasks={tasks}
                 initialStatuses={statuses || []}
                 initialSpaces={spacesWithPermission}
                 initialLists={listsWithCounts}

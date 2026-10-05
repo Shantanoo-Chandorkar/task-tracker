@@ -15,6 +15,7 @@ const sourceTask = {
 const rpcCalls = [];
 let lookupRow = null;
 let rpcResult = { error: null };
+let listReadError = null;
 
 /**
  * Stand-in Supabase client. Awaiting a filter chain answers with the source task's list, `single` answers the
@@ -27,9 +28,11 @@ function createFakeSupabase() {
         neq: () => chain,
         is: () => chain,
         order: () => chain,
+        range: () => chain,
         single: async () => ({ data: sourceTask, error: null }),
         maybeSingle: async () => ({ data: lookupRow }),
-        then: (resolve) => resolve({ data: [sourceTask] }),
+        then: (resolve) =>
+            resolve(listReadError ? { data: null, error: listReadError } : { data: [sourceTask] }),
     };
     return {
         from: () => chain,
@@ -56,6 +59,18 @@ describe('duplicateTask with a client-made id for the copy', () => {
         rpcCalls.length = 0;
         lookupRow = null;
         rpcResult = { error: null };
+        listReadError = null;
+    });
+
+    it('fails cleanly and copies nothing when the list read for the depth check fails', async () => {
+        listReadError = { code: '57014', message: 'timeout detail' };
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { duplicateTask } = await import('./task-actions');
+
+        const duplicateResult = await duplicateTask('task-1', NEW_ROOT_ID);
+
+        expect(duplicateResult).toEqual({ error: 'Failed to duplicate task' });
+        expect(rpcCalls).toHaveLength(0);
     });
 
     it('passes the id to the database function so the copy gets that id', async () => {
