@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { startGuestSession } from '@/actions/guest-actions';
-import { clearAllCaches } from '@/lib/cache';
+import { clearAllCaches } from '@/lib/clear-client-caches';
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 const TURNSTILE_SCRIPT_URL =

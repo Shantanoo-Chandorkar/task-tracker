@@ -45,7 +45,7 @@ import { removeRowFromCache } from '@/lib/query-cache';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
 import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { countSpaceContents } from '@/lib/delete-counts';
+import { countSpaceContents } from '@/lib/cached-delete-counts';
 import { getMoveTargets } from '@/lib/move-targets';
 import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/dnd-announcements';
 

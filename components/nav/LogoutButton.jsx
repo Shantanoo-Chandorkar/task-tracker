@@ -8,7 +8,7 @@ import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { signOutAction } from '@/actions/auth-actions';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
-import { clearAllCaches } from '@/lib/cache';
+import { clearAllCaches } from '@/lib/clear-client-caches';
 
 /**
  * Signs the current user out, clearing client-side caches first so the next login doesn't

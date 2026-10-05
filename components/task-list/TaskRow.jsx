@@ -14,7 +14,7 @@ import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import CompleteTaskDialog from './CompleteTaskDialog';
 import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
 import LimitWarning from './LimitWarning';
-import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
+import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/nesting-depth';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 import { useTaskPriority } from '@/hooks/useTaskPriority';

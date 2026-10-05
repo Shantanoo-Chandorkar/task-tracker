@@ -1,5 +1,5 @@
 import { LoaderCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/class-names';
 
 const sizeClasses = {
     xs: 'h-3 w-3',

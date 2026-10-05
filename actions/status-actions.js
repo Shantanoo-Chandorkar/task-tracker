@@ -1,6 +1,6 @@
 'use server';
 
-import { getNextPosition } from '@/lib/position';
+import { getNextPosition } from '@/lib/append-position';
 import { readClientId, findOwnRowById, insertRowOnce } from '@/lib/idempotent-create';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { sanitizeString, checkMaxLength } from '@/lib/validation';

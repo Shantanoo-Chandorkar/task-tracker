@@ -8,7 +8,9 @@ const fetchMock = vi.fn();
 const callOrder = [];
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ marker: 'query-client' }) }));
-vi.mock('@/lib/cache', () => ({ clearAllCaches: (...args) => clearAllCaches(...args) }));
+vi.mock('@/lib/clear-client-caches', () => ({
+    clearAllCaches: (...args) => clearAllCaches(...args),
+}));
 
 /** Mounts the component, then fires the `online` trigger once the one-minute gap has passed. */
 async function triggerRefreshWithResponse(response) {

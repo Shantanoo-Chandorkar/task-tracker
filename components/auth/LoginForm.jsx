@@ -11,7 +11,7 @@ import FormError from '@/components/ui/FormError';
 import PasswordInput from '@/components/auth/PasswordInput';
 import GuestEntryButton from '@/components/auth/GuestEntryButton';
 import { signInAction } from '@/actions/auth-actions';
-import { clearAllCaches } from '@/lib/cache';
+import { clearAllCaches } from '@/lib/clear-client-caches';
 
 /**
  * Email/password login form. On success, clears any stale cached shell from a

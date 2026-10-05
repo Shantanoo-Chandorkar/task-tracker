@@ -9,10 +9,10 @@ import {
     resolveRootAncestorSublistId,
 } from '@/lib/move-task-checks';
 import { computeNextOccurrence, recurrenceRulesMatch } from '@/lib/recurrence';
-import { NESTING_MODE, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
+import { NESTING_MODE, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/nesting-depth';
 import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
-import { getNextPosition } from '@/lib/position';
+import { getNextPosition } from '@/lib/append-position';
 import {
     readClientId,
     findOwnRowById,
