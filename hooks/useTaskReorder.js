@@ -15,7 +15,7 @@ import { useReorderRunner } from '@/hooks/useReorderRunner';
  * }} `onMoveTask` keeps one identity for the life of the list, so memoized rows are not re-rendered by it.
  */
 export function useTaskReorder(listId, flatList) {
-    const runReorder = useReorderRunner(listId);
+    const runReorder = useReorderRunner();
 
     async function handleTaskDragEnd({ active, over }) {
         const reorderPlan = planTaskReorder(flatList, active.id, over.id);
@@ -23,7 +23,7 @@ export function useTaskReorder(listId, flatList) {
         const { activeTask, reorderedSiblingIds, afterSiblingId, isMovingToStart } = reorderPlan;
 
         return runReorder({
-            scopeKey: 'tasks',
+            scopeKey: `tasks:${listId}`,
             queryKey: ['tasks', listId],
             // Lands in the new slot at once, without waiting on the save round-trip
             applyOptimistic: (queryClient) =>
@@ -47,6 +47,7 @@ export function useTaskReorder(listId, flatList) {
                 return response.ok ? null : 'Failed to reorder task';
             },
             failureMessage: 'Failed to reorder task',
+            bustCache: { urls: [`/lists/${listId}`] },
         });
     }
 

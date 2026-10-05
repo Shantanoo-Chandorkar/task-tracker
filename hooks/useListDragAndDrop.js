@@ -1,15 +1,10 @@
 'use client';
 
-import { KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { siblingScopedCollisionDetection } from '@/lib/tasks/sibling-collision';
 import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/ui/dnd-announcements';
 import { useTaskReorder } from '@/hooks/useTaskReorder';
 import { useSublistReorder } from '@/hooks/useSublistReorder';
-
-// Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
-const MOUSE_ACTIVATION = { distance: 5 };
-const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
+import { useDragSensors } from '@/hooks/useDragSensors';
 
 /**
  * Everything a task list needs for drag and drop: sensors, announcements and the reorder handlers.
@@ -27,12 +22,7 @@ export function useListDragAndDrop(listId, flatList, sublists) {
     const { handleTaskDragEnd, onMoveTask } = useTaskReorder(listId, flatList);
     const { handleSublistDragEnd, moveSublistNextTo } = useSublistReorder(listId, sublists);
 
-    const sensors = useSensors(
-        useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
-        // A delay and move tolerance let a tap or scroll through; PointerSensor would race with this sensor
-        useSensor(TouchSensor, { activationConstraint: TOUCH_ACTIVATION }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-    );
+    const sensors = useDragSensors();
 
     const announcements = buildAnnouncements(
         (rowId) =>

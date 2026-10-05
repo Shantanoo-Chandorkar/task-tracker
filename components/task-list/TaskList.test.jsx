@@ -29,7 +29,8 @@ vi.mock('sonner', () => ({
     },
 }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
-vi.mock('@/actions/sublist-actions', () => ({ updateSublist: vi.fn(), deleteSublist: vi.fn() }));
+vi.mock('@/actions/sublist-actions', () => ({ deleteSublist: vi.fn() }));
+vi.mock('@/actions/reorder-actions', () => ({ reorderSublists: vi.fn() }));
 vi.mock('@/lib/fetch-delete-counts', () => ({ fetchDeleteCounts: async () => null }));
 
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
@@ -123,7 +124,8 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
 
 const { toast } = await import('sonner');
 const { bustPageCache } = await import('@/lib/cache/service-worker-cache');
-const { updateSublist, deleteSublist } = await import('@/actions/sublist-actions');
+const { deleteSublist } = await import('@/actions/sublist-actions');
+const { reorderSublists } = await import('@/actions/reorder-actions');
 
 const STATUSES = [
     { id: 'st-todo', name: 'To do', color: '#111111', code: 'todo', is_default: true },
@@ -168,6 +170,8 @@ let queryClient;
 
 function renderTaskList() {
     queryClient = new QueryClient();
+    // The rows on screen come from this cache entry in the real app
+    queryClient.setQueryData(['sublists', LIST_ID], state.sublists);
     vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
     return render(
         <QueryClientProvider client={queryClient}>
@@ -595,7 +599,7 @@ describe('TaskList task reorder', () => {
 
 describe('TaskList sublist reorder', () => {
     it('reorders the sublists at once and saves only the positions that changed', async () => {
-        updateSublist.mockResolvedValue({ error: null });
+        reorderSublists.mockResolvedValue({ error: null });
         renderTaskList();
 
         await dragSublist('s2', 's1');
@@ -605,14 +609,13 @@ describe('TaskList sublist reorder', () => {
                 .getQueryData(['sublists', LIST_ID])
                 .map((cachedSublist) => cachedSublist.id),
         ).toEqual(['s2', 's1']);
-        expect(updateSublist).toHaveBeenCalledWith('s2', { position: 0 });
-        expect(updateSublist).toHaveBeenCalledWith('s1', { position: 1 });
+        expect(reorderSublists).toHaveBeenCalledWith(LIST_ID, ['s2', 's1']);
         expect(toast.success).toHaveBeenCalledWith('Order updated', { id: 'toast-id' });
         expect(bustPageCache).toHaveBeenCalledWith({ urls: [`/lists/${LIST_ID}`] });
     });
 
     it('shows the server message when a save is refused, and reloads the sublists', async () => {
-        updateSublist.mockResolvedValue({ error: 'Not allowed' });
+        reorderSublists.mockResolvedValue({ error: 'Not allowed' });
         renderTaskList();
 
         await dragSublist('s2', 's1');
@@ -625,7 +628,7 @@ describe('TaskList sublist reorder', () => {
     });
 
     it('reports a lost connection', async () => {
-        updateSublist.mockRejectedValue(new Error('offline'));
+        reorderSublists.mockRejectedValue(new Error('offline'));
         renderTaskList();
 
         await dragSublist('s2', 's1');
@@ -634,7 +637,7 @@ describe('TaskList sublist reorder', () => {
     });
 
     it('moves a sublist with Move down from its menu', async () => {
-        updateSublist.mockResolvedValue({ error: null });
+        reorderSublists.mockResolvedValue({ error: null });
         renderTaskList();
         const sprintBucket = screen.getByRole('heading', { name: /Sprint/ }).parentElement;
 
@@ -642,7 +645,7 @@ describe('TaskList sublist reorder', () => {
             fireEvent.click(within(sprintBucket).getByRole('button', { name: 'Move down' }));
         });
 
-        await waitFor(() => expect(updateSublist).toHaveBeenCalledWith('s1', { position: 1 }));
+        await waitFor(() => expect(reorderSublists).toHaveBeenCalledWith(LIST_ID, ['s2', 's1']));
     });
 
     it('disables Move up on the first sublist', () => {

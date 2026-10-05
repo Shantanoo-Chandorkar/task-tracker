@@ -4,25 +4,9 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
-import { toast } from 'sonner';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
-import {
-    DndContext,
-    closestCenter,
-    KeyboardSensor,
-    MouseSensor,
-    TouchSensor,
-    useSensor,
-    useSensors,
-} from '@dnd-kit/core';
-import {
-    SortableContext,
-    sortableKeyboardCoordinates,
-    useSortable,
-    verticalListSortingStrategy,
-    arrayMove,
-} from '@dnd-kit/sortable';
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -30,14 +14,12 @@ import RowActionsMenu, { MoveMenuItems } from '@/components/custom/RowActionsMen
 import { Loader } from '@/components/custom/Loader';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/custom/ModalShell';
-import { updateStatus, deleteStatus } from '@/actions/status-actions';
+import { deleteStatus } from '@/actions/status-actions';
+import { useDragSensors } from '@/hooks/useDragSensors';
+import { useStatusReorder } from '@/hooks/useStatusReorder';
 import StatusFormDialog from './StatusFormDialog';
 import { getMoveTargets } from '@/lib/tasks/move-neighbours';
 import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/ui/dnd-announcements';
-
-// Module-level so dnd-kit's internal useSensor memoization sees a stable options reference.
-const MOUSE_ACTIVATION = { distance: 5 };
-const TOUCH_ACTIVATION = { delay: 200, tolerance: 8 };
 
 /**
  * Sortable row for a single status entry in the settings page.
@@ -141,68 +123,8 @@ export default function StatusManager({ spaceId, initialStatuses }) {
         initialStatuses ? { initialData: initialStatuses } : {},
     );
 
-    const sensors = useSensors(
-        useSensor(MouseSensor, { activationConstraint: MOUSE_ACTIVATION }),
-        // TouchSensor (not PointerSensor) with delay/tolerance, so a tap or scroll isn't grabbed as a drag.
-        useSensor(TouchSensor, { activationConstraint: TOUCH_ACTIVATION }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-    );
-
-    async function handleDragEnd({ active, over }) {
-        if (!over || active.id === over.id) return;
-
-        const oldIndex = statuses.findIndex((status) => status.id === active.id);
-        const newIndex = statuses.findIndex((status) => status.id === over.id);
-        // The list can change mid-drag (refetch), leaving an id missing and arrayMove with a -1 index.
-        if (oldIndex < 0 || newIndex < 0) return;
-        return runExclusively(
-            `reorder:statuses:${spaceId}`,
-            async () => {
-                // A reload still in flight would overwrite the new order, so stop it first
-                await queryClient.cancelQueries({ queryKey: ['statuses', spaceId] });
-                const reordered = arrayMove(statuses, oldIndex, newIndex);
-
-                queryClient.setQueryData(['statuses', spaceId], reordered);
-
-                const toastId = toast.loading('Saving order...');
-
-                let results;
-                try {
-                    results = await Promise.all(
-                        reordered
-                            .map((status, newPosition) => ({ status, newPosition }))
-                            .filter(({ status, newPosition }) => status.position !== newPosition)
-                            .map(({ status, newPosition }) =>
-                                updateStatus(status.id, { position: newPosition }),
-                            ),
-                    );
-                } catch {
-                    await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-                    bustPageCache({ prefixes: ['/lists/'] });
-                    toast.error('Could not reach the server. Try again.', { id: toastId });
-                    return;
-                }
-
-                const failed = results.find((updateOutcome) => updateOutcome.error);
-                if (failed) {
-                    await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-                    bustPageCache({ prefixes: ['/lists/'] });
-                    toast.error(failed.error, { id: toastId });
-                    return;
-                }
-
-                await queryClient.invalidateQueries({ queryKey: ['statuses'] });
-                bustPageCache({ prefixes: ['/lists/'] });
-                toast.success('Order saved', { id: toastId });
-            },
-            () => toast.info(REORDER_BUSY_MESSAGE),
-        );
-    }
-
-    /** Move up / Move down: the same save path as a drag, so the same guards and optimistic update apply. */
-    function moveStatusNextTo(statusId, neighbourId) {
-        return handleDragEnd({ active: { id: statusId }, over: { id: neighbourId } });
-    }
+    const sensors = useDragSensors();
+    const { handleDragEnd, moveStatusNextTo } = useStatusReorder(spaceId, statuses);
 
     const announcements = buildAnnouncements(
         (rowId) => statuses.find((status) => status.id === rowId)?.name,

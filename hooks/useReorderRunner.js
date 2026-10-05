@@ -7,26 +7,34 @@ import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { runExclusively, REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 
 /**
- * Gives a list page one shared way to save a drag reorder: one at a time, optimistic, with toasts and a refetch.
+ * Gives every drag reorder one shared way to save: one at a time per scope, optimistic, with toasts and a refetch.
  *
- * @param {string} listId - List whose page cache is cleared after each save
  * @returns {(reorder: {
  *   scopeKey: string,
  *   queryKey: unknown[],
  *   applyOptimistic: (queryClient: object) => void,
  *   save: () => Promise<string|null>,
  *   failureMessage: string,
- * }) => Promise<void>} Runs one reorder. `save` resolves to a refusal message, or null when it worked; a throw
- *   counts as a lost connection and shows `failureMessage`. A second reorder in the same scope is turned away
- *   with a toast.
+ *   successMessage?: string,
+ *   bustCache: { urls?: string[], prefixes?: string[] },
+ * }) => Promise<void>} Runs one reorder. Only `scopeKey` locks, only `queryKey` reloads.
+ *   `save` resolves to a refusal message or null; a throw shows `failureMessage`.
  */
-export function useReorderRunner(listId) {
+export function useReorderRunner() {
     const queryClient = useQueryClient();
 
     return useCallback(
-        ({ scopeKey, queryKey, applyOptimistic, save, failureMessage }) =>
+        ({
+            scopeKey,
+            queryKey,
+            applyOptimistic,
+            save,
+            failureMessage,
+            successMessage = 'Order updated',
+            bustCache,
+        }) =>
             runExclusively(
-                `reorder:${scopeKey}:${listId}`,
+                `reorder:${scopeKey}`,
                 async () => {
                     // A reload still in flight would overwrite the new order, so stop it first
                     await queryClient.cancelQueries({ queryKey });
@@ -35,7 +43,7 @@ export function useReorderRunner(listId) {
                     const toastId = toast.loading('Saving order...');
                     async function refreshFromServer() {
                         await queryClient.invalidateQueries({ queryKey });
-                        bustPageCache({ urls: [`/lists/${listId}`] });
+                        bustPageCache(bustCache);
                     }
 
                     try {
@@ -46,7 +54,7 @@ export function useReorderRunner(listId) {
                             return;
                         }
                         await refreshFromServer();
-                        toast.success('Order updated', { id: toastId });
+                        toast.success(successMessage, { id: toastId });
                     } catch {
                         toast.error(failureMessage, { id: toastId });
                         await refreshFromServer();
@@ -54,6 +62,6 @@ export function useReorderRunner(listId) {
                 },
                 () => toast.info(REORDER_BUSY_MESSAGE),
             ),
-        [queryClient, listId],
+        [queryClient],
     );
 }
