@@ -9,7 +9,7 @@ import {
     resolveRootAncestorSublistId,
 } from '@/lib/move-task-checks';
 import { computeNextOccurrence, recurrenceRulesMatch } from '@/lib/recurrence';
-import { getNestingMode, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
+import { NESTING_MODE, isDepthAllowed, FINITE_MAX_DEPTH } from '@/lib/config';
 import { findAncestors, findDescendantIds, deepCloneSubtree } from '@/lib/tree';
 import { getPositionBetween } from '@/lib/fractional-index';
 import { getNextPosition } from '@/lib/position';
@@ -63,6 +63,35 @@ function snapshotMaxRelativeDepth(node) {
     const children = node.children || [];
     if (children.length === 0) return 0;
     return 1 + Math.max(...children.map(snapshotMaxRelativeDepth));
+}
+
+/**
+ * Refuses a create the caller's permission tier does not allow in the space.
+ *
+ * @param {object} supabase - Request-scoped Supabase client
+ * @param {string} spaceId - Space the new row would be created in
+ * @param {string} userId - Caller's user id
+ * @returns {Promise<{ error: string, code: string }|null>} A refusal, or null to proceed
+ * @throws {Error} Generic SERVER_LOAD_FAILED error when the permission read fails
+ */
+async function blockCreateInSpace(supabase, spaceId, userId) {
+    const permissionLevel = await resolveSpacePermission(supabase, spaceId, userId);
+    return blockCreateForPermission(permissionLevel);
+}
+
+/**
+ * Refuses an update or delete the caller's permission tier does not allow on a row.
+ *
+ * @param {object} supabase - Request-scoped Supabase client
+ * @param {string} spaceId - Space the row belongs to
+ * @param {string} userId - Caller's user id
+ * @param {string|null} rowCreatedBy - `created_by` of the row being changed
+ * @returns {Promise<{ error: string, code: string }|null>} A refusal, or null to proceed
+ * @throws {Error} Generic SERVER_LOAD_FAILED error when the permission read fails
+ */
+async function blockWriteInSpace(supabase, spaceId, userId, rowCreatedBy) {
+    const permissionLevel = await resolveSpacePermission(supabase, spaceId, userId);
+    return blockWriteForPermission(permissionLevel, { isOwnRow: rowCreatedBy === userId });
 }
 
 /**
@@ -158,8 +187,7 @@ export const createTask = withAuthenticatedAction(
         }
 
         const spaceId = await getSpaceIdForList(supabase, fields.list_id);
-        const permissionLevel = await resolveSpacePermission(supabase, spaceId, user.id);
-        const permissionBlock = blockCreateForPermission(permissionLevel);
+        const permissionBlock = await blockCreateInSpace(supabase, spaceId, user.id);
         if (permissionBlock) return { data: null, ...permissionBlock };
 
         const { data: space } = await supabase
@@ -211,8 +239,7 @@ export const createTask = withAuthenticatedAction(
         }
 
         // MAX_DEPTH_CONSTANT
-        const nestingMode = await getNestingMode();
-        if (!isDepthAllowed(depth, nestingMode)) {
+        if (!isDepthAllowed(depth)) {
             return { data: null, error: 'Maximum nesting depth reached' };
         }
 
@@ -320,14 +347,12 @@ export const updateTask = withAuthenticatedAction(
             .maybeSingle();
         if (!existingTask) return { data: null, error: 'Task not found' };
 
-        const permissionLevel = await resolveSpacePermission(
+        const permissionBlock = await blockWriteInSpace(
             supabase,
             existingTask.lists?.space_id,
             user.id,
+            existingTask.created_by,
         );
-        const permissionBlock = blockWriteForPermission(permissionLevel, {
-            isOwnRow: existingTask.created_by === user.id,
-        });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
         if (fields.due_date === null && existingTask.lists?.spaces?.require_due_date) {
@@ -479,10 +504,12 @@ export const completeTaskAndDescendants = withAuthenticatedAction(
         if (!task) return { error: 'Task not found' };
 
         // Gated on root-task ownership only - RLS still blocks any descendant the caller doesn't own.
-        const permissionLevel = await resolveSpacePermission(supabase, task.space_id, user.id);
-        const permissionBlock = blockWriteForPermission(permissionLevel, {
-            isOwnRow: task.created_by === user.id,
-        });
+        const permissionBlock = await blockWriteInSpace(
+            supabase,
+            task.space_id,
+            user.id,
+            task.created_by,
+        );
         if (permissionBlock) return permissionBlock;
 
         const doneStatusId = await getDoneStatusId(supabase, task.space_id);
@@ -532,10 +559,12 @@ export const uncompleteTaskAndDescendants = withAuthenticatedAction(
         if (!task) return { error: 'Task not found' };
 
         // Gated on root-task ownership only - RLS still blocks any descendant the caller doesn't own.
-        const permissionLevel = await resolveSpacePermission(supabase, task.space_id, user.id);
-        const permissionBlock = blockWriteForPermission(permissionLevel, {
-            isOwnRow: task.created_by === user.id,
-        });
+        const permissionBlock = await blockWriteInSpace(
+            supabase,
+            task.space_id,
+            user.id,
+            task.created_by,
+        );
         if (permissionBlock) return permissionBlock;
 
         const defaultStatusId = await getDefaultStatusId(supabase, task.space_id);
@@ -591,14 +620,12 @@ export const deleteTask = withAuthenticatedAction(
             .maybeSingle();
         if (!existingTask) return { error: 'Task not found' };
 
-        const permissionLevel = await resolveSpacePermission(
+        const permissionBlock = await blockWriteInSpace(
             supabase,
             existingTask.lists?.space_id,
             user.id,
+            existingTask.created_by,
         );
-        const permissionBlock = blockWriteForPermission(permissionLevel, {
-            isOwnRow: existingTask.created_by === user.id,
-        });
         if (permissionBlock) return permissionBlock;
 
         const { data: deletedTask, error } = await supabase
@@ -638,14 +665,12 @@ export const deleteTaskAndReparentChildren = withAuthenticatedAction(
 
         if (taskError || !task) return { error: 'Task not found' };
 
-        const permissionLevel = await resolveSpacePermission(
+        const permissionBlock = await blockWriteInSpace(
             supabase,
             task.lists?.space_id,
             user.id,
+            task.created_by,
         );
-        const permissionBlock = blockWriteForPermission(permissionLevel, {
-            isOwnRow: task.created_by === user.id,
-        });
         if (permissionBlock) return permissionBlock;
 
         // One transaction: children are moved up and the task deleted together, so a failure changes nothing.
@@ -724,12 +749,7 @@ export async function duplicateTask(taskId, newRootId) {
         if (taskError || !task) return { error: 'Task not found' };
 
         // Duplicating creates new rows, so this is a create-permission check, not row ownership.
-        const permissionLevel = await resolveSpacePermission(
-            supabase,
-            task.lists?.space_id,
-            user.id,
-        );
-        const permissionBlock = blockCreateForPermission(permissionLevel);
+        const permissionBlock = await blockCreateInSpace(supabase, task.lists?.space_id, user.id);
         if (permissionBlock) return permissionBlock;
 
         // Depth check needs only ids and parents; paged so a list past 1000 rows is not cut short.
@@ -756,9 +776,8 @@ export async function duplicateTask(taskId, newRootId) {
 
         // MAX_DEPTH_CONSTANT - duplicate lands at the same depth as the original, but a deep
         // subtree could still push its descendants past the limit.
-        const nestingMode = await getNestingMode();
         if (
-            nestingMode === 'finite' &&
+            NESTING_MODE === 'finite' &&
             task.depth + snapshotMaxRelativeDepth(snapshot) > FINITE_MAX_DEPTH
         ) {
             return { error: 'Duplicating this task would exceed the maximum nesting depth' };
@@ -855,14 +874,12 @@ export const moveTask = withAuthenticatedAction(
 
         if (taskError || !task) return { data: null, error: 'Task not found' };
 
-        const permissionLevel = await resolveSpacePermission(
+        const permissionBlock = await blockWriteInSpace(
             supabase,
             task.lists?.space_id,
             user.id,
+            task.created_by,
         );
-        const permissionBlock = blockWriteForPermission(permissionLevel, {
-            isOwnRow: task.created_by === user.id,
-        });
         if (permissionBlock) return { data: null, ...permissionBlock };
 
         // Read at most once, and only if a check below needs the whole list
@@ -915,8 +932,7 @@ export const moveTask = withAuthenticatedAction(
 
         // Cap applies to the deepest descendant too - reparenting carries the whole subtree's shape.
         // MAX_DEPTH_CONSTANT
-        const nestingMode = await getNestingMode();
-        if (nestingMode === 'finite' && depthDelta > 0) {
+        if (NESTING_MODE === 'finite' && depthDelta > 0) {
             const depthExceeded = exceedsMaxDepthAfterMove({
                 task,
                 depthDelta,

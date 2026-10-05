@@ -45,10 +45,6 @@ function createFakeSupabase() {
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => createFakeSupabase() }));
 vi.mock('@/lib/auth/session', () => ({ getCurrentUser: async () => ({ id: USER_ID }) }));
-vi.mock('@/lib/config', async (importOriginal) => ({
-    ...(await importOriginal()),
-    getNestingMode: async () => 'infinite',
-}));
 vi.mock('@/lib/permissions/space-permissions', async (importOriginal) => ({
     ...(await importOriginal()),
     resolveSpacePermission: async () => 'owner',
