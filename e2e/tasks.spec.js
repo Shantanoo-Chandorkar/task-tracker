@@ -664,4 +664,44 @@ test.describe('tasks', () => {
         await page.waitForTimeout(500);
         expect(serverActionRequests).toHaveLength(0);
     });
+
+    test('saving an edit after the task changed in another tab asks first, keeps the typed text, then replaces it', async ({
+        page,
+    }) => {
+        const originalTitle = await createTask(page);
+        await waitForCreatedToastsToClear(page);
+
+        await taskRow(page, originalTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByPlaceholder('Task title')).toHaveValue(originalTitle);
+
+        // A second tab of the same account saves a new title while this dialog is open.
+        const otherTab = await page.context().newPage();
+        await otherTab.goto(`/lists/${listId}`);
+        const otherTabTitle = uniqueName('Other tab title');
+        await taskRow(otherTab, originalTitle)
+            .getByRole('button', { name: 'More actions' })
+            .click();
+        await otherTab.getByRole('menuitem', { name: 'Edit' }).click();
+        const otherDialog = otherTab.getByRole('dialog');
+        await otherDialog.getByPlaceholder('Task title').fill(otherTabTitle);
+        await otherDialog.getByRole('button', { name: 'Save changes' }).click();
+        await expect(otherDialog).toBeHidden();
+        await expect(otherTab.getByText('Task updated successfully')).toBeVisible();
+
+        const myTitle = uniqueName('My title');
+        await dialog.getByPlaceholder('Task title').fill(myTitle);
+        await dialog.getByRole('button', { name: 'Save changes' }).click();
+
+        await expect(
+            dialog.getByText('Someone changed this task while you were editing: Title.'),
+        ).toBeVisible();
+        await expect(dialog.getByPlaceholder('Task title')).toHaveValue(myTitle);
+
+        await dialog.getByRole('button', { name: 'Save changes' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(taskRow(page, myTitle)).toBeVisible();
+        await expect(page.getByRole('link', { name: otherTabTitle, exact: true })).toHaveCount(0);
+    });
 });

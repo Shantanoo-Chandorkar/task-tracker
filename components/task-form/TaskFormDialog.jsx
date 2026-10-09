@@ -7,6 +7,7 @@ import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSpaceById } from '@/hooks/useSpaceById';
+import { useTaskEditConflict } from '@/hooks/useTaskEditConflict';
 import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +26,7 @@ import TaskTagPicker from '@/components/task-detail/TaskTagPicker';
 import LabeledField from '@/components/custom/LabeledField';
 import { createTaskWithTags } from '@/actions/task-create-actions';
 import { updateTask } from '@/actions/task-update-actions';
-import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
+import { TASK_DUE_DATE_REQUIRED, TASK_EDIT_CONFLICT } from '@/lib/error-codes';
 import { Loader } from '@/components/custom/Loader';
 import EditorErrorBoundary from '@/components/custom/EditorErrorBoundary';
 import { toast } from 'sonner';
@@ -110,6 +111,7 @@ export default function TaskFormDialog({
     const [titleError, setTitleError] = useState('');
     const [dueDateError, setDueDateError] = useState('');
     const [formError, setFormError] = useState('');
+    const editConflict = useTaskEditConflict();
 
     const spaceId = useSpaceIdForList(listId ?? task?.list_id);
     const requiresDueDate = useSpaceById(spaceId)?.require_due_date ?? false;
@@ -139,6 +141,8 @@ export default function TaskFormDialog({
             setFormError('');
             setSubmitting(false);
             setCreateRequestId(createClientId());
+            // Fixed now, not read at submit: a background reload must not quietly move the version under the user
+            editConflict.startEditing(task);
         }
     }
 
@@ -188,10 +192,23 @@ export default function TaskFormDialog({
                 error,
                 code,
                 tagErrors,
-            } = isEditing ? await updateTask(task.id, fields) : await createTaskWithTags(fields);
+                currentTask,
+            } = isEditing
+                ? await updateTask(task.id, fields, {
+                      expectedUpdatedAt: editConflict.expectedUpdatedAt,
+                  })
+                : await createTaskWithTags(fields);
 
             if (error) {
-                if (code === TASK_DUE_DATE_REQUIRED) {
+                if (code === TASK_EDIT_CONFLICT && currentTask) {
+                    setFormError(
+                        editConflict.resolveConflict({
+                            currentTask,
+                            taskListId: task.list_id,
+                            statuses,
+                        }),
+                    );
+                } else if (code === TASK_DUE_DATE_REQUIRED) {
                     setDueDateError(error);
                 } else {
                     setFormError(error);

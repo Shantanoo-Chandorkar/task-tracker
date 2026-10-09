@@ -12,7 +12,12 @@ import {
 import { canMarkTaskDone } from '@/lib/tasks/task-completion';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { toTaskRateLimitResult } from '@/lib/tasks/task-rate-limit';
-import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
+import { isValidVersionStamp, buildEditConflictMessage } from '@/lib/tasks/task-edit-conflict';
+import {
+    TASK_DUE_DATE_REQUIRED,
+    TASK_EDIT_CONFLICT,
+    TASK_VERSION_INVALID,
+} from '@/lib/error-codes';
 
 /**
  * Cleans the title, priority and description the client sent, in the order the caller should hear about problems.
@@ -130,16 +135,77 @@ function toUpdateTaskFailure(taskId, updates, updateError) {
 }
 
 /**
+ * Refuses a version stamp that is not a real timestamp, so it never reaches the database filter.
+ *
+ * @param {unknown} expectedUpdatedAt - Stamp the client sent, or nothing
+ * @returns {{ data: null, error: string, code: string }|null} The refusal, or null when absent or valid
+ */
+function blockInvalidVersionStamp(expectedUpdatedAt) {
+    if (expectedUpdatedAt === undefined || expectedUpdatedAt === null) return null;
+    if (isValidVersionStamp(expectedUpdatedAt)) return null;
+    return { data: null, error: 'The task version is not valid', code: TASK_VERSION_INVALID };
+}
+
+/**
+ * Explains why a version-checked update changed no row: the task is gone, or it changed after the client loaded it.
+ *
+ * @param {object} supabase - Request-scoped Supabase client
+ * @param {string} taskId - Task being updated
+ * @returns {Promise<{ data: object|null, error: string, code?: string, currentTask?: object }>} The refusal
+ */
+async function describeRefusedVersionedUpdate(supabase, taskId) {
+    const { data: currentTask } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .maybeSingle();
+    if (!currentTask) return { data: null, error: 'Task not found' };
+
+    // Write permission was checked before this point, so showing the stored row leaks nothing new
+    return {
+        data: null,
+        error: buildEditConflictMessage([]),
+        code: TASK_EDIT_CONFLICT,
+        currentTask,
+    };
+}
+
+/**
+ * Writes the update; with a version stamp it only applies if the task is still at that version.
+ *
+ * @param {object} supabase - Request-scoped Supabase client
+ * @param {string} taskId - Task being updated
+ * @param {object} updates - Cleaned fields to write
+ * @param {string|undefined} expectedUpdatedAt - Version the client loaded, or nothing to overwrite regardless
+ * @returns {Promise<{ data: object|null, error: string|null, code?: string, currentTask?: object }>} The saved row
+ */
+async function saveTaskUpdate(supabase, taskId, updates, expectedUpdatedAt) {
+    const isVersionChecked = expectedUpdatedAt !== undefined && expectedUpdatedAt !== null;
+    let updateQuery = supabase.from('tasks').update(updates).eq('id', taskId);
+    // The database compares the stamp, so the check and the write are one step and cannot race
+    if (isVersionChecked) updateQuery = updateQuery.eq('updated_at', expectedUpdatedAt);
+
+    const { data: updatedTask, error } = await updateQuery.select().maybeSingle();
+    if (error) return toUpdateTaskFailure(taskId, updates, error);
+    if (updatedTask) return { data: updatedTask, error: null };
+    if (isVersionChecked) return describeRefusedVersionedUpdate(supabase, taskId);
+    return toUpdateTaskFailure(taskId, updates, null);
+}
+
+/**
  * Updates specific fields on an existing task.
  *
  * @param {string} taskId - Task ID to update
  * @param {object} fields - Partial task fields to update
- * @returns {{ data: object|null, error: string|null, code: string|undefined }}
+ * @param {object} [options]
+ * @param {string} [options.expectedUpdatedAt] - The `updated_at` the caller loaded; a newer task is refused with
+ *   `TASK_EDIT_CONFLICT` and returned as `currentTask`. Leave out to overwrite regardless.
+ * @returns {{ data: object|null, error: string|null, code: string|undefined, currentTask: object|undefined }}
  */
 export const updateTask = withAuthenticatedAction(
     '[tasks] update',
     'Unexpected error updating task',
-    async (user, supabase, taskId, fields) => {
+    async (user, supabase, taskId, fields, options = {}) => {
         if (!taskId) return { data: null, error: 'Task ID is required' };
 
         const { data: existingTask } = await supabase
@@ -158,6 +224,9 @@ export const updateTask = withAuthenticatedAction(
             existingTask.created_by,
         );
         if (permissionBlock) return { data: null, ...permissionBlock };
+
+        const versionBlock = blockInvalidVersionStamp(options?.expectedUpdatedAt);
+        if (versionBlock) return versionBlock;
 
         if (fields.due_date === null && existingTask.lists?.spaces?.require_due_date) {
             return {
@@ -189,14 +258,6 @@ export const updateTask = withAuthenticatedAction(
         }
 
         const updates = withRecurrenceSchedule(cleanedFields.updates, existingTask);
-        const { data: updatedTask, error } = await supabase
-            .from('tasks')
-            .update(updates)
-            .eq('id', taskId)
-            .select()
-            .maybeSingle();
-        if (error || !updatedTask) return toUpdateTaskFailure(taskId, updates, error);
-
-        return { data: updatedTask, error: null };
+        return saveTaskUpdate(supabase, taskId, updates, options?.expectedUpdatedAt);
     },
 );

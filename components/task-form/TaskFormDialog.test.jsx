@@ -116,6 +116,137 @@ describe('TaskFormDialog first mounted already open', () => {
     });
 });
 
+const OPENED_STAMP = '2030-01-01T10:00:00.123456+00:00';
+const NEWER_STAMP = '2030-01-01T10:05:00.654321+00:00';
+const EDITED_TASK = {
+    id: 't1',
+    title: 'Original title',
+    list_id: 'list-1',
+    status_id: 's1',
+    updated_at: OPENED_STAMP,
+};
+
+function renderEditDialog(task = EDITED_TASK) {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(['tasks', 'list-1'], [task]);
+    vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue();
+    render(
+        <QueryClientProvider client={queryClient}>
+            <TaskFormDialog open onClose={vi.fn()} task={task} />
+        </QueryClientProvider>,
+    );
+    return queryClient;
+}
+
+function conflictReply(storedTask) {
+    return {
+        data: null,
+        error: 'Task changed',
+        code: 'TASK_EDIT_CONFLICT',
+        currentTask: storedTask,
+    };
+}
+
+describe('TaskFormDialog edit conflicts', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('sends the version the dialog was opened on', async () => {
+        updateTask.mockResolvedValue({ data: { ...EDITED_TASK, title: 'New' }, error: null });
+        renderEditDialog();
+
+        await submitTitle('New');
+
+        expect(updateTask).toHaveBeenCalledWith('t1', expect.objectContaining({ title: 'New' }), {
+            expectedUpdatedAt: OPENED_STAMP,
+        });
+    });
+
+    it('sends no version for a task that carries none, so it saves as before', async () => {
+        updateTask.mockResolvedValue({ data: EDITED_TASK, error: null });
+        const { updated_at: _omitted, ...taskWithoutVersion } = EDITED_TASK;
+        renderEditDialog(taskWithoutVersion);
+
+        await submitTitle('New');
+
+        expect(updateTask.mock.calls[0][2]).toEqual({ expectedUpdatedAt: undefined });
+    });
+
+    it('names what changed, keeps what the user typed, and lets them save again', async () => {
+        updateTask.mockResolvedValue(
+            conflictReply({ ...EDITED_TASK, title: 'Theirs', updated_at: NEWER_STAMP }),
+        );
+        renderEditDialog();
+
+        await submitTitle('Mine');
+
+        expect(
+            screen.getByText(/Someone changed this task while you were editing: Title\./),
+        ).toBeTruthy();
+        expect(screen.getByPlaceholderText('Task title').value).toBe('Mine');
+        expect(document.querySelector('form').hasAttribute('inert')).toBe(false);
+        expect(screen.getByRole('button', { name: 'Save changes' }).disabled).toBe(false);
+    });
+
+    it('shows the stored task in the list cache after a conflict', async () => {
+        updateTask.mockResolvedValue(
+            conflictReply({ ...EDITED_TASK, title: 'Theirs', updated_at: NEWER_STAMP }),
+        );
+        const queryClient = renderEditDialog();
+
+        await submitTitle('Mine');
+
+        expect(queryClient.getQueryData(['tasks', 'list-1'])[0]).toMatchObject({
+            title: 'Theirs',
+            updated_at: NEWER_STAMP,
+        });
+    });
+
+    it('saves on the next try against the stored version, replacing theirs', async () => {
+        updateTask
+            .mockResolvedValueOnce(
+                conflictReply({ ...EDITED_TASK, title: 'Theirs', updated_at: NEWER_STAMP }),
+            )
+            .mockResolvedValue({ data: { ...EDITED_TASK, title: 'Mine' }, error: null });
+        renderEditDialog();
+
+        await submitTitle('Mine');
+        await act(async () => {
+            fireEvent.submit(document.querySelector('form'));
+        });
+
+        expect(updateTask).toHaveBeenCalledTimes(2);
+        expect(updateTask.mock.calls[1][2]).toEqual({ expectedUpdatedAt: NEWER_STAMP });
+        expect(updateTask.mock.calls[1][1].title).toBe('Mine');
+    });
+
+    it('keeps the opened version when the save fails for another reason', async () => {
+        updateTask
+            .mockResolvedValueOnce({ data: null, error: 'Failed to update task' })
+            .mockResolvedValue({ data: EDITED_TASK, error: null });
+        renderEditDialog();
+
+        await submitTitle('Mine');
+        await act(async () => {
+            fireEvent.submit(document.querySelector('form'));
+        });
+
+        expect(updateTask.mock.calls[1][2]).toEqual({ expectedUpdatedAt: OPENED_STAMP });
+    });
+
+    it('uses the generic error when a conflict reply carries no stored task', async () => {
+        updateTask.mockResolvedValue({
+            data: null,
+            error: 'Task changed',
+            code: 'TASK_EDIT_CONFLICT',
+        });
+        renderEditDialog();
+
+        await submitTitle('Mine');
+
+        expect(screen.getByText('Task changed')).toBeTruthy();
+    });
+});
+
 describe('scheduleEditorPrefetch', () => {
     afterEach(() => {
         delete window.requestIdleCallback;
