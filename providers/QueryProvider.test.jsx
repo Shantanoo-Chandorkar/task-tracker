@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleQueryError } from './QueryProvider';
+import { HomeAwareQueryClient, handleQueryError } from './QueryProvider';
 
 const toastError = vi.fn();
 vi.mock('sonner', () => ({ toast: { error: (...args) => toastError(...args) } }));
@@ -29,5 +29,42 @@ describe('handleQueryError', () => {
         handleQueryError(new Error('secret SQL detail'), { state: { data: [] } });
 
         expect(JSON.stringify(toastError.mock.calls)).not.toContain('secret SQL detail');
+    });
+});
+
+describe('HomeAwareQueryClient', () => {
+    it.each(['tasks', 'lists', 'sublists', 'spaces', 'statuses'])(
+        'also invalidates Home when %s is invalidated',
+        (queryKeyFamily) => {
+            const queryClient = new HomeAwareQueryClient();
+            const invalidatedKeys = [];
+            const parentInvalidate = vi
+                .spyOn(Object.getPrototypeOf(HomeAwareQueryClient.prototype), 'invalidateQueries')
+                .mockImplementation((filters) => {
+                    invalidatedKeys.push(filters.queryKey[0]);
+                    return Promise.resolve();
+                });
+
+            queryClient.invalidateQueries({ queryKey: [queryKeyFamily] });
+
+            expect(invalidatedKeys).toEqual(['home', queryKeyFamily]);
+            parentInvalidate.mockRestore();
+        },
+    );
+
+    it('leaves Home alone when an unrelated key such as tags is invalidated', () => {
+        const queryClient = new HomeAwareQueryClient();
+        const invalidatedKeys = [];
+        const parentInvalidate = vi
+            .spyOn(Object.getPrototypeOf(HomeAwareQueryClient.prototype), 'invalidateQueries')
+            .mockImplementation((filters) => {
+                invalidatedKeys.push(filters.queryKey[0]);
+                return Promise.resolve();
+            });
+
+        queryClient.invalidateQueries({ queryKey: ['tags', 'space-1'] });
+
+        expect(invalidatedKeys).toEqual(['tags']);
+        parentInvalidate.mockRestore();
     });
 });

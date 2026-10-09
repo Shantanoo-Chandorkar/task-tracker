@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { withApiErrorHandling, requireAuthResponse } from '@/lib/api-response';
+import { withApiErrorHandling, requireAuthResponse, apiErrorResponse } from '@/lib/api-response';
+import { EXPORT_REQUEST_INVALID, EXPORT_SCOPE_NOT_FOUND } from '@/lib/error-codes';
 import { resolveExportScope } from '@/lib/export/resolveExportScope';
 import { formatExport } from '@/lib/export/formatExport';
 
@@ -20,14 +21,14 @@ export const GET = withApiErrorHandling(async function GET(request) {
     const format = request.nextUrl.searchParams.get('format');
 
     if (!VALID_TYPES.has(type) || !id || !VALID_FORMATS.has(format)) {
-        return NextResponse.json({ error: 'Invalid export request' }, { status: 400 });
+        return apiErrorResponse('Invalid export request', EXPORT_REQUEST_INVALID, 400);
     }
 
     const supabase = await createClient();
     const scope = await resolveExportScope(supabase, { type, id });
 
     if (!scope) {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        return apiErrorResponse('Not found', EXPORT_SCOPE_NOT_FOUND, 404);
     }
 
     const { body, contentType, filename } = formatExport(scope, format);

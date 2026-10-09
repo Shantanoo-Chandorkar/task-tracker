@@ -1,7 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { createTask } from '@/actions/task-actions';
-import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
+import { createTask } from '@/actions/task-create-actions';
+import {
+    withApiErrorHandling,
+    actionResponse,
+    requireAuthResponse,
+    apiErrorResponse,
+    queryFailedResponse,
+} from '@/lib/api-response';
+import { TASKS_LIST_ID_REQUIRED, TASKS_LOAD_FAILED } from '@/lib/error-codes';
+import { fetchListTasks } from '@/lib/tasks/list-tasks';
 
 /**
  * GET /api/tasks?list_id=<id>
@@ -16,29 +24,21 @@ export const GET = withApiErrorHandling(async function GET(request) {
     const listId = request.nextUrl.searchParams.get('list_id');
 
     if (!listId) {
-        return NextResponse.json({ error: 'list_id is required' }, { status: 400 });
+        return apiErrorResponse('list_id is required', TASKS_LIST_ID_REQUIRED, 400);
     }
 
-    const { data: tasks, error } = await supabase
-        .from('tasks')
-        .select('*, statuses(id, name, color, is_default, position), task_tags(tags(id, name))')
-        .eq('list_id', listId)
-        .order('depth', { ascending: true })
-        .order('position', { ascending: true });
+    const { data: tasks, error } = await fetchListTasks(supabase, listId);
 
     if (error) {
-        return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
+        return queryFailedResponse(
+            '[api/tasks]',
+            error,
+            'Failed to fetch tasks',
+            TASKS_LOAD_FAILED,
+        );
     }
 
-    // Flattens the statuses and task_tags joins so callers don't need to know either's structure.
-    const normalized = (tasks || []).map((task) => ({
-        ...task,
-        status_name: task.statuses?.name ?? null,
-        status_color: task.statuses?.color ?? null,
-        tags: (task.task_tags || []).map((taskTagRow) => taskTagRow.tags),
-    }));
-
-    return NextResponse.json(normalized);
+    return NextResponse.json(tasks);
 });
 
 /**

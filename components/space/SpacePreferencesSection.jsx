@@ -7,7 +7,7 @@ import { useSpaceById } from '@/hooks/useSpaceById';
 import { updateSpace } from '@/actions/space-actions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 
 /**
  * Space-wide task creation preferences, rendered inside the space's Settings sheet.

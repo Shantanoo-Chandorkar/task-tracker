@@ -30,7 +30,7 @@ function createFakeSupabase() {
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => createFakeSupabase() }));
 vi.mock('@/lib/auth/session', () => ({ getCurrentUser: async () => ({ id: USER_ID }) }));
-vi.mock('@/lib/position', () => ({ getNextPosition: async () => 7 }));
+vi.mock('@/lib/tasks/append-position', () => ({ getNextPosition: async () => 7 }));
 vi.mock('@/lib/permissions/space-permissions', async (importOriginal) => ({
     ...(await importOriginal()),
     resolveSpacePermission: async () => 'owner',
@@ -64,7 +64,7 @@ const createActionCases = [
     },
     {
         name: 'createTask',
-        module: './task-actions',
+        module: './task-create-actions',
         ownerColumn: 'created_by',
         fields: { title: 'Buy milk', list_id: 'list-1' },
     },

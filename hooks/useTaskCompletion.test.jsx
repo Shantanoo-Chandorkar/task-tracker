@@ -1,17 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useTaskCompletion } from './useTaskCompletion';
 
 const updateTask = vi.fn();
 const completeTaskAndDescendants = vi.fn();
 
-vi.mock('@/actions/task-actions', () => ({
+vi.mock('@/actions/task-update-actions', () => ({
     updateTask: (...args) => updateTask(...args),
+}));
+vi.mock('@/actions/task-completion-actions', () => ({
     completeTaskAndDescendants: (...args) => completeTaskAndDescendants(...args),
     uncompleteTaskAndDescendants: vi.fn(),
 }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useSpaceIdForList', () => ({ useSpaceIdForList: () => 'space-1' }));
 vi.mock('@/hooks/useStatusesQuery', () => ({
     useStatusesQuery: () => ({
@@ -129,5 +132,27 @@ describe('useTaskCompletion', () => {
 
         const cachedTask = queryClient.getQueryData(['tasks', 'list-1'])[0];
         expect(cachedTask).toMatchObject({ id: 'task-patch-1', status_id: 'done', title: 'Write' });
+    });
+
+    it('confirms with a Marked complete toast, so the task does not just vanish into the collapsed Done group', async () => {
+        const task = { id: 'task-toast-1', status_id: 'todo' };
+        updateTask.mockResolvedValue({ error: null });
+        const completionHook = renderCompletionHook();
+
+        await act(() => completionHook.current.setComplete(task, [task], 'list-1', true));
+
+        expect(toast.success).toHaveBeenCalledWith('Marked complete', { id: 'toast-id' });
+        expect(toast.dismiss).not.toHaveBeenCalled();
+    });
+
+    it('stays quiet when a task is reopened, since it lands in a group that is already open', async () => {
+        const task = { id: 'task-toast-2', status_id: 'done' };
+        updateTask.mockResolvedValue({ error: null });
+        const completionHook = renderCompletionHook();
+
+        await act(() => completionHook.current.setComplete(task, [task], 'list-1', false));
+
+        expect(toast.success).not.toHaveBeenCalled();
+        expect(toast.dismiss).toHaveBeenCalledWith('toast-id');
     });
 });

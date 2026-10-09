@@ -75,7 +75,7 @@ task-tracker/
 │   └── tree.js, recurrence.js, fractional-index.js, validation.js ...
 ├── providers/                  # QueryProvider, UI state
 ├── public/sw.js                # Service worker (offline shell, cache busting)
-├── scripts/                    # verify-bucket*.mjs, verify-guest.mjs, reassign-space-owner.mjs
+├── scripts/                    # verify-*.mjs checks, reassign-space-owner.mjs
 ├── supabase/migrations/        # SQL migrations, run in order (kept locally, not committed: see .gitignore)
 ├── e2e/                        # Playwright specs (one per feature area) + shared fixtures
 └── vercel.json                 # Region and the daily recurrence cron
@@ -182,7 +182,7 @@ node --env-file=.env.local scripts/verify-guest.mjs --with-expiry   # adds the 3
 
 It checks isolation between guests and real users, every cap and text limit (filling each to the number in `guest-config.js`), sharing and conversion blocks (including the `auth.users` trigger through the admin API), function permissions, that the database session length matches the app, and that registered users are unaffected (no caps, no text limit, sharing and password change still work). `--with-expiry` prints one `UPDATE` to run in the Supabase SQL editor, since the API cannot change `auth.users.created_at`, then verifies an expired guest is locked out and that the purge removes it while leaving live guests and registered users.
 
-The older `verify-bucket1..4.mjs` scripts check the core RLS (ownership, sharing) with real accounts passed as arguments; see the usage line at the top of each. Run them after any change to a policy.
+The older RLS scripts (`verify-space-ownership-and-profiles.mjs`, `verify-per-space-statuses.mjs`, `verify-auth-rate-limits.mjs`, `verify-space-collaborators-rls.mjs`) check ownership, sharing and rate limits with real accounts passed as arguments; see the usage line at the top of each. Run them after any change to a policy.
 
 ---
 

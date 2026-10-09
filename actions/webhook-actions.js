@@ -84,7 +84,7 @@ export const listWebhookEndpoints = withAuthenticatedAction(
     async (user, supabase, spaceId) => {
         if (!spaceId)
             return { data: null, error: 'Space ID is required', code: WEBHOOK_INPUT_INVALID };
-        if ((await resolveSpacePermission(supabase, spaceId, user.id)) !== 'owner')
+        if ((await resolveSpacePermission(supabase, spaceId)) !== 'owner')
             return { data: null, ...ownerOnlyFailure };
 
         const { data: endpoints, error } = await supabase
@@ -120,7 +120,7 @@ export const createWebhookEndpoint = withAuthenticatedAction(
         if (!endpointInput.isValid)
             return { data: null, error: endpointInput.error, code: endpointInput.code };
 
-        if ((await resolveSpacePermission(supabase, spaceId, user.id)) !== 'owner')
+        if ((await resolveSpacePermission(supabase, spaceId)) !== 'owner')
             return { data: null, ...ownerOnlyFailure };
 
         const hostFailure = await checkHostIsPublic(endpointInput.cleanedFields.url);

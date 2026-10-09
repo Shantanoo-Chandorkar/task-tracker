@@ -7,11 +7,12 @@ import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
 import { useSpaceById } from '@/hooks/useSpaceById';
-import ModalShell from '@/components/ui/modal-shell';
+import { useTaskEditConflict } from '@/hooks/useTaskEditConflict';
+import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import CharLimitField from '@/components/ui/CharLimitField';
-import FormError from '@/components/ui/FormError';
+import CharLimitField from '@/components/custom/CharLimitField';
+import FormError from '@/components/custom/FormError';
 import {
     Select,
     SelectContent,
@@ -22,21 +23,22 @@ import {
 import RecurrenceBuilder from './RecurrenceBuilder';
 import StagedTagPicker from './StagedTagPicker';
 import TaskTagPicker from '@/components/task-detail/TaskTagPicker';
-import LabeledField from '@/components/ui/LabeledField';
-import { createTaskWithTags, updateTask } from '@/actions/task-actions';
-import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
-import { Loader } from '@/components/ui/loader';
-import EditorErrorBoundary from '@/components/ui/EditorErrorBoundary';
+import LabeledField from '@/components/custom/LabeledField';
+import { createTaskWithTags } from '@/actions/task-create-actions';
+import { updateTask } from '@/actions/task-update-actions';
+import { TASK_DUE_DATE_REQUIRED, TASK_EDIT_CONFLICT } from '@/lib/error-codes';
+import { Loader } from '@/components/custom/Loader';
+import EditorErrorBoundary from '@/components/custom/EditorErrorBoundary';
 import { toast } from 'sonner';
-import { bustPageCache } from '@/lib/service-worker-cache';
-import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
+import { withSavedRow, withStatusDisplay } from '@/lib/cache/query-cache';
 import { createClientId } from '@/lib/client-id';
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 10000;
 
 // Tiptap is heavy and only needed once this dialog actually opens - keeps it out of the list page's initial bundle.
-const RichTextEditor = dynamic(() => import('@/components/ui/RichTextEditor'), {
+const RichTextEditor = dynamic(() => import('@/components/custom/RichTextEditor'), {
     ssr: false,
     loading: () => (
         <div className="flex min-h-[200px] items-center justify-center">
@@ -57,7 +59,7 @@ export function scheduleEditorPrefetch() {
     if (typeof window === 'undefined' || navigator.connection?.saveData) return () => {};
 
     // A failed warm-up is harmless: the dialog loads the editor itself when it opens
-    const prefetchEditor = () => import('@/components/ui/RichTextEditor').catch(() => {});
+    const prefetchEditor = () => import('@/components/custom/RichTextEditor').catch(() => {});
 
     if (window.requestIdleCallback) {
         const idleHandle = window.requestIdleCallback(prefetchEditor);
@@ -98,7 +100,7 @@ export default function TaskFormDialog({
     const [description, setDescription] = useState('');
     const [statusId, setStatusId] = useState('');
     const [sublistId, setSublistId] = useState('');
-    const [tagNames, setTagNames] = useState([]);
+    const [tagIds, setTagIds] = useState([]);
     const [dueDate, setDueDate] = useState('');
     const [isPrioritised, setIsPrioritised] = useState(false);
     const [isRecurring, setIsRecurring] = useState(false);
@@ -109,6 +111,7 @@ export default function TaskFormDialog({
     const [titleError, setTitleError] = useState('');
     const [dueDateError, setDueDateError] = useState('');
     const [formError, setFormError] = useState('');
+    const editConflict = useTaskEditConflict();
 
     const spaceId = useSpaceIdForList(listId ?? task?.list_id);
     const requiresDueDate = useSpaceById(spaceId)?.require_due_date ?? false;
@@ -128,7 +131,7 @@ export default function TaskFormDialog({
             setDescription(task?.description ?? '');
             setStatusId(task?.status_id ?? defaultStatusId ?? fallbackStatus?.id ?? '');
             setSublistId(defaultSublistId ?? '');
-            setTagNames([]);
+            setTagIds([]);
             setDueDate(task?.due_date ?? '');
             setIsPrioritised(task?.is_prioritised ?? false);
             setIsRecurring(task?.is_recurring ?? false);
@@ -138,6 +141,8 @@ export default function TaskFormDialog({
             setFormError('');
             setSubmitting(false);
             setCreateRequestId(createClientId());
+            // Fixed now, not read at submit: a background reload must not quietly move the version under the user
+            editConflict.startEditing(task);
         }
     }
 
@@ -174,7 +179,7 @@ export default function TaskFormDialog({
                       ...(createRequestId && { id: createRequestId }),
                       list_id: listId,
                       sublist_id: isRootCreate ? sublistId || null : null,
-                      tagNames,
+                      tagIds,
                   }),
             is_prioritised: isPrioritised,
             is_recurring: isRecurring,
@@ -187,10 +192,23 @@ export default function TaskFormDialog({
                 error,
                 code,
                 tagErrors,
-            } = isEditing ? await updateTask(task.id, fields) : await createTaskWithTags(fields);
+                currentTask,
+            } = isEditing
+                ? await updateTask(task.id, fields, {
+                      expectedUpdatedAt: editConflict.expectedUpdatedAt,
+                  })
+                : await createTaskWithTags(fields);
 
             if (error) {
-                if (code === TASK_DUE_DATE_REQUIRED) {
+                if (code === TASK_EDIT_CONFLICT && currentTask) {
+                    setFormError(
+                        editConflict.resolveConflict({
+                            currentTask,
+                            taskListId: task.list_id,
+                            statuses,
+                        }),
+                    );
+                } else if (code === TASK_DUE_DATE_REQUIRED) {
                     setDueDateError(error);
                 } else {
                     setFormError(error);
@@ -334,8 +352,8 @@ export default function TaskFormDialog({
                                 ) : (
                                     <StagedTagPicker
                                         spaceId={spaceId}
-                                        tagNames={tagNames}
-                                        onChange={setTagNames}
+                                        tagIds={tagIds}
+                                        onChange={setTagIds}
                                     />
                                 )}
                             </div>

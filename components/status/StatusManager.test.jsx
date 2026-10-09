@@ -1,6 +1,9 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import StatusManager from './StatusManager';
 
 const statuses = [
@@ -11,16 +14,20 @@ const statuses = [
 vi.mock('@/hooks/useStatusesQuery', () => ({
     useStatusesQuery: () => ({ data: statuses, isLoading: false }),
 }));
-const updateStatus = vi.fn();
+const reorderStatuses = vi.fn();
 vi.mock('@/actions/status-actions', () => ({
-    updateStatus: (...args) => updateStatus(...args),
+    createStatus: vi.fn(),
+    updateStatus: vi.fn(),
     deleteStatus: vi.fn(),
+}));
+vi.mock('@/actions/reorder-actions', () => ({
+    reorderStatuses: (...args) => reorderStatuses(...args),
 }));
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
-vi.mock('./StatusFormDialog', () => ({ default: () => null }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/components/space-labels/LabelFormDialog', () => ({ default: () => null }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
 // Radix positions the menu with a ResizeObserver, which jsdom does not provide
@@ -34,9 +41,13 @@ beforeAll(() => {
 
 afterEach(cleanup);
 
+let lastQueryClient;
+
 function renderManager() {
+    lastQueryClient = new QueryClient();
+    lastQueryClient.setQueryData(['statuses', 'space-1'], statuses);
     return render(
-        <QueryClientProvider client={new QueryClient()}>
+        <QueryClientProvider client={lastQueryClient}>
             <StatusManager spaceId="space-1" />
         </QueryClientProvider>,
     );
@@ -110,14 +121,89 @@ describe('StatusManager row menu', () => {
     });
 
     it('saves the swapped order when Move up is chosen', async () => {
-        updateStatus.mockResolvedValue({ error: null });
+        reorderStatuses.mockResolvedValue({ error: null });
         renderManager();
         openRowMenu('Doing');
 
         fireEvent.click(await screen.findByRole('menuitem', { name: 'Move up' }));
 
-        await waitFor(() => expect(updateStatus).toHaveBeenCalledTimes(2));
-        expect(updateStatus).toHaveBeenCalledWith('s2', { position: 0 });
-        expect(updateStatus).toHaveBeenCalledWith('s1', { position: 1 });
+        await waitFor(() => expect(reorderStatuses).toHaveBeenCalledTimes(1));
+        expect(reorderStatuses).toHaveBeenCalledWith('space-1', ['s2', 's1']);
+    });
+});
+
+describe('StatusManager reorder save', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    async function moveDoingUp() {
+        openRowMenu('Doing');
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Move up' }));
+    }
+
+    it('shows the new order in the cache at once, before the save finishes', async () => {
+        let finishSave;
+        reorderStatuses.mockReturnValue(new Promise((resolve) => (finishSave = resolve)));
+        renderManager();
+
+        await moveDoingUp();
+        await waitFor(() => expect(reorderStatuses).toHaveBeenCalledTimes(1));
+
+        expect(lastQueryClient.getQueryData(['statuses', 'space-1']).map((row) => row.id)).toEqual([
+            's2',
+            's1',
+        ]);
+        await act(async () => finishSave({ error: null }));
+    });
+
+    it('confirms with Order saved and clears the cached list pages', async () => {
+        reorderStatuses.mockResolvedValue({ error: null });
+        renderManager();
+
+        await moveDoingUp();
+
+        await waitFor(() =>
+            expect(toast.success).toHaveBeenCalledWith('Order saved', { id: 'toast-id' }),
+        );
+        expect(bustPageCache).toHaveBeenCalledWith({ prefixes: ['/lists/'] });
+    });
+
+    it('shows the first refusal and does not confirm', async () => {
+        reorderStatuses.mockResolvedValue({ error: 'Not allowed' });
+        renderManager();
+
+        await moveDoingUp();
+
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith('Not allowed', { id: 'toast-id' }),
+        );
+        expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('says the server could not be reached when a save throws', async () => {
+        reorderStatuses.mockRejectedValue(new Error('offline'));
+        renderManager();
+
+        await moveDoingUp();
+
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith('Could not reach the server. Try again.', {
+                id: 'toast-id',
+            }),
+        );
+    });
+
+    it('turns away a second reorder while one is saving', async () => {
+        let finishSave;
+        reorderStatuses.mockReturnValue(new Promise((resolve) => (finishSave = resolve)));
+        renderManager();
+
+        await moveDoingUp();
+        await waitFor(() => expect(reorderStatuses).toHaveBeenCalledTimes(1));
+        openRowMenu('To do');
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Move down' }));
+
+        expect(toast.info).toHaveBeenCalledWith(REORDER_BUSY_MESSAGE);
+        expect(reorderStatuses).toHaveBeenCalledTimes(1);
+        await act(async () => finishSave({ error: null }));
     });
 });

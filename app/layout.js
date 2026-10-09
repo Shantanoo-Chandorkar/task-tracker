@@ -4,7 +4,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Toaster } from 'sonner';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { UIStateProvider } from '@/providers/UIStateProvider';
-import { THEME_BACKGROUND_COLORS } from '@/lib/theme-colors';
+import { THEME_BACKGROUND_COLORS } from '@/lib/ui/theme-colors';
 import NavigationProgressBar from '@/components/nav/NavigationProgressBar';
 import ServiceWorkerRegister from '@/components/nav/ServiceWorkerRegister';
 import './globals.css';

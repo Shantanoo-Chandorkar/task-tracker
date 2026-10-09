@@ -9,7 +9,7 @@ import { retryWebhookDelivery } from '@/actions/webhook-actions';
 import { useWebhookDeliveriesQuery } from '@/hooks/useWebhookDeliveriesQuery';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import { describeDelivery, describeEventType } from '@/lib/webhooks/webhook-display';
 
 const BADGE_VARIANT_BY_TONE = { good: 'secondary', pending: 'outline', bad: 'destructive' };

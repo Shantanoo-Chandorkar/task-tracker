@@ -4,7 +4,7 @@ import { useId, useState } from 'react';
 import { CornerDownRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { findMatchingMoveTargets } from '@/lib/tree';
+import { findMatchingMoveTargets } from '@/lib/tasks/move-target-tree';
 import MoveDestinationNode from '@/components/task-list/MoveDestinationNode';
 
 const SEARCH_DEBOUNCE_MS = 300;

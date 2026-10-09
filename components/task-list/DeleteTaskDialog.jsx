@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 
 /**
  * Confirmation dialog for deleting a task; offers reparent-first or cascade-delete when it has children.

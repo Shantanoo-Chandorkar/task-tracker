@@ -81,9 +81,7 @@ export default async function proxy(request) {
 }
 
 export const config = {
-    // Skips static assets, the PWA manifest/icons/service worker, and /api (routes are not
-    // yet auth-scoped - that lands in Bucket 2 - so redirecting them here would just break
-    // existing anonymous fetches instead of protecting anything).
+    // Skips static assets, the PWA files and /api, whose routes authenticate themselves.
     matcher: [
         '/((?!_next/static|_next/image|api|favicon.ico|apple-icon.png|icon.png|manifest.webmanifest|icons|sw.js).*)',
     ],

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { updateSpace, deleteSpace } from '@/actions/space-actions';
-import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
+import { withApiErrorHandling, requireAuthResponse, apiErrorResponse } from '@/lib/api-response';
+import { SPACE_NOT_FOUND } from '@/lib/error-codes';
 
 /**
  * GET /api/spaces/[id]
@@ -18,7 +18,7 @@ export const GET = withApiErrorHandling(async function GET(request, { params }) 
     const { data: space, error } = await supabase.from('spaces').select('*').eq('id', id).single();
 
     if (error) {
-        return NextResponse.json({ error: 'Space not found' }, { status: 404 });
+        return apiErrorResponse('Space not found', SPACE_NOT_FOUND, 404);
     }
 
     const { data: lists } = await supabase.from('lists').select('id').eq('space_id', id);
@@ -34,23 +34,4 @@ export const GET = withApiErrorHandling(async function GET(request, { params }) 
     }
 
     return NextResponse.json({ ...space, list_count: listIds.length, task_count: taskCount });
-});
-
-/**
- * PATCH /api/spaces/[id]
- * Updates a space's name, color, or position. Returns the updated space.
- */
-export const PATCH = withApiErrorHandling(async function PATCH(request, { params }) {
-    const { id } = await params;
-    const body = await request.json();
-    return actionResponse(await updateSpace(id, body));
-});
-
-/**
- * DELETE /api/spaces/[id]
- * Deletes a space. Cascades to its lists and their tasks.
- */
-export const DELETE = withApiErrorHandling(async function DELETE(request, { params }) {
-    const { id } = await params;
-    return actionResponse(await deleteSpace(id));
 });

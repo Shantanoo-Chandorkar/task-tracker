@@ -4,6 +4,7 @@ import { isUuid } from '@/lib/validation';
 import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 import TaskDetail from '@/components/task-detail/TaskDetail';
 import { loadListName } from '@/lib/page-titles';
+import { LIST_TASK_COLUMNS } from '@/lib/tasks/list-tasks';
 
 /**
  * Tab title: "Task in <list name>"; the task's own title would need an extra query, so it is not used.
@@ -30,7 +31,7 @@ export default async function TaskDetailPage({ params }) {
     const [tasksResult, listResult] = await Promise.all([
         supabase
             .from('tasks')
-            .select('*, statuses(id, name, color, is_default, position), task_tags(tags(id, name))')
+            .select(LIST_TASK_COLUMNS)
             .eq('list_id', listId)
             .order('depth', { ascending: true })
             .order('position', { ascending: true }),

@@ -8,6 +8,8 @@ import {
     taskRow,
     waitForCreatedToastsToClear,
     spaceSection,
+    openTagSettings,
+    createTag,
 } from './fixtures/app-data.js';
 
 /**
@@ -24,13 +26,26 @@ function collectServerActionRequests(page) {
     return serverActionRequests;
 }
 
+/**
+ * Opens the Done group, which starts collapsed. Exactly one caller owns this toggle per test; a second click closes it.
+ *
+ * @param {import('@playwright/test').Page} page - Page showing the list.
+ * @returns {Promise<void>} Resolves once the group is open.
+ */
+async function expandDoneGroup(page) {
+    const doneToggle = page.getByRole('button', { name: /^Done \(\d+\)$/ });
+    await doneToggle.click();
+    await expect(doneToggle).toHaveAttribute('aria-expanded', 'true');
+}
+
 test.describe('tasks', () => {
+    let spaceName;
     let listId;
 
     test.beforeEach(async ({ page, testUser }) => {
         await loginAs(page, testUser);
         await page.goto('/spaces');
-        const spaceName = await createSpace(page);
+        spaceName = await createSpace(page);
         const listName = await createList(page, spaceName);
         await spaceSection(page, spaceName).getByRole('link', { name: listName }).click();
         await page.waitForURL(/\/lists\//);
@@ -129,6 +144,9 @@ test.describe('tasks', () => {
         await expect(page.getByText('This will also mark 1 subtask as complete.')).toBeVisible();
         await page.getByRole('button', { name: 'Mark complete' }).click();
 
+        // The completed task leaves for the collapsed Done group; the toast is the signal that the save finished.
+        await expect(page.getByText('Marked complete', { exact: true })).toBeVisible();
+        await expandDoneGroup(page);
         // Checks status text, not the menu - reopening it right after a dialog closes is flaky (see e2e-test-quality.md).
         await expect(taskRow(page, parentTitle).getByText('Done', { exact: true })).toBeVisible();
         await expect(taskRow(page, childTitle).getByText('Done', { exact: true })).toBeVisible();
@@ -144,6 +162,8 @@ test.describe('tasks', () => {
         await taskRow(page, parentTitle).getByRole('button', { name: 'More actions' }).click();
         await page.getByRole('menuitem', { name: 'Mark as complete' }).click();
         await page.getByRole('button', { name: 'Mark complete' }).click();
+        await expect(page.getByText('Marked complete', { exact: true })).toBeVisible();
+        await expandDoneGroup(page);
         await expect(taskRow(page, parentTitle).getByText('Done', { exact: true })).toBeVisible();
         // The confirm dialog's close animation must finish before the dropdown trigger below will reopen it.
         await expect(page.getByText(`Mark “${parentTitle}” complete?`)).toBeHidden();
@@ -416,14 +436,16 @@ test.describe('tasks', () => {
     test('tag pills and the add-tag button are as tall as the Status select in the task form', async ({
         page,
     }) => {
+        await page.goto('/spaces');
+        await createTag(page, await openTagSettings(page, spaceName), 'Heights');
+        await page.goto(`/lists/${listId}`);
         const title = await createTask(page);
         await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
         await page.getByRole('menuitem', { name: 'Edit' }).click();
         const dialog = page.getByRole('dialog');
 
         await dialog.getByRole('button', { name: 'Tag', exact: true }).click();
-        await page.getByPlaceholder('Find or create a tag').fill('Heights');
-        await page.getByRole('option', { name: 'Create "Heights"' }).click();
+        await page.getByRole('option', { name: 'Heights', exact: true }).click();
         const tagPill = dialog.locator('[data-slot="badge"]', { hasText: 'Heights' });
         await expect(tagPill).toBeVisible();
 
@@ -646,5 +668,45 @@ test.describe('tasks', () => {
         // A duplicate takes a server round trip to show up, but its request leaves the instant the key is handled.
         await page.waitForTimeout(500);
         expect(serverActionRequests).toHaveLength(0);
+    });
+
+    test('saving an edit after the task changed in another tab asks first, keeps the typed text, then replaces it', async ({
+        page,
+    }) => {
+        const originalTitle = await createTask(page);
+        await waitForCreatedToastsToClear(page);
+
+        await taskRow(page, originalTitle).getByRole('button', { name: 'More actions' }).click();
+        await page.getByRole('menuitem', { name: 'Edit' }).click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByPlaceholder('Task title')).toHaveValue(originalTitle);
+
+        // A second tab of the same account saves a new title while this dialog is open.
+        const otherTab = await page.context().newPage();
+        await otherTab.goto(`/lists/${listId}`);
+        const otherTabTitle = uniqueName('Other tab title');
+        await taskRow(otherTab, originalTitle)
+            .getByRole('button', { name: 'More actions' })
+            .click();
+        await otherTab.getByRole('menuitem', { name: 'Edit' }).click();
+        const otherDialog = otherTab.getByRole('dialog');
+        await otherDialog.getByPlaceholder('Task title').fill(otherTabTitle);
+        await otherDialog.getByRole('button', { name: 'Save changes' }).click();
+        await expect(otherDialog).toBeHidden();
+        await expect(otherTab.getByText('Task updated successfully')).toBeVisible();
+
+        const myTitle = uniqueName('My title');
+        await dialog.getByPlaceholder('Task title').fill(myTitle);
+        await dialog.getByRole('button', { name: 'Save changes' }).click();
+
+        await expect(
+            dialog.getByText('Someone changed this task while you were editing: Title.'),
+        ).toBeVisible();
+        await expect(dialog.getByPlaceholder('Task title')).toHaveValue(myTitle);
+
+        await dialog.getByRole('button', { name: 'Save changes' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(taskRow(page, myTitle)).toBeVisible();
+        await expect(page.getByRole('link', { name: otherTabTitle, exact: true })).toHaveCount(0);
     });
 });

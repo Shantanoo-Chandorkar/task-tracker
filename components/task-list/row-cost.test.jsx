@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SortableContext } from '@dnd-kit/sortable';
 import TaskRow from './TaskRow';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
-import { createStableIdsReader, createStableTreeBuilder } from '@/lib/tree';
+import { createStableIdsReader, createStableTreeBuilder } from '@/lib/tasks/task-tree';
 
 const LIST_ID = 'list-1';
 const SPACE_ID = 'space-1';
@@ -25,14 +25,16 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
-vi.mock('@/actions/task-actions', () => ({
+vi.mock('@/actions/task-delete-actions', () => ({
     deleteTask: vi.fn(),
     deleteTaskAndReparentChildren: vi.fn(),
-    updateTask: vi.fn(),
+}));
+vi.mock('@/actions/task-update-actions', () => ({ updateTask: vi.fn() }));
+vi.mock('@/actions/task-completion-actions', () => ({
     completeTaskAndDescendants: vi.fn(),
     uncompleteTaskAndDescendants: vi.fn(),
 }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 // A row calls useSortable on every render, so counting its calls counts the row's real renders
 vi.mock('@dnd-kit/sortable', async () => {

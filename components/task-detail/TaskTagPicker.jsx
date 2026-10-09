@@ -5,13 +5,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { runExclusively } from '@/lib/in-flight-entities';
 import { useTagsQuery } from '@/hooks/useTagsQuery';
-import { addTagToTask, removeTagFromTask } from '@/actions/tag-actions';
-import { bustPageCache } from '@/lib/service-worker-cache';
+import { assignTagsToTask, removeTagFromTask } from '@/actions/tag-actions';
+import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import TagComboboxField from '@/components/tag/TagComboboxField';
 
 /**
- * Tag pills for a task, backed by the real `addTagToTask`/`removeTagFromTask` server actions.
- * No permission gating - this page relies on the server rejection toast for every action already.
+ * Tag pills for a task, backed by the real `assignTagsToTask`/`removeTagFromTask` server actions.
+ * Read-only collaborators only see the pills; other refusals come back from the server as a toast.
  *
  * @param {object} props
  * @param {object} props.task - Task whose tags are shown/edited (uses id, list_id, tags)
@@ -23,9 +24,14 @@ export default function TaskTagPicker({ task, spaceId, isFieldSized = false }) {
     const [pending, setPending] = useState(false);
     const [removingKey, setRemovingKey] = useState(null);
     const { data: spaceTags = [] } = useTagsQuery(spaceId);
+    const isReadOnly = usePermissionForSpace(spaceId) === 'read_only';
 
-    const tags = (task.tags ?? []).map((tag) => ({ key: tag.id, name: tag.name }));
-    const suggestions = spaceTags.map((tag) => ({ key: tag.id, name: tag.name }));
+    const tags = (task.tags ?? []).map((tag) => ({
+        key: tag.id,
+        name: tag.name,
+        color: tag.color,
+    }));
+    const suggestions = spaceTags.map((tag) => ({ key: tag.id, name: tag.name, color: tag.color }));
 
     async function refreshTags() {
         await queryClient.invalidateQueries({ queryKey: ['tasks', task.list_id] });
@@ -40,13 +46,13 @@ export default function TaskTagPicker({ task, spaceId, isFieldSized = false }) {
         );
     }
 
-    function handleAdd(name) {
+    function handleAdd(tagId) {
         return runTagChange(async () => {
             setPending(true);
             try {
-                const result = await addTagToTask({ taskId: task.id, name });
-                if (result.error) {
-                    toast.error(result.error);
+                const assignResult = await assignTagsToTask({ taskId: task.id, tagIds: [tagId] });
+                if (assignResult.error) {
+                    toast.error(assignResult.error);
                     return;
                 }
                 await refreshTags();
@@ -62,9 +68,9 @@ export default function TaskTagPicker({ task, spaceId, isFieldSized = false }) {
         return runTagChange(async () => {
             setRemovingKey(tagId);
             try {
-                const result = await removeTagFromTask({ taskId: task.id, tagId });
-                if (result.error) {
-                    toast.error(result.error);
+                const removeResult = await removeTagFromTask({ taskId: task.id, tagId });
+                if (removeResult.error) {
+                    toast.error(removeResult.error);
                     return;
                 }
                 await refreshTags();
@@ -85,6 +91,7 @@ export default function TaskTagPicker({ task, spaceId, isFieldSized = false }) {
             addPending={pending}
             removingKey={removingKey}
             isFieldSized={isFieldSized}
+            isReadOnly={isReadOnly}
         />
     );
 }

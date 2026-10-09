@@ -1,7 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { updateList, deleteList } from '@/actions/list-actions';
-import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
+import {
+    withApiErrorHandling,
+    actionResponse,
+    requireAuthResponse,
+    apiErrorResponse,
+} from '@/lib/api-response';
+import { LIST_NOT_FOUND } from '@/lib/error-codes';
 
 /**
  * GET /api/lists/[id]
@@ -21,7 +27,7 @@ export const GET = withApiErrorHandling(async function GET(request, { params }) 
     ]);
 
     if (error) {
-        return NextResponse.json({ error: 'List not found' }, { status: 404 });
+        return apiErrorResponse('List not found', LIST_NOT_FOUND, 404);
     }
 
     return NextResponse.json({ ...list, task_count: taskCount ?? 0 });

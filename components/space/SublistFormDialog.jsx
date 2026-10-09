@@ -4,11 +4,11 @@ import { useId, useState } from 'react';
 import { useColorNameForm } from '@/hooks/useColorNameForm';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
-import ModalShell from '@/components/ui/modal-shell';
+import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
-import ColorNameField from '@/components/ui/ColorNameField';
-import LabeledField from '@/components/ui/LabeledField';
+import { Loader } from '@/components/custom/Loader';
+import ColorNameField from '@/components/custom/ColorNameField';
+import LabeledField from '@/components/custom/LabeledField';
 import {
     Select,
     SelectContent,

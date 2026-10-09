@@ -1,1 +1,1 @@
-export { default } from '@/components/ui/NotFoundMessage';
+export { default } from '@/components/custom/NotFoundMessage';

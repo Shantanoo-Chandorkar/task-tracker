@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import PasswordInput from '@/components/auth/PasswordInput';
 import { updatePasswordAction } from '@/actions/auth-actions';
-import { clearAllCaches } from '@/lib/cache';
+import { clearAllCaches } from '@/lib/cache/clear-client-caches';
 
 // Length over composition rules (NIST 800-63B, OWASP) -- no forced uppercase/symbol/number.
 const MIN_PASSWORD_LENGTH = 12;
