@@ -6,6 +6,7 @@ import {
     reorderOwnedSpaces,
     reorderStatusesInSpace,
     reorderSublistsInList,
+    reorderTagsInSpace,
 } from '@/lib/reorder/reorder-rows';
 
 /**
@@ -63,5 +64,20 @@ export const reorderStatuses = withAuthenticatedAction(
     'Unexpected error saving the order',
     (user, supabase, spaceId, orderedStatusIds) =>
         reorderStatusesInSpace(supabase, user, spaceId, orderedStatusIds),
+    { hasData: false },
+);
+
+/**
+ * Saves a new order for the tags of one space in one request.
+ *
+ * @param {string} spaceId - Space the tags belong to
+ * @param {string[]} orderedTagIds - Ids of the space's tags, in the wanted order
+ * @returns {{ error: string|null, code: string|undefined }}
+ */
+export const reorderTags = withAuthenticatedAction(
+    '[reorder] tags',
+    'Unexpected error saving the order',
+    (user, supabase, spaceId, orderedTagIds) =>
+        reorderTagsInSpace(supabase, user, spaceId, orderedTagIds),
     { hasData: false },
 );

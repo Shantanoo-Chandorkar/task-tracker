@@ -8,6 +8,8 @@ import {
     taskRow,
     waitForCreatedToastsToClear,
     spaceSection,
+    openTagSettings,
+    createTag,
 } from './fixtures/app-data.js';
 
 /**
@@ -37,12 +39,13 @@ async function expandDoneGroup(page) {
 }
 
 test.describe('tasks', () => {
+    let spaceName;
     let listId;
 
     test.beforeEach(async ({ page, testUser }) => {
         await loginAs(page, testUser);
         await page.goto('/spaces');
-        const spaceName = await createSpace(page);
+        spaceName = await createSpace(page);
         const listName = await createList(page, spaceName);
         await spaceSection(page, spaceName).getByRole('link', { name: listName }).click();
         await page.waitForURL(/\/lists\//);
@@ -433,14 +436,16 @@ test.describe('tasks', () => {
     test('tag pills and the add-tag button are as tall as the Status select in the task form', async ({
         page,
     }) => {
+        await page.goto('/spaces');
+        await createTag(page, await openTagSettings(page, spaceName), 'Heights');
+        await page.goto(`/lists/${listId}`);
         const title = await createTask(page);
         await taskRow(page, title).getByRole('button', { name: 'More actions' }).click();
         await page.getByRole('menuitem', { name: 'Edit' }).click();
         const dialog = page.getByRole('dialog');
 
         await dialog.getByRole('button', { name: 'Tag', exact: true }).click();
-        await page.getByPlaceholder('Find or create a tag').fill('Heights');
-        await page.getByRole('option', { name: 'Create "Heights"' }).click();
+        await page.getByRole('option', { name: 'Heights', exact: true }).click();
         const tagPill = dialog.locator('[data-slot="badge"]', { hasText: 'Heights' });
         await expect(tagPill).toBeVisible();
 

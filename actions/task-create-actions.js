@@ -18,9 +18,10 @@ import { readClientId, findOwnRowById, insertRowOnce } from '@/lib/idempotent-cr
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import { toTaskRateLimitResult } from '@/lib/tasks/task-rate-limit';
-import { TASK_DUE_DATE_REQUIRED, TAG_ALREADY_ON_TASK } from '@/lib/error-codes';
+import { TASK_DUE_DATE_REQUIRED } from '@/lib/error-codes';
 import { getSpaceIdForList } from '@/lib/permissions/space-permissions';
-import { addTagToTask } from '@/actions/tag-actions';
+import { attachTagsToTask } from '@/lib/tags/attach-tags-to-task';
+import { loadTaskForTagWrite } from '@/lib/tags/load-task-for-tag-write';
 
 /**
  * Checks the fields that need no database read, in the order the caller should hear about them.
@@ -122,6 +123,65 @@ function toCreateTaskFailure(insertError, listId) {
 }
 
 /**
+ * Creates the task for an already signed-in user: validates, checks the space rules and inserts the row.
+ *
+ * @param {object} user - The signed-in user
+ * @param {object} supabase - Request-scoped Supabase client
+ * @param {object} fields - Fields sent to `createTask`
+ * @returns {Promise<{ data: object|null, error: string|null, code?: string }>} The task, or why not
+ */
+async function createTaskForUser(user, supabase, fields) {
+    const clientId = readClientId(fields);
+    if (clientId.failure) return { data: null, ...clientId.failure };
+    const replayedTask = await findOwnRowById(
+        supabase,
+        'tasks',
+        clientId.id,
+        'created_by',
+        user.id,
+    );
+    if (replayedTask) return { data: replayedTask, error: null };
+
+    const checkedFields = checkCreateFields(fields);
+    if (checkedFields.failure) return { data: null, ...checkedFields.failure };
+
+    const spaceRuleBlock = await blockCreateBySpaceRules(supabase, fields);
+    if (spaceRuleBlock) return { data: null, ...spaceRuleBlock };
+
+    const depth = await resolveDepthBelowParent(supabase, fields.parent_id);
+    // MAX_DEPTH_CONSTANT
+    if (!isDepthAllowed(depth)) return { data: null, error: 'Maximum nesting depth reached' };
+
+    const { data: createdTask, error } = await insertRowOnce(
+        supabase,
+        'tasks',
+        {
+            title: checkedFields.title,
+            description: checkedFields.description,
+            status_id: fields.status_id ?? null,
+            parent_id: fields.parent_id ?? null,
+            sublist_id: fields.parent_id ? null : (fields.sublist_id ?? null),
+            list_id: fields.list_id,
+            position: await resolveNewTaskPosition(supabase, fields),
+            depth,
+            due_date: fields.due_date || null,
+            is_prioritised: fields.is_prioritised ?? false,
+            is_recurring: fields.is_recurring ?? false,
+            recurrence_rule: fields.recurrence_rule ?? null,
+            next_occurrence:
+                fields.is_recurring && fields.recurrence_rule
+                    ? nextOccurrenceIso(fields.recurrence_rule)
+                    : null,
+            created_by: user.id,
+        },
+        { clientId: clientId.id, ownerColumn: 'created_by', userId: user.id },
+    );
+    if (error) return toCreateTaskFailure(error, fields.list_id);
+
+    return { data: createdTask, error: null };
+}
+
+/**
  * Creates a new task. Computes depth from parent if provided.
  * Appends the task as the last sibling if no position is specified.
  *
@@ -143,79 +203,54 @@ function toCreateTaskFailure(insertError, listId) {
 export const createTask = withAuthenticatedAction(
     '[tasks] create',
     'Unexpected error creating task',
-    async (user, supabase, fields) => {
-        const clientId = readClientId(fields);
-        if (clientId.failure) return { data: null, ...clientId.failure };
-        const replayedTask = await findOwnRowById(
-            supabase,
-            'tasks',
-            clientId.id,
-            'created_by',
-            user.id,
-        );
-        if (replayedTask) return { data: replayedTask, error: null };
-
-        const checkedFields = checkCreateFields(fields);
-        if (checkedFields.failure) return { data: null, ...checkedFields.failure };
-
-        const spaceRuleBlock = await blockCreateBySpaceRules(supabase, fields);
-        if (spaceRuleBlock) return { data: null, ...spaceRuleBlock };
-
-        const depth = await resolveDepthBelowParent(supabase, fields.parent_id);
-        // MAX_DEPTH_CONSTANT
-        if (!isDepthAllowed(depth)) return { data: null, error: 'Maximum nesting depth reached' };
-
-        const { data: createdTask, error } = await insertRowOnce(
-            supabase,
-            'tasks',
-            {
-                title: checkedFields.title,
-                description: checkedFields.description,
-                status_id: fields.status_id ?? null,
-                parent_id: fields.parent_id ?? null,
-                sublist_id: fields.parent_id ? null : (fields.sublist_id ?? null),
-                list_id: fields.list_id,
-                position: await resolveNewTaskPosition(supabase, fields),
-                depth,
-                due_date: fields.due_date || null,
-                is_prioritised: fields.is_prioritised ?? false,
-                is_recurring: fields.is_recurring ?? false,
-                recurrence_rule: fields.recurrence_rule ?? null,
-                next_occurrence:
-                    fields.is_recurring && fields.recurrence_rule
-                        ? nextOccurrenceIso(fields.recurrence_rule)
-                        : null,
-                created_by: user.id,
-            },
-            { clientId: clientId.id, ownerColumn: 'created_by', userId: user.id },
-        );
-        if (error) return toCreateTaskFailure(error, fields.list_id);
-
-        return { data: createdTask, error: null };
-    },
+    createTaskForUser,
 );
 
 /**
- * Creates a task and attaches any staged tag names to it in the same round trip.
+ * Attaches the chosen tags to a just-saved task, reporting a failure instead of throwing.
+ *
+ * @param {object} user - The signed-in user
+ * @param {object} supabase - Request-scoped Supabase client
+ * @param {object} task - The saved task
+ * @param {unknown} tagIds - Tag ids sent by the client
+ * @returns {Promise<string[]>} Messages for the tags that could not be attached, empty when all went well
+ */
+async function attachTagsToSavedTask(user, supabase, task, tagIds) {
+    try {
+        const { spaceId, failure } = await loadTaskForTagWrite(supabase, user, task.id);
+        if (failure) return [failure.error];
+
+        const attachResult = await attachTagsToTask(supabase, { taskId: task.id, spaceId, tagIds });
+        return attachResult.error ? [attachResult.error] : [];
+    } catch (thrown) {
+        console.error('[tasks] create with tags: attach threw', {
+            taskId: task.id,
+            detail: thrown?.message,
+        });
+        return ['Could not add the tags'];
+    }
+}
+
+/**
+ * Creates a task and attaches the chosen tags with one sign-in and one tag write.
  *
  * A failed tag attach never rolls back the task - the failure is reported in `tagErrors` instead.
  *
  * @param {object} fields - Same fields as `createTask`, plus:
- * @param {string[]} [fields.tagNames] - Tag names to attach after the task is created
+ * @param {string[]} [fields.tagIds] - Ids of existing tags of the space, attached after the task is created
  * @returns {{ data: object|null, error: string|null, tagErrors: string[] }}
  */
-export async function createTaskWithTags({ tagNames, ...taskFields }) {
-    const taskResult = await createTask(taskFields);
-    if (taskResult.error || !taskResult.data) return { ...taskResult, tagErrors: [] };
+export const createTaskWithTags = withAuthenticatedAction(
+    '[tasks] create with tags',
+    'Unexpected error creating task',
+    async (user, supabase, { tagIds, ...taskFields }) => {
+        const taskResult = await createTaskForUser(user, supabase, taskFields);
+        if (taskResult.error || !taskResult.data) return { ...taskResult, tagErrors: [] };
 
-    const tagErrors = [];
-    for (const name of tagNames ?? []) {
-        const tagResult = await addTagToTask({ taskId: taskResult.data.id, name });
-        // A retried create finds its tags already attached, which is the result we want, not a failure
-        if (tagResult.error && tagResult.code !== TAG_ALREADY_ON_TASK) {
-            tagErrors.push(`${name}: ${tagResult.error}`);
-        }
-    }
-
-    return { data: taskResult.data, error: null, tagErrors };
-}
+        const hasTags = Array.isArray(tagIds) && tagIds.length > 0;
+        const tagErrors = hasTags
+            ? await attachTagsToSavedTask(user, supabase, taskResult.data, tagIds)
+            : [];
+        return { data: taskResult.data, error: null, tagErrors };
+    },
+);

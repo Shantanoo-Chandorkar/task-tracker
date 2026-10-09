@@ -138,14 +138,14 @@ export function statusFormDialog(page) {
 }
 
 /**
- * Locates one status row inside the open settings sheet.
+ * Locates one status or tag row inside the open settings sheet; both are the same sortable label row.
  *
- * @param {import('@playwright/test').Locator} sheet - From openStatusSettings.
- * @param {string} statusName
+ * @param {import('@playwright/test').Locator} sheet - From openStatusSettings or openTagSettings.
+ * @param {string} labelName
  * @returns {import('@playwright/test').Locator}
  */
-export function statusRow(sheet, statusName) {
-    return sheet.locator('[class*="py-2.5"]').filter({ hasText: statusName });
+export function statusRow(sheet, labelName) {
+    return sheet.locator('[class*="py-2.5"]').filter({ hasText: labelName });
 }
 
 /**
@@ -161,6 +161,48 @@ export async function createStatus(page, sheet, name = uniqueName('Status')) {
     const form = statusFormDialog(page);
     await form.getByPlaceholder('Status name').fill(name);
     await form.getByRole('button', { name: 'Create status' }).click();
+    await expect(form).toBeHidden();
+    return name;
+}
+
+/**
+ * Opens a space's settings sheet and expands its Tags section.
+ * Like openStatusSettings, this helper is the only opener of both toggles (docs/e2e-test-quality.md #3).
+ *
+ * @param {import('@playwright/test').Page} page - Already on /spaces.
+ * @param {string} spaceName
+ * @returns {Promise<import('@playwright/test').Locator>} The settings sheet.
+ */
+export async function openTagSettings(page, spaceName) {
+    await spaceSection(page, spaceName).getByRole('button', { name: 'Space settings' }).click();
+    const sheet = page.getByRole('dialog');
+    await sheet.getByRole('button', { name: 'Tags', exact: true }).click();
+    return sheet;
+}
+
+/**
+ * Locates the create/edit tag form, which opens on top of the settings sheet.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {import('@playwright/test').Locator}
+ */
+export function tagFormDialog(page) {
+    return page.getByRole('dialog').filter({ has: page.getByPlaceholder('Tag name') });
+}
+
+/**
+ * Creates a tag through the open settings sheet's "+ Add tag" form.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').Locator} sheet - From openTagSettings, Tags section expanded.
+ * @param {string} [name] - Defaults to a generated unique name.
+ * @returns {Promise<string>} The tag's name.
+ */
+export async function createTag(page, sheet, name = uniqueName('Tag')) {
+    await sheet.getByRole('button', { name: '+ Add tag' }).click();
+    const form = tagFormDialog(page);
+    await form.getByPlaceholder('Tag name').fill(name);
+    await form.getByRole('button', { name: 'Create tag' }).click();
     await expect(form).toBeHidden();
     return name;
 }

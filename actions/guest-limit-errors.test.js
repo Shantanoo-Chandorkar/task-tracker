@@ -13,7 +13,7 @@ const { createList } = await import('./list-actions');
 const { createSublist } = await import('./sublist-actions');
 const { createStatus } = await import('./status-actions');
 const { createTask } = await import('./task-create-actions');
-const { addTagToTask } = await import('./tag-actions');
+const { createTag } = await import('./tag-actions');
 const { GUEST_ERROR_CODES } = await import('@/lib/guest/guest-error-codes');
 
 const GUEST_USER_ID = 'guest-1';
@@ -46,7 +46,7 @@ function makeClientWhoseInsertFails(insertError) {
         maybeSingle: async () => ({ data: { owner_id: GUEST_USER_ID }, error: null }),
         then: (resolve) => resolve({ data: [{ owner_id: GUEST_USER_ID }], error: null }),
     };
-    // Covers addTagToTask's two 'tasks' reads (space lookup, then created_by) before its insert.
+    // Answers the task and list lookups the create actions make before their insert.
     const taskLookupResult = {
         list_id: 'list-1',
         lists: { space_id: 'space-1' },
@@ -82,7 +82,7 @@ const createCases = [
     ['createSublist', () => createSublist({ name: 'Sublist', list_id: 'list-1' })],
     ['createStatus', () => createStatus({ name: 'Status', space_id: 'space-1' })],
     ['createTask', () => createTask({ title: 'Task', list_id: 'list-1' })],
-    ['addTagToTask', () => addTagToTask({ taskId: 'task-1', name: 'Tag' })],
+    ['createTag', () => createTag({ name: 'Tag', space_id: 'space-1' })],
 ];
 
 beforeEach(() => {

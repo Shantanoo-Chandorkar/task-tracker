@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import TaskFormDialog, { scheduleEditorPrefetch } from './TaskFormDialog';
 
 const createTaskWithTags = vi.fn();
@@ -31,7 +32,13 @@ vi.mock('@/hooks/useSpaceById', () => ({ useSpaceById: () => ({ require_due_date
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('./RecurrenceBuilder', () => ({ default: () => null }));
-vi.mock('./StagedTagPicker', () => ({ default: () => null }));
+vi.mock('./StagedTagPicker', () => ({
+    default: ({ tagIds, onChange }) => (
+        <button type="button" onClick={() => onChange([...tagIds, 'tag-1'])}>
+            pick tag
+        </button>
+    ),
+}));
 vi.mock('@/components/task-detail/TaskTagPicker', () => ({ default: () => null }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
@@ -97,6 +104,51 @@ describe('TaskFormDialog client-made id for create', () => {
         await submitTitle('Buy milk');
 
         expect(createTaskWithTags.mock.calls[0][0]).not.toHaveProperty('id');
+    });
+});
+
+describe('TaskFormDialog tags for a new task', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        clientIds.unavailable = false;
+        createTaskWithTags.mockResolvedValue({ data: { id: 'x' }, error: null, tagErrors: [] });
+    });
+
+    it('sends the ids of the picked tags with the task', async () => {
+        renderCreateDialog();
+
+        fireEvent.click(screen.getByText('pick tag'));
+        await submitTitle('Buy milk');
+
+        expect(createTaskWithTags.mock.calls[0][0].tagIds).toEqual(['tag-1']);
+        expect(createTaskWithTags.mock.calls[0][0]).not.toHaveProperty('tagNames');
+    });
+
+    it('starts each time the dialog opens with no tags picked', async () => {
+        const { setOpen } = renderCreateDialog();
+        fireEvent.click(screen.getByText('pick tag'));
+        await submitTitle('First');
+
+        setOpen(false);
+        setOpen(true);
+        await submitTitle('Second');
+
+        expect(createTaskWithTags.mock.calls[1][0].tagIds).toEqual([]);
+    });
+
+    it('says which tags could not be added when the task itself was saved', async () => {
+        createTaskWithTags.mockResolvedValue({
+            data: { id: 'x' },
+            error: null,
+            tagErrors: ['A task can have at most 10 tags'],
+        });
+        renderCreateDialog();
+
+        await submitTitle('Buy milk');
+
+        expect(toast.info).toHaveBeenCalledWith(
+            "Task saved, but couldn't add: A task can have at most 10 tags",
+        );
     });
 });
 

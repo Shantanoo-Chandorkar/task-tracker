@@ -15,7 +15,11 @@ vi.mock('@/hooks/useStatusesQuery', () => ({
     useStatusesQuery: () => ({ data: statuses, isLoading: false }),
 }));
 const reorderStatuses = vi.fn();
-vi.mock('@/actions/status-actions', () => ({ deleteStatus: vi.fn() }));
+vi.mock('@/actions/status-actions', () => ({
+    createStatus: vi.fn(),
+    updateStatus: vi.fn(),
+    deleteStatus: vi.fn(),
+}));
 vi.mock('@/actions/reorder-actions', () => ({
     reorderStatuses: (...args) => reorderStatuses(...args),
 }));
@@ -23,7 +27,7 @@ vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
-vi.mock('./StatusFormDialog', () => ({ default: () => null }));
+vi.mock('@/components/space-labels/LabelFormDialog', () => ({ default: () => null }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
 // Radix positions the menu with a ResizeObserver, which jsdom does not provide

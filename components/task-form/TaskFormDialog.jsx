@@ -100,7 +100,7 @@ export default function TaskFormDialog({
     const [description, setDescription] = useState('');
     const [statusId, setStatusId] = useState('');
     const [sublistId, setSublistId] = useState('');
-    const [tagNames, setTagNames] = useState([]);
+    const [tagIds, setTagIds] = useState([]);
     const [dueDate, setDueDate] = useState('');
     const [isPrioritised, setIsPrioritised] = useState(false);
     const [isRecurring, setIsRecurring] = useState(false);
@@ -131,7 +131,7 @@ export default function TaskFormDialog({
             setDescription(task?.description ?? '');
             setStatusId(task?.status_id ?? defaultStatusId ?? fallbackStatus?.id ?? '');
             setSublistId(defaultSublistId ?? '');
-            setTagNames([]);
+            setTagIds([]);
             setDueDate(task?.due_date ?? '');
             setIsPrioritised(task?.is_prioritised ?? false);
             setIsRecurring(task?.is_recurring ?? false);
@@ -179,7 +179,7 @@ export default function TaskFormDialog({
                       ...(createRequestId && { id: createRequestId }),
                       list_id: listId,
                       sublist_id: isRootCreate ? sublistId || null : null,
-                      tagNames,
+                      tagIds,
                   }),
             is_prioritised: isPrioritised,
             is_recurring: isRecurring,
@@ -352,8 +352,8 @@ export default function TaskFormDialog({
                                 ) : (
                                     <StagedTagPicker
                                         spaceId={spaceId}
-                                        tagNames={tagNames}
-                                        onChange={setTagNames}
+                                        tagIds={tagIds}
+                                        onChange={setTagIds}
                                     />
                                 )}
                             </div>

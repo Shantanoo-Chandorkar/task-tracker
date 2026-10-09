@@ -17,6 +17,9 @@ const SUBLIST_1 = '30000000-0000-4000-8000-000000000001';
 const SUBLIST_2 = '30000000-0000-4000-8000-000000000002';
 const STATUS_1 = '40000000-0000-4000-8000-000000000001';
 const STATUS_2 = '40000000-0000-4000-8000-000000000002';
+const TAG_1 = '50000000-0000-4000-8000-000000000001';
+const TAG_2 = '50000000-0000-4000-8000-000000000002';
+const TAG_3 = '50000000-0000-4000-8000-000000000003';
 const MISSING_ID = '99999999-9999-4999-8999-999999999999';
 
 let fake;
@@ -59,6 +62,11 @@ function buildTables(collaboratorLevel = null) {
         statuses: [
             { id: STATUS_1, space_id: SPACE_1, created_by: OWNER_ID, position: 0 },
             { id: STATUS_2, space_id: SPACE_1, created_by: OWNER_ID, position: 1 },
+        ],
+        tags: [
+            { id: TAG_1, space_id: SPACE_1, created_by: OWNER_ID, position: 0 },
+            { id: TAG_2, space_id: SPACE_1, created_by: COLLABORATOR_ID, position: 1 },
+            { id: TAG_3, space_id: SPACE_2, created_by: OWNER_ID, position: 0 },
         ],
     };
 }
@@ -366,6 +374,45 @@ describe('reorderStatuses', () => {
 
         expect(await runAction('reorderStatuses', SPACE_1, [STATUS_2, STATUS_1])).toMatchObject({
             code: 'PERMISSION_READ_ONLY',
+        });
+    });
+});
+
+describe('reorderTags', () => {
+    it('saves the new order for the owner', async () => {
+        expect(await runAction('reorderTags', SPACE_1, [TAG_2, TAG_1])).toEqual({ error: null });
+        expect(positionsOf('tags')).toMatchObject({ [TAG_2]: 0, [TAG_1]: 1, [TAG_3]: 0 });
+    });
+
+    it('refuses a tag that is in another space and writes nothing', async () => {
+        const reorderResult = await runAction('reorderTags', SPACE_1, [TAG_3, TAG_1]);
+
+        expect(reorderResult).toMatchObject({ code: 'REORDER_ROWS_NOT_FOUND' });
+        expect(fake.updates).toHaveLength(0);
+    });
+
+    it('refuses a restricted collaborator who tries to move a tag they did not make', async () => {
+        currentUserId = COLLABORATOR_ID;
+        tables = buildTables('restricted');
+        fake = createFakeSupabase({ tables, getCallerId: () => currentUserId });
+
+        expect(await runAction('reorderTags', SPACE_1, [TAG_2, TAG_1])).toMatchObject({
+            code: 'PERMISSION_RESTRICTED_NOT_OWN',
+        });
+        expect(fake.updates).toHaveLength(0);
+    });
+
+    it('refuses a read-only collaborator and a stranger', async () => {
+        currentUserId = COLLABORATOR_ID;
+        tables = buildTables('read_only');
+        fake = createFakeSupabase({ tables, getCallerId: () => currentUserId });
+        expect(await runAction('reorderTags', SPACE_1, [TAG_2, TAG_1])).toMatchObject({
+            code: 'PERMISSION_READ_ONLY',
+        });
+
+        currentUserId = STRANGER_ID;
+        expect(await runAction('reorderTags', SPACE_1, [TAG_2, TAG_1])).toMatchObject({
+            code: 'PERMISSION_NOT_A_MEMBER',
         });
     });
 });

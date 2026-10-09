@@ -13,6 +13,7 @@ const MAX_ROWS = 1000;
  * @param {() => string} [options.getCallerId] - Id the database would read from the login token (`auth.uid()`)
  * @param {Record<string, object|((args: object) => object)>} [options.rpcResults] - Replies for other rpc names
  * @param {object} [options.insertError] - Error every insert answers with, instead of storing the row
+ * @param {Record<string, object>} [options.insertErrorByTable] - Like `insertError`, but only for the named tables
  * @param {object} [options.updateError] - Error every update answers with, instead of changing rows
  * @param {object} [options.deleteError] - Error every delete answers with, instead of removing rows
  * @returns {{ client: object, rpcCalls: object[], queries: object[], updates: object[], inserts: object[],
@@ -25,6 +26,7 @@ export function createFakeSupabase({
     getCallerId = () => null,
     rpcResults = {},
     insertError = null,
+    insertErrorByTable = {},
     updateError = null,
     deleteError = null,
 }) {
@@ -120,7 +122,8 @@ export function createFakeSupabase({
             },
             single: async () => {
                 if (pendingInsert) {
-                    if (insertError) return { data: null, error: insertError };
+                    const failure = insertErrorByTable[tableName] ?? insertError;
+                    if (failure) return { data: null, error: failure };
                     insertedRowCount += 1;
                     const insertedRow = {
                         id: `${tableName}-new-${insertedRowCount}`,
@@ -144,6 +147,18 @@ export function createFakeSupabase({
                 inserts.push({ tableName, values });
                 return builder;
             },
+            upsert(values, { onConflict, ignoreDuplicates } = {}) {
+                const rows = Array.isArray(values) ? values : [values];
+                const conflictColumns = onConflict ? onConflict.split(',') : ['id'];
+                const storedRows = tables[tableName] ?? [];
+                const isDuplicate = (row) =>
+                    storedRows.some((stored) =>
+                        conflictColumns.every((column) => stored[column] === row[column]),
+                    );
+                pendingInsert = ignoreDuplicates ? rows.filter((row) => !isDuplicate(row)) : rows;
+                inserts.push({ tableName, values, isUpsert: true });
+                return builder;
+            },
             delete() {
                 isDeleting = true;
                 deletes.push({ tableName, filters });
@@ -158,6 +173,23 @@ export function createFakeSupabase({
                 return { data: row, error: null };
             },
             then(resolve) {
+                if (pendingInsert) {
+                    const failure = insertErrorByTable[tableName] ?? insertError;
+                    if (failure) return resolve({ data: null, error: failure });
+                    const insertedRows = Array.isArray(pendingInsert)
+                        ? pendingInsert
+                        : [pendingInsert];
+                    (tables[tableName] ??= []).push(...insertedRows);
+                    return resolve({ data: insertedRows, error: null });
+                }
+                if (isDeleting) {
+                    if (deleteError) return resolve({ data: null, error: deleteError });
+                    const removedRows = matchingRows();
+                    tables[tableName] = tables[tableName].filter(
+                        (row) => !removedRows.includes(row),
+                    );
+                    return resolve({ data: removedRows, error: null });
+                }
                 if (pendingUpdate && updateError)
                     return resolve({ data: null, error: updateError });
                 const rows = matchingRows();

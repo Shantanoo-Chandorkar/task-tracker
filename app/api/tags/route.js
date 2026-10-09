@@ -10,8 +10,8 @@ import { TAG_SPACE_ID_REQUIRED, TAGS_LOAD_FAILED } from '@/lib/error-codes';
 
 /**
  * GET /api/tags?space_id=<id>
- * Returns every reusable tag in one space, for tag-picker autocomplete. space_id is required -
- * tags only ever make sense scoped to one space.
+ * Returns every tag of one space in its saved order, for the tag picker and the tag settings.
+ * space_id is required - tags only ever make sense scoped to one space.
  */
 export const GET = withApiErrorHandling(async function GET(request) {
     const unauthorized = await requireAuthResponse();
@@ -26,8 +26,9 @@ export const GET = withApiErrorHandling(async function GET(request) {
 
     const { data: tags, error } = await supabase
         .from('tags')
-        .select('id, name')
+        .select('id, name, color, position')
         .eq('space_id', spaceId)
+        .order('position', { ascending: true })
         .order('name', { ascending: true });
 
     if (error) {
