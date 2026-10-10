@@ -1,7 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { createSublist } from '@/actions/sublist-actions';
-import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
+import {
+    withApiErrorHandling,
+    requireAuthResponse,
+    apiErrorResponse,
+    queryFailedResponse,
+} from '@/lib/api-response';
+import { SUBLISTS_LIST_ID_REQUIRED, SUBLISTS_LOAD_FAILED } from '@/lib/error-codes';
 
 /**
  * GET /api/sublists?list_id=<id>
@@ -16,7 +21,7 @@ export const GET = withApiErrorHandling(async function GET(request) {
     const listId = request.nextUrl.searchParams.get('list_id');
 
     if (!listId) {
-        return NextResponse.json({ error: 'list_id is required' }, { status: 400 });
+        return apiErrorResponse('list_id is required', SUBLISTS_LIST_ID_REQUIRED, 400);
     }
 
     const [{ data: sublists, error }, { data: tasks }] = await Promise.all([
@@ -29,7 +34,12 @@ export const GET = withApiErrorHandling(async function GET(request) {
     ]);
 
     if (error) {
-        return NextResponse.json({ error: 'Failed to fetch sublists' }, { status: 500 });
+        return queryFailedResponse(
+            '[api/sublists]',
+            error,
+            'Failed to fetch sublists',
+            SUBLISTS_LOAD_FAILED,
+        );
     }
 
     const taskCountBySublistId = new Map();
@@ -47,13 +57,4 @@ export const GET = withApiErrorHandling(async function GET(request) {
     }));
 
     return NextResponse.json(sublistsWithCounts);
-});
-
-/**
- * POST /api/sublists
- * Creates a new sublist under a list. Appends it to the end of that list's sublists.
- */
-export const POST = withApiErrorHandling(async function POST(request) {
-    const body = await request.json();
-    return actionResponse(await createSublist(body), 201);
 });

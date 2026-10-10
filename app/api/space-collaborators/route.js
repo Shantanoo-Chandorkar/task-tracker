@@ -1,7 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-import { withApiErrorHandling, requireAuthResponse } from '@/lib/api-response';
+import {
+    withApiErrorHandling,
+    requireAuthResponse,
+    apiErrorResponse,
+    queryFailedResponse,
+} from '@/lib/api-response';
+import { COLLABORATORS_SPACE_ID_REQUIRED, COLLABORATORS_LOAD_FAILED } from '@/lib/error-codes';
 
 /**
  * Attaches each collaborator's display_name, resolved server-side via the admin client.
@@ -44,7 +50,7 @@ export const GET = withApiErrorHandling(async function GET(request) {
     const spaceId = request.nextUrl.searchParams.get('space_id');
     const status = request.nextUrl.searchParams.get('status');
     if (!spaceId) {
-        return NextResponse.json({ error: 'space_id is required' }, { status: 400 });
+        return apiErrorResponse('space_id is required', COLLABORATORS_SPACE_ID_REQUIRED, 400);
     }
 
     const supabase = await createClient();
@@ -55,7 +61,12 @@ export const GET = withApiErrorHandling(async function GET(request) {
     const { data: collaborators, error } = await query.order('created_at', { ascending: true });
 
     if (error) {
-        return NextResponse.json({ error: 'Failed to fetch collaborators' }, { status: 500 });
+        return queryFailedResponse(
+            '[api/space-collaborators]',
+            error,
+            'Failed to fetch collaborators',
+            COLLABORATORS_LOAD_FAILED,
+        );
     }
 
     return NextResponse.json(await attachDisplayNames(collaborators || []));

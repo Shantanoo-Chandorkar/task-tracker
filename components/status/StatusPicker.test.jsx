@@ -13,7 +13,7 @@ const task = { id: 'task-1', list_id: 'list-1', status_id: 's-todo' };
 const fetchMock = vi.fn();
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 
 // Radix Select measures and scrolls elements, which jsdom does not implement
 beforeAll(() => {

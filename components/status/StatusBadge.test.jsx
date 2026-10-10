@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import StatusBadge from './StatusBadge';
-import { PILL_SURFACE_COLORS, contrastRatio, mixColors } from '@/lib/color-contrast';
+import { PILL_SURFACE_COLORS, contrastRatio, mixColors } from '@/lib/ui/color-contrast';
 
 afterEach(cleanup);
 

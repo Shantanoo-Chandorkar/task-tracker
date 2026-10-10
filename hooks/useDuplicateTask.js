@@ -3,8 +3,8 @@
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { duplicateTask } from '@/actions/task-actions';
-import { bustPageCache } from '@/lib/service-worker-cache';
+import { duplicateTask } from '@/actions/task-duplicate-action';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
 import { createClientId } from '@/lib/client-id';
 

@@ -12,15 +12,15 @@ import TaskRowRecurrence from './TaskRowRecurrence';
 import TaskRowActions from './TaskRowActions';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import CompleteTaskDialog from './CompleteTaskDialog';
-import MountOnFirstOpen from '@/components/ui/MountOnFirstOpen';
+import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
 import LimitWarning from './LimitWarning';
-import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/config';
+import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/nesting-depth';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 import { useTaskPriority } from '@/hooks/useTaskPriority';
 import { useGetTasks } from '@/hooks/useTasksQuery';
-import { isStartOfUnprioritisedTier } from '@/lib/tree';
-import { getMoveTargets } from '@/lib/move-targets';
+import { isStartOfUnprioritisedTier } from '@/lib/tasks/task-tree';
+import { getMoveTargets } from '@/lib/tasks/move-neighbours';
 
 /**
  * Plain line between the prioritised and unprioritised tier, named so it is not an anonymous separator.

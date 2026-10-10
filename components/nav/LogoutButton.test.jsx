@@ -13,7 +13,9 @@ vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: (...args) => toastError(...args) },
 }));
 vi.mock('@/actions/auth-actions', () => ({ signOutAction: (...args) => signOutAction(...args) }));
-vi.mock('@/lib/cache', () => ({ clearAllCaches: (...args) => clearAllCaches(...args) }));
+vi.mock('@/lib/cache/clear-client-caches', () => ({
+    clearAllCaches: (...args) => clearAllCaches(...args),
+}));
 vi.mock('@/hooks/useCurrentUserProfileQuery', () => ({
     useCurrentUserProfileQuery: () => ({ data: { is_guest: false } }),
 }));

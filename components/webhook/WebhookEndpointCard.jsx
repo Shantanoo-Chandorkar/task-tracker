@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { removeRowFromCache } from '@/lib/query-cache';
+import { removeRowFromCache } from '@/lib/cache/query-cache';
 import {
     deleteWebhookEndpoint,
     rotateWebhookSecret,
@@ -16,8 +16,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
-import ModalShell from '@/components/ui/modal-shell';
+import { Loader } from '@/components/custom/Loader';
+import ModalShell from '@/components/custom/ModalShell';
 import WebhookDeliveryLog from '@/components/webhook/WebhookDeliveryLog';
 import {
     PAYLOAD_LEVEL_OPTIONS,

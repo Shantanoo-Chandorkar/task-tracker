@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { createList } from '@/actions/list-actions';
-import { withApiErrorHandling, actionResponse, requireAuthResponse } from '@/lib/api-response';
-import { attachTaskCounts } from '@/lib/list-task-counts';
+import { withApiErrorHandling, requireAuthResponse, queryFailedResponse } from '@/lib/api-response';
+import { LISTS_LOAD_FAILED } from '@/lib/error-codes';
+import { attachTaskCounts } from '@/lib/tasks/list-task-counts';
 
 /**
  * GET /api/lists
@@ -23,17 +23,13 @@ export const GET = withApiErrorHandling(async function GET(request) {
     const { data: lists, error } = await query;
 
     if (error) {
-        return NextResponse.json({ error: 'Failed to fetch lists' }, { status: 500 });
+        return queryFailedResponse(
+            '[api/lists]',
+            error,
+            'Failed to fetch lists',
+            LISTS_LOAD_FAILED,
+        );
     }
 
     return NextResponse.json(await attachTaskCounts(supabase, lists || []));
-});
-
-/**
- * POST /api/lists
- * Creates a new list under a space. Appends it to the end of that space's lists.
- */
-export const POST = withApiErrorHandling(async function POST(request) {
-    const body = await request.json();
-    return actionResponse(await createList(body), 201);
 });

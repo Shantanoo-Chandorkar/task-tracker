@@ -5,15 +5,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
-import { findCompletedDescendants, findIncompleteDescendants } from '@/lib/tree';
+import { findCompletedDescendants, findIncompleteDescendants } from '@/lib/tasks/task-completion';
 import {
-    updateTask,
     completeTaskAndDescendants,
     uncompleteTaskAndDescendants,
-} from '@/actions/task-actions';
-import { bustPageCache } from '@/lib/service-worker-cache';
+} from '@/actions/task-completion-actions';
+import { updateTask } from '@/actions/task-update-actions';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
-import { withSavedRow, withStatusDisplay } from '@/lib/query-cache';
+import { withSavedRow, withStatusDisplay } from '@/lib/cache/query-cache';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 /**
@@ -112,7 +112,9 @@ export function useTaskCompletion(listId) {
                 }
                 queryClient.invalidateQueries({ queryKey: ['tasks', listId] });
                 bustPageCache({ urls: [`/lists/${listId}`] });
-                toast.dismiss(toastId);
+                // A completed task leaves for the collapsed Done group, so say it worked instead of vanishing silently
+                if (isComplete) toast.success('Marked complete', { id: toastId });
+                else toast.dismiss(toastId);
             } finally {
                 releaseInFlight();
             }

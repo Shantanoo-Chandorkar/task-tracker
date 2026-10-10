@@ -6,12 +6,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader } from '@/components/ui/loader';
-import FormError from '@/components/ui/FormError';
+import { Loader } from '@/components/custom/Loader';
+import FormError from '@/components/custom/FormError';
 import PasswordInput from '@/components/auth/PasswordInput';
 import GuestEntryButton from '@/components/auth/GuestEntryButton';
 import { signInAction } from '@/actions/auth-actions';
-import { clearAllCaches } from '@/lib/cache';
+import { clearAllCaches } from '@/lib/cache/clear-client-caches';
 
 /**
  * Email/password login form. On success, clears any stale cached shell from a

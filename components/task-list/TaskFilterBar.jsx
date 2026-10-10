@@ -4,7 +4,7 @@ import { Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
 import { useTaskFilterOptions } from '@/hooks/useTaskFilterOptions';
-import { DUE_BUCKETS, CREATED_BUCKETS } from '@/lib/task-filters';
+import { DUE_BUCKETS, CREATED_BUCKETS } from '@/lib/tasks/task-filters';
 
 const DIMENSION_LABELS = {
     statusIds: 'Status',

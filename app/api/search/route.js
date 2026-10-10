@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { requireAuthResponse, withApiErrorHandling } from '@/lib/api-response';
+import { requireAuthResponse, withApiErrorHandling, queryFailedResponse } from '@/lib/api-response';
+import { SEARCH_FAILED } from '@/lib/error-codes';
 
 const RESULTS_PER_CATEGORY = 8;
 
@@ -58,7 +59,12 @@ export const GET = withApiErrorHandling(async function GET(request) {
     ]);
 
     if (tasksError || listsError || spacesError) {
-        return NextResponse.json({ error: 'Search failed' }, { status: 500 });
+        return queryFailedResponse(
+            '[api/search]',
+            tasksError || listsError || spacesError,
+            'Search failed',
+            SEARCH_FAILED,
+        );
     }
 
     const normalizedTasks = (tasks || []).map((task) => ({

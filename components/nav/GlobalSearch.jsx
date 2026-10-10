@@ -13,7 +13,7 @@ import {
     CommandGroup,
     CommandItem,
 } from '@/components/ui/command';
-import { Loader } from '@/components/ui/loader';
+import { Loader } from '@/components/custom/Loader';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { fetchJson } from '@/lib/fetch-json';
 

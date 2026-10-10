@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { bustPageCache } from '@/lib/service-worker-cache';
-import { withSavedRow } from '@/lib/query-cache';
+import { bustPageCache } from '@/lib/cache/service-worker-cache';
+import { withSavedRow } from '@/lib/cache/query-cache';
 import { createClientId } from '@/lib/client-id';
 
 /**

@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useColorNameForm } from './useColorNameForm';
 
-vi.mock('@/lib/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
+vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 // Counts up so each "new id" is visibly different; `unavailable` mimics a browser without crypto.randomUUID
 const clientIds = vi.hoisted(() => ({ counter: 0, unavailable: false }));
 vi.mock('@/lib/client-id', () => ({

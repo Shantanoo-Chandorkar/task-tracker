@@ -7,8 +7,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import LabeledField from '@/components/ui/LabeledField';
-import { Loader } from '@/components/ui/loader';
+import LabeledField from '@/components/custom/LabeledField';
+import { Loader } from '@/components/custom/Loader';
 import {
     ALL_TASK_EVENTS,
     EVENT_OPTIONS,

@@ -7,7 +7,7 @@ import {
     filtersToSearchString,
     countActiveFilters,
     EMPTY_TASK_FILTERS,
-} from '@/lib/task-filters';
+} from '@/lib/tasks/task-filters';
 
 /**
  * URL-backed task-list filter state, shared by the list page's filter compute and the sheet.

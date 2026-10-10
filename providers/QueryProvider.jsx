@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { shouldRetryRequest } from '@/lib/fetch-json';
 
-// Data the Home screen shows; invalidating any of it must also refresh Home
+// Data the Home screen shows; invalidating any of it must also refresh Home (guarded by QueryProvider.test)
 const HOME_SOURCE_QUERY_KEYS = ['tasks', 'lists', 'sublists', 'spaces', 'statuses'];
 
 // A fixed id makes Sonner replace the toast instead of stacking one per failed query
@@ -28,7 +28,7 @@ export function handleQueryError(_error, failedQuery) {
  * QueryClient that refreshes the Home summary whenever the data behind it is invalidated.
  * Done here rather than at each call site, because a mutation site that forgets it leaves Home stale.
  */
-class HomeAwareQueryClient extends QueryClient {
+export class HomeAwareQueryClient extends QueryClient {
     /**
      * Invalidates the matching queries, and Home as well when the keys are ones Home is built from.
      *

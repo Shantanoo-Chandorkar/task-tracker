@@ -5,7 +5,7 @@ import { Dialog as SheetPrimitive } from 'radix-ui';
 import { cva } from 'class-variance-authority';
 import { XIcon } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/ui/class-names';
 
 function Sheet({ ...props }) {
     return <SheetPrimitive.Root data-slot="sheet" {...props} />;

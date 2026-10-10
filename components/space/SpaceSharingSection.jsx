@@ -1,60 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { Copy, Check, X, Send } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Loader } from '@/components/ui/loader';
-import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import ModalShell from '@/components/ui/modal-shell';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { bustPageCache } from '@/lib/service-worker-cache';
-import { removeRowFromCache } from '@/lib/query-cache';
-import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { runExclusively } from '@/lib/in-flight-entities';
+import { Loader } from '@/components/custom/Loader';
 import { useJoinRequestsQuery } from '@/hooks/useJoinRequestsQuery';
 import { useCollaboratorsQuery } from '@/hooks/useCollaboratorsQuery';
 import { usePendingInvitesQuery } from '@/hooks/usePendingInvitesQuery';
-import {
-    approveJoinRequest,
-    rejectJoinRequest,
-    removeCollaborator,
-    updateCollaboratorPermission,
-} from '@/actions/collaboration-actions';
-import { sendSpaceInvite, revokeSpaceInvite } from '@/actions/invite-actions';
-import { PERMISSION_LEVEL_LABELS } from '@/lib/permissions/space-permissions';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-async function copyToClipboard(text, label) {
-    try {
-        await navigator.clipboard.writeText(text);
-        toast.success(`${label} copied`);
-    } catch {
-        toast.error(`Could not copy ${label.toLowerCase()}`);
-    }
-}
-
-/**
- * Renders how long until an invite expires, or that it already has -- a display-only label; the
- * server is the actual source of truth for whether an expired invite can still be redeemed.
- *
- * @param {string} expiresAt - ISO timestamp.
- * @returns {string} e.g. "Expires in 3 days" or "Expired".
- */
-function formatInviteExpiry(expiresAt) {
-    const daysLeft = Math.ceil((Date.parse(expiresAt) - Date.now()) / DAY_MS);
-    if (daysLeft <= 0) return 'Expired';
-    return `Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
-}
+import { useInviteSender } from '@/hooks/useInviteSender';
+import { useSharingRowActions } from '@/hooks/useSharingRowActions';
+import { useSharingConfirm } from '@/hooks/useSharingConfirm';
+import ShareLinkControls from './sharing/ShareLinkControls';
+import InviteByEmailForm from './sharing/InviteByEmailForm';
+import PendingInvitesList from './sharing/PendingInvitesList';
+import JoinRequestsList from './sharing/JoinRequestsList';
+import CollaboratorsList from './sharing/CollaboratorsList';
+import SharingConfirmDialog from './sharing/SharingConfirmDialog';
 
 /**
  * Owner-only sharing controls for one space: share the ID/link, review pending requests,
@@ -64,7 +22,6 @@ function formatInviteExpiry(expiresAt) {
  * @param {object} props.space - The space these controls belong to
  */
 export default function SpaceSharingSection({ space }) {
-    const queryClient = useQueryClient();
     const { data: pendingRequests = [], isLoading: isLoadingRequests } = useJoinRequestsQuery(
         space.id,
     );
@@ -74,222 +31,16 @@ export default function SpaceSharingSection({ space }) {
     const { data: pendingInvites = [], isLoading: isLoadingInvites } = usePendingInvitesQuery(
         space.id,
     );
-    // { action: 'reject'|'remove'|'revoke-invite', targetId, label } while a confirm dialog is open, else null.
-    const [confirmTarget, setConfirmTarget] = useState(null);
-    const sharingConfirm = useConfirmAction(Boolean(confirmTarget));
-    const [busyRowKeys, setBusyRowKeys] = useState(() => new Set());
-    const [inviteEmail, setInviteEmail] = useState('');
-    const [sendingInvite, setSendingInvite] = useState(false);
-    const [inviteError, setInviteError] = useState('');
-
-    async function refetch() {
-        await queryClient.invalidateQueries({ queryKey: ['space-collaborators', space.id] });
-        await queryClient.invalidateQueries({ queryKey: ['space-invites', space.id] });
-        bustPageCache({ urls: ['/spaces'] });
-    }
-
-    async function handleSendInvite(event) {
-        event.preventDefault();
-        if (!inviteEmail.trim() || sendingInvite) return;
-
-        setSendingInvite(true);
-        setInviteError('');
-
-        let sendInviteResult;
-        try {
-            sendInviteResult = await sendSpaceInvite({
-                spaceId: space.id,
-                email: inviteEmail.trim(),
-            });
-        } catch {
-            setSendingInvite(false);
-            setInviteError('Could not reach the server. Try again.');
-            return;
-        }
-        setSendingInvite(false);
-
-        if (sendInviteResult.error) {
-            setInviteError(sendInviteResult.error);
-            return;
-        }
-
-        setInviteEmail('');
-        toast.success('Invite sent');
-        await refetch();
-    }
-
-    /**
-     * Runs one row's action once at a time and marks that row busy while it works.
-     *
-     * @param {string} rowKey - Key such as `approve:<requestId>`, also used to disable that row's control.
-     * @param {() => Promise<*>} work - The row's async action.
-     * @returns {Promise<*>} What `work` returned, or undefined when the row was already busy.
-     */
-    async function runRowAction(rowKey, work) {
-        return runExclusively(rowKey, async () => {
-            setBusyRowKeys((current) => new Set(current).add(rowKey));
-            try {
-                return await work();
-            } finally {
-                setBusyRowKeys((current) => {
-                    const remaining = new Set(current);
-                    remaining.delete(rowKey);
-                    return remaining;
-                });
-            }
-        });
-    }
-
-    function handleApprove(requestId) {
-        return runRowAction(`approve:${requestId}`, async () => {
-            const toastId = toast.loading('Approving...');
-            let approveResult;
-            try {
-                approveResult = await approveJoinRequest({ requestId });
-            } catch {
-                toast.error('Could not reach the server. Try again.', { id: toastId });
-                return;
-            }
-            if (approveResult.error) {
-                toast.error(approveResult.error, { id: toastId });
-                return;
-            }
-            toast.success('Request approved', { id: toastId });
-            // Awaited so the button keeps spinning until the person shows up in the collaborators list.
-            await refetch();
-        });
-    }
-
-    function handleConfirm() {
-        if (!confirmTarget) return;
-        const { action, targetId } = confirmTarget;
-        const actionByName = {
-            reject: {
-                loadingMessage: 'Rejecting...',
-                successMessage: 'Request rejected',
-                run: () => rejectJoinRequest({ requestId: targetId }),
-            },
-            remove: {
-                loadingMessage: 'Removing...',
-                successMessage: 'Collaborator removed',
-                run: () => removeCollaborator({ collaboratorId: targetId }),
-            },
-            'revoke-invite': {
-                loadingMessage: 'Revoking...',
-                successMessage: 'Invite revoked',
-                run: () => revokeSpaceInvite({ inviteId: targetId }),
-            },
-        };
-        const chosenAction = actionByName[action];
-
-        return sharingConfirm.runConfirmedAction({
-            entityKey: `${action}:${targetId}`,
-            loadingMessage: chosenAction.loadingMessage,
-            successMessage: chosenAction.successMessage,
-            action: chosenAction.run,
-            // The row leaves the list at once, so the popup closes onto the final screen; the reload is quiet.
-            onSuccess: () => {
-                removeRowFromCache(queryClient, ['space-collaborators', space.id], targetId);
-                removeRowFromCache(queryClient, ['space-invites', space.id], targetId);
-                refetch();
-            },
-            close: () => setConfirmTarget(null),
-        });
-    }
-
-    function handlePermissionChange(collaboratorId, newPermissionLevel) {
-        return runRowAction(`permission:${collaboratorId}`, async () => {
-            const toastId = toast.loading('Updating permission...');
-            let permissionResult;
-            try {
-                permissionResult = await updateCollaboratorPermission({
-                    collaboratorId,
-                    permissionLevel: newPermissionLevel,
-                });
-            } catch {
-                toast.error('Could not reach the server. Try again.', { id: toastId });
-                return;
-            }
-            if (permissionResult.error) {
-                toast.error(permissionResult.error, { id: toastId });
-                return;
-            }
-            toast.success('Permission updated', { id: toastId });
-            // The Select shows the new level at once; the reload only reconciles in the background.
-            queryClient.setQueriesData(
-                { queryKey: ['space-collaborators', space.id] },
-                (cachedRows) =>
-                    Array.isArray(cachedRows)
-                        ? cachedRows.map((row) =>
-                              row.id === collaboratorId
-                                  ? { ...row, permission_level: newPermissionLevel }
-                                  : row,
-                          )
-                        : cachedRows,
-            );
-            refetch();
-        });
-    }
+    const inviteSender = useInviteSender(space.id);
+    const rowActions = useSharingRowActions(space.id);
+    const sharingConfirm = useSharingConfirm(space.id);
 
     return (
         <div className="space-y-3">
             <div>
                 <h3 className="text-sm font-semibold mb-1">Share this space</h3>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="truncate font-mono">{space.id}</span>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 flex-shrink-0"
-                        aria-label="Copy space ID"
-                        onClick={() => copyToClipboard(space.id, 'Space ID')}
-                    >
-                        <Copy className="h-3 w-3" />
-                    </Button>
-                </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 gap-1.5"
-                    onClick={() =>
-                        copyToClipboard(
-                            `${window.location.origin}/spaces?join=${space.id}`,
-                            'Join link',
-                        )
-                    }
-                >
-                    <Copy className="h-3.5 w-3.5" />
-                    Copy join link
-                </Button>
-
-                <form onSubmit={handleSendInvite} className="mt-3 flex items-start gap-1.5">
-                    <div className="flex-1">
-                        <Input
-                            type="email"
-                            placeholder="Invite by email"
-                            className="h-8 text-sm"
-                            value={inviteEmail}
-                            onChange={(event) => {
-                                setInviteEmail(event.target.value);
-                                if (inviteError) setInviteError('');
-                            }}
-                            disabled={sendingInvite}
-                            aria-label="Invite by email"
-                        />
-                        {inviteError && (
-                            <p className="mt-1 text-xs text-destructive">{inviteError}</p>
-                        )}
-                    </div>
-                    <Button
-                        type="submit"
-                        size="sm"
-                        className="h-8 gap-1.5"
-                        disabled={!inviteEmail.trim() || sendingInvite}
-                    >
-                        {sendingInvite ? <Loader size="xs" /> : <Send className="h-3.5 w-3.5" />}
-                        Send
-                    </Button>
-                </form>
+                <ShareLinkControls spaceId={space.id} />
+                <InviteByEmailForm inviteSender={inviteSender} />
             </div>
 
             {(isLoadingRequests || isLoadingCollaborators || isLoadingInvites) && (
@@ -300,198 +51,37 @@ export default function SpaceSharingSection({ space }) {
             )}
 
             {!isLoadingInvites && pendingInvites.length > 0 && (
-                <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                        Pending invites
-                    </p>
-                    <div className="rounded-lg bg-muted/50 divide-y divide-border">
-                        {pendingInvites.map((invite) => (
-                            <div
-                                key={invite.id}
-                                className="flex items-center justify-between gap-2 px-3 py-2"
-                            >
-                                <div className="min-w-0">
-                                    <p className="text-sm truncate">{invite.invited_email}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {formatInviteExpiry(invite.expires_at)}
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
-                                    aria-label="Revoke invite"
-                                    onClick={() =>
-                                        setConfirmTarget({
-                                            action: 'revoke-invite',
-                                            targetId: invite.id,
-                                            label: invite.invited_email,
-                                        })
-                                    }
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <PendingInvitesList
+                    invites={pendingInvites}
+                    onRevoke={(inviteId, invitedEmail) =>
+                        sharingConfirm.requestConfirm('revoke-invite', inviteId, invitedEmail)
+                    }
+                />
             )}
 
             {!isLoadingRequests && pendingRequests.length > 0 && (
-                <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                        Pending requests
-                    </p>
-                    <div className="rounded-lg bg-muted/50 divide-y divide-border">
-                        {pendingRequests.map((request) => (
-                            <div
-                                key={request.id}
-                                className="flex items-center justify-between gap-2 px-3 py-2"
-                            >
-                                <span className="text-sm truncate">{request.requester_email}</span>
-                                <div className="flex gap-1 flex-shrink-0">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
-                                        aria-label="Approve request"
-                                        disabled={busyRowKeys.has(`approve:${request.id}`)}
-                                        onClick={() => handleApprove(request.id)}
-                                    >
-                                        {busyRowKeys.has(`approve:${request.id}`) ? (
-                                            <Loader size="xs" />
-                                        ) : (
-                                            <Check className="h-4 w-4" />
-                                        )}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-destructive hover:text-destructive"
-                                        aria-label="Reject request"
-                                        onClick={() =>
-                                            setConfirmTarget({
-                                                action: 'reject',
-                                                targetId: request.id,
-                                                label: request.requester_email,
-                                            })
-                                        }
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <JoinRequestsList
+                    requests={pendingRequests}
+                    busyRowKeys={rowActions.busyRowKeys}
+                    onApprove={rowActions.handleApprove}
+                    onReject={(requestId, requesterEmail) =>
+                        sharingConfirm.requestConfirm('reject', requestId, requesterEmail)
+                    }
+                />
             )}
 
             {!isLoadingCollaborators && collaborators.length > 0 && (
-                <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                        Collaborators
-                    </p>
-                    <div className="rounded-lg bg-muted/50 divide-y divide-border">
-                        {collaborators.map((collaborator) => (
-                            <div
-                                key={collaborator.id}
-                                className="flex items-center justify-between gap-2 px-3 py-2"
-                            >
-                                <span className="text-sm truncate">
-                                    {collaborator.requester_email}
-                                </span>
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                    <Select
-                                        value={collaborator.permission_level}
-                                        disabled={busyRowKeys.has(`permission:${collaborator.id}`)}
-                                        onValueChange={(newPermissionLevel) =>
-                                            handlePermissionChange(
-                                                collaborator.id,
-                                                newPermissionLevel,
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            className="h-7 w-auto text-xs"
-                                            aria-label={`Permission for ${collaborator.requester_email}`}
-                                        >
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Object.entries(PERMISSION_LEVEL_LABELS).map(
-                                                ([level, label]) => (
-                                                    <SelectItem key={level} value={level}>
-                                                        {label}
-                                                    </SelectItem>
-                                                ),
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                        aria-label="Remove collaborator"
-                                        onClick={() =>
-                                            setConfirmTarget({
-                                                action: 'remove',
-                                                targetId: collaborator.id,
-                                                label: collaborator.requester_email,
-                                            })
-                                        }
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <CollaboratorsList
+                    collaborators={collaborators}
+                    busyRowKeys={rowActions.busyRowKeys}
+                    onPermissionChange={rowActions.handlePermissionChange}
+                    onRemove={(collaboratorId, email) =>
+                        sharingConfirm.requestConfirm('remove', collaboratorId, email)
+                    }
+                />
             )}
 
-            <ModalShell
-                open={!!confirmTarget}
-                onClose={() => setConfirmTarget(null)}
-                isBusy={sharingConfirm.isPending}
-                errorMessage={sharingConfirm.errorMessage}
-                variant="alert"
-                title={
-                    {
-                        reject: `Reject request from "${confirmTarget?.label}"?`,
-                        remove: `Remove "${confirmTarget?.label}" from this space?`,
-                        'revoke-invite': `Revoke the invite sent to "${confirmTarget?.label}"?`,
-                    }[confirmTarget?.action]
-                }
-                description={
-                    {
-                        reject: "They'll need to send a new request to join.",
-                        remove: "They'll lose access to this space's lists and tasks.",
-                        'revoke-invite': 'The link in their email will stop working.',
-                    }[confirmTarget?.action]
-                }
-                footer={
-                    <>
-                        <AlertDialogCancel
-                            onClick={() => setConfirmTarget(null)}
-                            disabled={sharingConfirm.isPending}
-                        >
-                            Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleConfirm}
-                            disabled={sharingConfirm.isPending}
-                            className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                            {sharingConfirm.isPending && <Loader size="xs" />}
-                            {
-                                { reject: 'Reject', remove: 'Remove', 'revoke-invite': 'Revoke' }[
-                                    confirmTarget?.action
-                                ]
-                            }
-                        </AlertDialogAction>
-                    </>
-                }
-            />
+            <SharingConfirmDialog sharingConfirm={sharingConfirm} />
         </div>
     );
 }
