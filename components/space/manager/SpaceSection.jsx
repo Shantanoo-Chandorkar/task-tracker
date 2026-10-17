@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
-import { getMoveTargets } from '@/lib/tasks/move-neighbours';
+import { getMoveTargets } from '@/modules/tasks/domain/move-neighbours';
 import SpaceSharingSection from '../SpaceSharingSection';
 import SpaceSettingsSheet from '../SpaceSettingsSheet';
 import ListRow from './ListRow';

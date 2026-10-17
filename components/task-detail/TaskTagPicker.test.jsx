@@ -7,7 +7,7 @@ const assignTagsToTask = vi.fn();
 const toastInfo = vi.fn();
 const toastError = vi.fn();
 
-vi.mock('@/actions/tag-actions', () => ({
+vi.mock('@/modules/tasks/actions/tag-actions', () => ({
     assignTagsToTask: (...args) => assignTagsToTask(...args),
     removeTagFromTask: vi.fn(),
 }));

@@ -4,9 +4,9 @@ import { isUuid } from '@/lib/validation';
 import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 import TaskList from '@/components/task-list/TaskList';
 import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
-import { loadListName } from '@/lib/page-titles';
+import { loadListName } from '@/modules/tasks/domain/page-titles';
 import { loadRequestUser, loadShellData } from '@/lib/app-shell-data';
-import { fetchListTasks } from '@/lib/tasks/list-tasks';
+import { fetchListTasks } from '@/modules/tasks/data/list-tasks';
 
 /**
  * Tab title: the list's name, or a generic one when the id is malformed or the list is not visible.

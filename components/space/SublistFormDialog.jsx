@@ -16,7 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { createSublist, updateSublist } from '@/actions/sublist-actions';
+import { createSublist, updateSublist } from '@/modules/tasks/actions/sublist-actions';
 
 const SUBLIST_NAME_MAX = 200;
 

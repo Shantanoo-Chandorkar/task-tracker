@@ -15,12 +15,12 @@ vi.mock('@/hooks/useStatusesQuery', () => ({
     useStatusesQuery: () => ({ data: statuses, isLoading: false }),
 }));
 const reorderStatuses = vi.fn();
-vi.mock('@/actions/status-actions', () => ({
+vi.mock('@/modules/tasks/actions/status-actions', () => ({
     createStatus: vi.fn(),
     updateStatus: vi.fn(),
     deleteStatus: vi.fn(),
 }));
-vi.mock('@/actions/reorder-actions', () => ({
+vi.mock('@/modules/tasks/actions/reorder-actions', () => ({
     reorderStatuses: (...args) => reorderStatuses(...args),
 }));
 vi.mock('sonner', () => ({

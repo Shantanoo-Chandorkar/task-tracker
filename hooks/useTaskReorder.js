@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { applyTaskReorder, planTaskReorder } from '@/lib/tasks/task-reorder';
+import { applyTaskReorder, planTaskReorder } from '@/modules/tasks/domain/task-reorder';
 import { useReorderRunner } from '@/hooks/useReorderRunner';
 
 /**

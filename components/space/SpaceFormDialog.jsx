@@ -6,7 +6,7 @@ import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/custom/Loader';
 import ColorNameField from '@/components/custom/ColorNameField';
-import { createSpace, updateSpace } from '@/actions/space-actions';
+import { createSpace, updateSpace } from '@/modules/tasks/actions/space-actions';
 
 const SPACE_NAME_MAX = 100;
 

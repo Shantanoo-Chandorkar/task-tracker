@@ -11,13 +11,13 @@ import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import CompleteTaskDialog from './CompleteTaskDialog';
 import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
 import LimitWarning from './LimitWarning';
-import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/lib/nesting-depth';
+import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/modules/tasks/domain/nesting-depth';
 import { useUIFlag, toggleFlag, setFlag } from '@/providers/UIStateProvider';
 import { useTaskCompletion } from '@/hooks/useTaskCompletion';
 import { useTaskPriority } from '@/hooks/useTaskPriority';
 import { useGetTasks } from '@/hooks/useTasksQuery';
-import { isStartOfUnprioritisedTier } from '@/lib/tasks/task-tree';
-import { getMoveTargets } from '@/lib/tasks/move-neighbours';
+import { isStartOfUnprioritisedTier } from '@/modules/tasks/domain/task-tree';
+import { getMoveTargets } from '@/modules/tasks/domain/move-neighbours';
 
 /**
  * Plain line between the prioritised and unprioritised tier, named so it is not an anonymous separator.

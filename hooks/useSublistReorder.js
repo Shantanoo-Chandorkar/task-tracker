@@ -1,6 +1,6 @@
 'use client';
 
-import { reorderSublists } from '@/actions/reorder-actions';
+import { reorderSublists } from '@/modules/tasks/actions/reorder-actions';
 import { useRowReorder } from '@/hooks/useRowReorder';
 
 /**

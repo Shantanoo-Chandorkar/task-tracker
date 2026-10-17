@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { PERMISSION_LEVEL_LABELS } from '@/lib/permissions/space-permissions';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
-import { fetchDeleteCounts } from '@/lib/fetch-delete-counts';
+import { fetchDeleteCounts } from '@/modules/tasks/domain/fetch-delete-counts';
 import SpaceListManager from './SpaceListManager';
 
 const USER_ID = 'user-1';
@@ -47,13 +47,13 @@ vi.mock('@/hooks/useListsQuery', () => ({ useListsQuery: () => ({ data: mocks.li
 vi.mock('@/hooks/useCurrentUserProfileQuery', () => ({
     useCurrentUserProfileQuery: () => ({ data: { is_guest: mocks.isGuest } }),
 }));
-vi.mock('@/actions/space-actions', () => ({
+vi.mock('@/modules/tasks/actions/space-actions', () => ({
     deleteSpace: (...args) => mocks.deleteSpace(...args),
 }));
-vi.mock('@/actions/list-actions', () => ({
+vi.mock('@/modules/tasks/actions/list-actions', () => ({
     deleteList: (...args) => mocks.deleteList(...args),
 }));
-vi.mock('@/actions/reorder-actions', () => ({
+vi.mock('@/modules/tasks/actions/reorder-actions', () => ({
     reorderSpaces: (...args) => mocks.reorderSpaces(...args),
     reorderLists: (...args) => mocks.reorderLists(...args),
 }));
@@ -70,7 +70,7 @@ vi.mock('sonner', () => ({
     },
 }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
-vi.mock('@/lib/fetch-delete-counts', () => ({ fetchDeleteCounts: vi.fn() }));
+vi.mock('@/modules/tasks/domain/fetch-delete-counts', () => ({ fetchDeleteCounts: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('./SpaceFormDialog', () => ({
     default: ({ open, space }) =>

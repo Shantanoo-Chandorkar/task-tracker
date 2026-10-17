@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { createTask } from '@/actions/task-create-actions';
+import { createTask } from '@/modules/tasks/actions/task-create-actions';
 import {
     withApiErrorHandling,
     actionResponse,
@@ -8,8 +8,8 @@ import {
     apiErrorResponse,
     queryFailedResponse,
 } from '@/lib/api-response';
-import { TASKS_LIST_ID_REQUIRED, TASKS_LOAD_FAILED } from '@/lib/error-codes';
-import { fetchListTasks } from '@/lib/tasks/list-tasks';
+import { TASKS_LIST_ID_REQUIRED, TASKS_LOAD_FAILED } from '@/modules/tasks/errors';
+import { fetchListTasks } from '@/modules/tasks/data/list-tasks';
 
 /**
  * GET /api/tasks?list_id=<id>

@@ -1,5 +1,5 @@
 import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
-import { moveTask } from '@/actions/task-move-action';
+import { moveTask } from '@/modules/tasks/actions/task-move-action';
 
 /**
  * POST /api/tasks/[id]/move

@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { createList, updateList } from '@/actions/list-actions';
+import { createList, updateList } from '@/modules/tasks/actions/list-actions';
 
 const LIST_NAME_MAX = 200;
 

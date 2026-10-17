@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { withApiErrorHandling, requireAuthResponse, queryFailedResponse } from '@/lib/api-response';
-import { SPACES_LOAD_FAILED } from '@/lib/error-codes';
+import { SPACES_LOAD_FAILED } from '@/modules/tasks/errors';
 import { getCurrentUser } from '@/lib/auth/session';
 import { attachMyPermissionLevel } from '@/lib/permissions/space-permissions';
 import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';

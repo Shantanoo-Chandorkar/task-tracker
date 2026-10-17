@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback } from 'react';
-import { planRowReorder } from '@/lib/reorder/plan-row-reorder';
-import { replaceRowsInPlace } from '@/lib/reorder/replace-rows-in-place';
+import { planRowReorder } from '@/modules/tasks/domain/plan-row-reorder';
+import { replaceRowsInPlace } from '@/modules/tasks/domain/replace-rows-in-place';
 import { useReorderRunner } from '@/hooks/useReorderRunner';
 
 /**

@@ -29,9 +29,11 @@ vi.mock('sonner', () => ({
     },
 }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
-vi.mock('@/actions/sublist-actions', () => ({ deleteSublist: vi.fn() }));
-vi.mock('@/actions/reorder-actions', () => ({ reorderSublists: vi.fn() }));
-vi.mock('@/lib/fetch-delete-counts', () => ({ fetchDeleteCounts: async () => null }));
+vi.mock('@/modules/tasks/actions/sublist-actions', () => ({ deleteSublist: vi.fn() }));
+vi.mock('@/modules/tasks/actions/reorder-actions', () => ({ reorderSublists: vi.fn() }));
+vi.mock('@/modules/tasks/domain/fetch-delete-counts', () => ({
+    fetchDeleteCounts: async () => null,
+}));
 
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('@/hooks/useTasksQuery', () => ({ useTasksQuery: () => ({ data: state.tasks }) }));
@@ -48,7 +50,7 @@ vi.mock('@/hooks/useDuplicateTask', () => ({
 vi.mock('@/hooks/useTaskFilters', () => ({
     useTaskFilters: () => ({ filters: {}, activeCount: state.filters.activeCount }),
 }));
-vi.mock('@/lib/tasks/task-filters', async (importOriginal) => ({
+vi.mock('@/modules/tasks/domain/task-filters', async (importOriginal) => ({
     ...(await importOriginal()),
     taskMatchesFilters: (task) => state.filters.matchingTaskIds.includes(task.id),
 }));
@@ -124,8 +126,8 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
 
 const { toast } = await import('sonner');
 const { bustPageCache } = await import('@/lib/cache/service-worker-cache');
-const { deleteSublist } = await import('@/actions/sublist-actions');
-const { reorderSublists } = await import('@/actions/reorder-actions');
+const { deleteSublist } = await import('@/modules/tasks/actions/sublist-actions');
+const { reorderSublists } = await import('@/modules/tasks/actions/reorder-actions');
 
 const STATUSES = [
     { id: 'st-todo', name: 'To do', color: '#111111', code: 'todo', is_default: true },

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Loader } from '@/components/custom/Loader';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useLabelReorder } from '@/hooks/useLabelReorder';
-import { getMoveTargets } from '@/lib/tasks/move-neighbours';
+import { getMoveTargets } from '@/modules/tasks/domain/move-neighbours';
 import LabelRow from './LabelRow';
 import LabelFormDialog from './LabelFormDialog';
 import LabelDeleteDialog from './LabelDeleteDialog';

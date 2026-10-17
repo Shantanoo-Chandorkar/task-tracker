@@ -1,9 +1,12 @@
 'use client';
 
 import { Plus } from 'lucide-react';
-import { getMoveTargets } from '@/lib/tasks/move-neighbours';
-import { describeBucketBreakdown } from '@/lib/tasks/task-buckets';
-import { getStatusGroupFlagKey, isStatusGroupCollapsed } from '@/lib/tasks/status-group-collapse';
+import { getMoveTargets } from '@/modules/tasks/domain/move-neighbours';
+import { describeBucketBreakdown } from '@/modules/tasks/domain/task-buckets';
+import {
+    getStatusGroupFlagKey,
+    isStatusGroupCollapsed,
+} from '@/modules/tasks/domain/status-group-collapse';
 import StatusGroup from './StatusGroup';
 import SublistHeader from './SublistHeader';
 

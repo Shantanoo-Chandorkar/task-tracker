@@ -1,13 +1,13 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { deleteSpace } from '@/actions/space-actions';
-import { deleteList } from '@/actions/list-actions';
+import { deleteSpace } from '@/modules/tasks/actions/space-actions';
+import { deleteList } from '@/modules/tasks/actions/list-actions';
 import { leaveSpace } from '@/actions/collaboration-actions';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { removeRowFromCache } from '@/lib/cache/query-cache';
 import { countSpaceContents } from '@/lib/cache/cached-delete-counts';
-import { getDeleteToasts } from '@/lib/spaces/delete-target-copy';
+import { getDeleteToasts } from '@/modules/tasks/delete-target-copy';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
 

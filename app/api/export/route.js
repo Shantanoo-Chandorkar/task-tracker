@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withApiErrorHandling, requireAuthResponse, apiErrorResponse } from '@/lib/api-response';
-import { EXPORT_REQUEST_INVALID, EXPORT_SCOPE_NOT_FOUND } from '@/lib/error-codes';
-import { resolveExportScope } from '@/lib/export/resolveExportScope';
-import { formatExport } from '@/lib/export/formatExport';
+import { EXPORT_REQUEST_INVALID, EXPORT_SCOPE_NOT_FOUND } from '@/modules/tasks/errors';
+import { resolveExportScope } from '@/modules/tasks/data/resolveExportScope';
+import { formatExport } from '@/modules/tasks/domain/formatExport';
 
 const VALID_TYPES = new Set(['list', 'sublist', 'space']);
 const VALID_FORMATS = new Set(['csv', 'json']);

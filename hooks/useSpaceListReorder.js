@@ -1,6 +1,6 @@
 'use client';
 
-import { reorderLists, reorderSpaces } from '@/actions/reorder-actions';
+import { reorderLists, reorderSpaces } from '@/modules/tasks/actions/reorder-actions';
 import { UNREACHABLE_TRY_AGAIN_MESSAGE } from '@/lib/ui/unreachable-message';
 import { useRowReorder } from '@/hooks/useRowReorder';
 

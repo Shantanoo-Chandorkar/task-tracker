@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { withApiErrorHandling, requireAuthResponse, queryFailedResponse } from '@/lib/api-response';
-import { LISTS_LOAD_FAILED } from '@/lib/error-codes';
-import { attachTaskCounts } from '@/lib/tasks/list-task-counts';
+import { LISTS_LOAD_FAILED } from '@/modules/tasks/errors';
+import { attachTaskCounts } from '@/modules/tasks/data/list-task-counts';
 
 /**
  * GET /api/lists

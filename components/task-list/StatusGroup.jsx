@@ -2,7 +2,7 @@
 
 import { Fragment, useId } from 'react';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
-import { isStartOfUnprioritisedTier } from '@/lib/tasks/task-tree';
+import { isStartOfUnprioritisedTier } from '@/modules/tasks/domain/task-tree';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
 
 /**

@@ -7,7 +7,7 @@ import { useSpaceListReorder } from './useSpaceListReorder';
 
 const mocks = vi.hoisted(() => ({ reorderSpaces: vi.fn(), reorderLists: vi.fn() }));
 
-vi.mock('@/actions/reorder-actions', () => ({
+vi.mock('@/modules/tasks/actions/reorder-actions', () => ({
     reorderSpaces: (...args) => mocks.reorderSpaces(...args),
     reorderLists: (...args) => mocks.reorderLists(...args),
 }));

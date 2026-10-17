@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { withApiErrorHandling, requireAuthResponse, apiErrorResponse } from '@/lib/api-response';
-import { SPACE_NOT_FOUND } from '@/lib/error-codes';
+import { SPACE_NOT_FOUND } from '@/modules/tasks/errors';
 
 /**
  * GET /api/spaces/[id]

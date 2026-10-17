@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { fetchDeleteCounts } from '@/lib/fetch-delete-counts';
+import { fetchDeleteCounts } from '@/modules/tasks/domain/fetch-delete-counts';
 import { claimInFlight } from '@/lib/in-flight-entities';
 
 /**

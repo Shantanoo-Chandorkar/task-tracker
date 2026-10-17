@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withApiErrorHandling, requireAuthResponse } from '@/lib/api-response';
-import { HOME_LOAD_FAILED } from '@/lib/error-codes';
-import { loadHomeSummary } from '@/lib/home/build-home-summary';
+import { HOME_LOAD_FAILED } from '@/modules/tasks/errors';
+import { loadHomeSummary } from '@/modules/tasks/data/build-home-summary';
 
 /**
  * GET /api/home - priority tasks, recent tasks, recent lists and recent sublists for the Home screen.

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
-import { buildTaskBuckets, countTasksByStatusId } from '@/lib/tasks/task-buckets';
-import { createStableTreeBuilder } from '@/lib/tasks/task-tree';
-import { getStatusGroupFlagKey } from '@/lib/tasks/status-group-collapse';
+import { buildTaskBuckets, countTasksByStatusId } from '@/modules/tasks/domain/task-buckets';
+import { createStableTreeBuilder } from '@/modules/tasks/domain/task-tree';
+import { getStatusGroupFlagKey } from '@/modules/tasks/domain/status-group-collapse';
 import { toggleFlag as toggleGroup, useUIFlags } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useTasksQuery } from '@/hooks/useTasksQuery';

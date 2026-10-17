@@ -10,9 +10,12 @@ import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdow
 import RowActionsMenu, { MoveMenuItems } from '@/components/custom/RowActionsMenu';
 import ModalShell from '@/components/custom/ModalShell';
 import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
-import { deleteTask, deleteTaskAndReparentChildren } from '@/actions/task-delete-actions';
+import {
+    deleteTask,
+    deleteTaskAndReparentChildren,
+} from '@/modules/tasks/actions/task-delete-actions';
 import { useDuplicateTask } from '@/hooks/useDuplicateTask';
-import { buildMoveGroups } from '@/lib/tasks/move-groups';
+import { buildMoveGroups } from '@/modules/tasks/domain/move-groups';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';

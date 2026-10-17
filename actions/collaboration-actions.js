@@ -2,7 +2,8 @@
 
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
-import { SPACE_NOT_FOUND, ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
+import { ALREADY_MEMBER, REQUEST_NOT_FOUND } from '@/lib/error-codes';
+import { SPACE_NOT_FOUND } from '@/modules/tasks/errors';
 import { isUuid } from '@/lib/validation';
 import { COLLABORATOR_PERMISSION_LEVELS } from '@/lib/permissions/space-permissions';
 import { sendJoinRequestEmail } from '@/lib/email/notifications/send-join-request-email';

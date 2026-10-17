@@ -7,7 +7,7 @@ import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
 import { useSpaceListReorder } from '@/hooks/useSpaceListReorder';
 import { useSpaceListDeletion } from '@/hooks/useSpaceListDeletion';
 import { useJoinSpaceDialog } from '@/hooks/useJoinSpaceDialog';
-import { getMoveTargets } from '@/lib/tasks/move-neighbours';
+import { getMoveTargets } from '@/modules/tasks/domain/move-neighbours';
 import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
 import JoinSpaceDialog from './JoinSpaceDialog';

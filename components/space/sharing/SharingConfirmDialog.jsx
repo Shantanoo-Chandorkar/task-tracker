@@ -3,7 +3,7 @@
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/custom/ModalShell';
 import { Loader } from '@/components/custom/Loader';
-import { describeSharingConfirm } from '@/lib/spaces/sharing-confirm-copy';
+import { describeSharingConfirm } from '@/modules/tasks/sharing-confirm-copy';
 
 /**
  * Confirmation popup for rejecting a request, removing a collaborator, or revoking an invite.
