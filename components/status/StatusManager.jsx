@@ -74,7 +74,7 @@ export default function StatusManager({ spaceId, initialStatuses }) {
             noun="Status"
             resourceKey="statuses"
             heading="Statuses"
-            description="Manage the statuses used to organize your tasks. Drag to reorder."
+            description="Manage the statuses used to organize your tasks. Use the menu to reorder."
             deleteDescription="Tasks using this status will lose it. This cannot be undone."
             emptyMessage="No statuses in this space yet."
             labels={statuses}

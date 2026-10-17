@@ -156,11 +156,10 @@ function pendingPromise() {
 }
 
 describe('SpaceListManager row menus', () => {
-    it('names every drag handle and menu button after its space or list', () => {
+    it('names every menu button after its space or list', () => {
         renderManager();
 
         for (const rowName of ['Home', 'Work', 'Groceries', 'Chores']) {
-            expect(screen.getByRole('button', { name: `Drag to reorder ${rowName}` })).toBeTruthy();
             expect(
                 screen.getByRole('button', { name: `More actions for ${rowName}` }),
             ).toBeTruthy();
@@ -312,7 +311,6 @@ describe('SpaceListManager shared spaces', () => {
 
         expect(screen.getAllByText('Shared with you')).toHaveLength(2);
         expect(screen.getByText(`${PERMISSION_LEVEL_LABELS.full} access`)).toBeTruthy();
-        expect(screen.queryByRole('button', { name: 'Drag to reorder Team' })).toBeNull();
         expect(screen.queryByRole('button', { name: 'More actions for Team' })).toBeNull();
         expect(screen.getByRole('button', { name: 'Leave space' })).toBeTruthy();
     });

@@ -7,12 +7,11 @@ import { useRowReorder } from '@/hooks/useRowReorder';
 const SPACES_PAGE_CACHE = { urls: ['/spaces'] };
 
 /**
- * Reordering of the user's own spaces and of the lists inside one space, by drag or by Move up / Move down.
+ * Reordering of the user's own spaces and of the lists inside one space, by Move up / Move down.
  *
  * @param {object[]} ownedSpaces - Spaces the user owns, in display order (shared spaces cannot be reordered)
  * @param {object[]} lists - Lists of every space
  * @returns {{
- *   handleDragEnd: (drag: { active: { id: string, data: object }, over: { id: string }|null }) => Promise<void>,
  *   moveSpaceNextTo: (spaceId: string, neighbourId: string) => Promise<void>,
  *   moveListNextTo: (list: object, neighbourId: string) => Promise<void>,
  * }} Handlers that save the new order. A space reorder never touches the lists cache, and the other way round.
@@ -59,14 +58,5 @@ export function useSpaceListReorder(ownedSpaces, lists) {
         return reorderListInSpace(list.id, list.space_id, neighbourId);
     }
 
-    function handleDragEnd({ active, over }) {
-        if (!over || active.id === over.id) return;
-        const dragType = active.data.current?.type;
-        if (dragType === 'space') return moveSpaceNextTo(active.id, over.id);
-        if (dragType === 'list') {
-            return reorderListInSpace(active.id, active.data.current.spaceId, over.id);
-        }
-    }
-
-    return { handleDragEnd, moveSpaceNextTo, moveListNextTo };
+    return { moveSpaceNextTo, moveListNextTo };
 }

@@ -1,11 +1,8 @@
 'use client';
 
-import { Fragment, memo, useMemo, useState } from 'react';
+import { Fragment, memo, useState } from 'react';
 import Link from 'next/link';
-import { useSortable } from '@dnd-kit/sortable';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { Check, ChevronDown, ChevronRight, Circle, GripVertical, Star } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Circle, Star } from 'lucide-react';
 import StatusPicker from '@/components/status/StatusPicker';
 import TaskRowTags from './TaskRowTags';
 import TaskRowRecurrence from './TaskRowRecurrence';
@@ -53,7 +50,6 @@ export function PriorityLine() {
 
 /**
  * Recursive row component - renders one task and all its children.
- * Each level of children is wrapped in a SortableContext for sibling DnD reordering.
  * Indentation: `--row-indent` per depth level (16px mobile, 24px desktop), set by the ancestor section.
  *
  * @param {object} props
@@ -80,20 +76,6 @@ function TaskRow({
     const expandKey = `task-row:${task.id}`;
     const isExpanded = useUIFlag(expandKey);
 
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-        id: task.id,
-        data: {
-            parentId: task.parent_id,
-            sublistId: task.sublist_id ?? null,
-            isPrioritised: Boolean(task.is_prioritised),
-        },
-    });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-    };
-
     // The star changes tier, so Move up and Move down never step across the prioritised line
     const moveTargets = onMoveTask
         ? getMoveTargets(
@@ -104,8 +86,6 @@ function TaskRow({
           )
         : null;
 
-    // A new array each render would make SortableContext re-render every child on any change
-    const childIds = useMemo(() => task.children.map((child) => child.id), [task.children]);
     const hasChildren = task.children && task.children.length > 0;
     const directChildCount = task.children?.length ?? 0;
     const isSubtaskCapReached =
@@ -139,11 +119,7 @@ function TaskRow({
     const nestedRowPadding = depth > 0 ? 'var(--row-indent, 24px)' : 0;
 
     return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className={isDragging ? 'opacity-50 relative z-10' : ''}
-        >
+        <div>
             {/* Task row - flat, hairline-separated: no per-row card background or radius */}
             <div
                 onClick={handleRowClick}
@@ -153,16 +129,6 @@ function TaskRow({
             >
                 {/* h-6 matches the 3-dot button so these controls centre on the title line, not the whole two-row block */}
                 <div data-row-space className="flex h-6 flex-shrink-0 items-center gap-1.5">
-                    {/* Drag handle - always visible (mobile has no hover to reveal it on) */}
-                    <button
-                        {...listeners}
-                        {...attributes}
-                        className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-3 -m-3 flex-shrink-0"
-                        aria-label={`Drag to reorder ${task.title}`}
-                    >
-                        <GripVertical className="h-3.5 w-3.5" />
-                    </button>
-
                     {/* Hidden below lg - mobile operates entirely through the 3-dot menu, which has the same action */}
                     <button
                         onClick={handleToggleComplete}
@@ -321,25 +287,23 @@ function TaskRow({
                         />
                     )}
 
-                    <SortableContext items={childIds} strategy={verticalListSortingStrategy}>
-                        {task.children.map((child, childIndex) => (
-                            <Fragment key={child.id}>
-                                {isStartOfUnprioritisedTier(task.children, childIndex) && (
-                                    <PriorityTierDivider />
-                                )}
-                                <TaskRow
-                                    task={child}
-                                    depth={depth + 1}
-                                    listId={listId}
-                                    currentUserId={currentUserId}
-                                    myPermission={myPermission}
-                                    maxSubtasksPerParent={maxSubtasksPerParent}
-                                    siblingTasks={task.children}
-                                    onMoveTask={onMoveTask}
-                                />
-                            </Fragment>
-                        ))}
-                    </SortableContext>
+                    {task.children.map((child, childIndex) => (
+                        <Fragment key={child.id}>
+                            {isStartOfUnprioritisedTier(task.children, childIndex) && (
+                                <PriorityTierDivider />
+                            )}
+                            <TaskRow
+                                task={child}
+                                depth={depth + 1}
+                                listId={listId}
+                                currentUserId={currentUserId}
+                                myPermission={myPermission}
+                                maxSubtasksPerParent={maxSubtasksPerParent}
+                                siblingTasks={task.children}
+                                onMoveTask={onMoveTask}
+                            />
+                        </Fragment>
+                    ))}
                 </div>
             )}
         </div>

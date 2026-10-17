@@ -53,28 +53,6 @@ function renderManager() {
     );
 }
 
-describe('StatusManager drag handles', () => {
-    it('puts the sortable semantics on each drag handle', () => {
-        renderManager();
-
-        const handles = screen.getAllByRole('button', { name: /Drag to reorder/ });
-        expect(handles).toHaveLength(2);
-        for (const handle of handles) {
-            expect(handle.getAttribute('aria-roledescription')).toBe('sortable');
-        }
-    });
-
-    it('keeps the row itself out of the tab order, since it only holds other controls', () => {
-        const { container } = renderManager();
-
-        const sortableElements = container.querySelectorAll('[aria-roledescription="sortable"]');
-        expect(sortableElements).toHaveLength(2);
-        for (const element of sortableElements) {
-            expect(element.tagName).toBe('BUTTON');
-        }
-    });
-});
-
 function openRowMenu(statusName) {
     fireEvent.pointerDown(screen.getByRole('button', { name: `More actions for ${statusName}` }), {
         button: 0,
@@ -83,11 +61,11 @@ function openRowMenu(statusName) {
 }
 
 describe('StatusManager row menu', () => {
-    it('names each drag handle after its status', () => {
+    it('names each menu button after its status', () => {
         renderManager();
 
-        expect(screen.getByRole('button', { name: 'Drag to reorder To do' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: 'Drag to reorder Doing' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'More actions for To do' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'More actions for Doing' })).toBeTruthy();
     });
 
     it('offers Edit, Move up, Move down and Delete in one menu', async () => {

@@ -51,22 +51,6 @@ describe('useLabelReorder', () => {
         expect(bustPageCache).toHaveBeenCalledWith({ prefixes: ['/lists/'] });
     });
 
-    it('turns a drop on another row into a move, and ignores a drop on itself or on nothing', async () => {
-        const saveOrder = vi.fn().mockResolvedValue({ error: null });
-        const { result: hookResult } = renderLabelReorder('statuses', saveOrder);
-
-        await act(() => hookResult.current.handleDragEnd({ active: { id: 'a' }, over: null }));
-        await act(() =>
-            hookResult.current.handleDragEnd({ active: { id: 'a' }, over: { id: 'a' } }),
-        );
-        expect(saveOrder).not.toHaveBeenCalled();
-
-        await act(() =>
-            hookResult.current.handleDragEnd({ active: { id: 'a' }, over: { id: 'b' } }),
-        );
-        expect(saveOrder).toHaveBeenCalledWith('space-1', ['b', 'a', 'c']);
-    });
-
     it('shows the first refusal and does not confirm', async () => {
         const saveOrder = vi.fn().mockResolvedValue({ error: 'Not allowed' });
         const { result: hookResult } = renderLabelReorder('tags', saveOrder);
