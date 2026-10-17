@@ -22,9 +22,6 @@
         "perf:realload:prod": "node scripts/perf-realload.mjs https://task-tracker-ashy-one.vercel.app/lists/e92f917d-721e-40ee-978e-65c34f739f66"
     },
     "dependencies": {
-        "@dnd-kit/core": "^6.3.1",
-        "@dnd-kit/sortable": "^10.0.0",
-        "@dnd-kit/utilities": "^3.2.2",
         "@supabase/ssr": "^0.10.2",
         "@supabase/supabase-js": "^2.116.0",
         "@tanstack/react-query": "^5.99.0",
