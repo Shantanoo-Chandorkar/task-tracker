@@ -11,8 +11,8 @@ Task Tracker is a mobile-first, installable task manager with nested subtasks, i
 - **Home screen** - priority tasks, recent tasks, recent lists and sublists, with quick actions (new task, spaces, search)
 - **Nested tasks** - subtasks up to 3 levels deep, grouped by status with collapsible sections
 - **Statuses per space** - default To Do / In Progress / Done plus custom statuses with colours
-- **Priority** - star a task to float it above the rest of its siblings; a starred parent carries its subtasks with it. Drag reordering works within each tier
-- **Drag and drop** - reorder sibling tasks, spaces, lists and sublists
+- **Priority** - star a task to float it above the rest of its siblings; a starred parent carries its subtasks with it. Move up/down reordering stays within each tier
+- **Reorder** - Move up/down for sibling tasks, spaces, lists and sublists
 - **Rearrange** - promote a task, or move it anywhere via a searchable destination list
 - **Duplicate** - clones a task and its whole subtree (Ctrl+D)
 - **Recurring tasks** - daily, weekly, monthly or yearly with custom intervals; a daily cron spawns the next instance
@@ -36,7 +36,6 @@ Task Tracker is a mobile-first, installable task manager with nested subtasks, i
 | Styling / UI               | Tailwind CSS v4, shadcn/ui on Radix                                          |
 | Database and auth          | Supabase (PostgreSQL, Row Level Security, Supabase Auth via `@supabase/ssr`) |
 | Server state               | TanStack Query v5                                                            |
-| Drag and drop              | @dnd-kit/sortable                                                            |
 | Rich text                  | TipTap, sanitised with `xss`                                                 |
 | Recurrence                 | rrule + date-fns                                                             |
 | Email                      | Brevo SMTP through nodemailer                                                |
