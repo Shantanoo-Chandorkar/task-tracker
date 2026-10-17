@@ -5,15 +5,17 @@ import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 /**
  * Reads every task matching a scope filter, paged so an export past the row cap is never cut short.
  *
- * @param {object} supabase - Supabase server client
- * @param {(tasksQuery: object) => object} applyScopeFilter - Adds the scope's `.eq`/`.in` filter to a tasks query
- * @returns {Promise<{ data: object[]|null, error: object|null }>} Every matching task, or the query error
+ * @param {SupabaseClient} supabase - Supabase server client
+ * @param {(tasksQuery: Record<string, any>) => Record<string, any>} applyScopeFilter - Adds the scope's `.eq`/`.in` filter to a tasks query
+ * @returns {Promise<{ data: Record<string, any>[]|null, error: Record<string, any>|null }>} Every matching task, or the query error
  */
 function fetchAllScopedTasks(supabase, applyScopeFilter) {
-    return fetchAllRows(({ from, to }) =>
-        applyScopeFilter(supabase.from('tasks').select('*'))
-            .order('id', { ascending: true })
-            .range(from, to),
+    return fetchAllRows(
+        /** @type {(range: { from: number, to: number }) => any} */
+        ({ from, to }) =>
+            applyScopeFilter(supabase.from('tasks').select('*'))
+                .order('id', { ascending: true })
+                .range(from, to),
     );
 }
 
@@ -21,8 +23,8 @@ function fetchAllScopedTasks(supabase, applyScopeFilter) {
  * Finds the sublist a task effectively belongs to - only root tasks carry `sublist_id`
  * directly, so a nested task inherits its root ancestor's sublist.
  *
- * @param {object} task - Task to resolve
- * @param {object[]} flatList - Flat list containing `task` and its ancestors
+ * @param {Record<string, any>} task - Task to resolve
+ * @param {Record<string, any>[]} flatList - Flat list containing `task` and its ancestors
  * @returns {string|null} Effective sublist id, or null if the task isn't under a sublist
  */
 function rootSublistId(task, flatList) {
@@ -36,13 +38,13 @@ function rootSublistId(task, flatList) {
  * Enriches flat tasks with human-readable context (space/list/sublist/ancestor names) instead
  * of raw ids, per the export requirement that titles - not ids - are what users need to see.
  *
- * @param {object[]} flatList - Flat tasks to enrich (ancestors must be present for parent_path)
+ * @param {Record<string, any>[]} flatList - Flat tasks to enrich (ancestors must be present for parent_path)
  * @param {object} context
  * @param {string|null} context.spaceName
  * @param {Map<string, string>} context.listNameById
  * @param {Map<string, string>} context.sublistNameById
  * @param {Map<string, string>} context.statusNameById
- * @returns {object[]} Export-ready rows; `id`/`parent_id` stay for `flatToTree` linking, stripped by formatters
+ * @returns {Record<string, any>[]} Export-ready rows; `id`/`parent_id` stay for `flatToTree` linking, stripped by formatters
  */
 function enrichTasks(flatList, { spaceName, listNameById, sublistNameById, statusNameById }) {
     return flatList.map((task) => {
@@ -61,7 +63,7 @@ function enrichTasks(flatList, { spaceName, listNameById, sublistNameById, statu
             depth: task.depth,
             space: spaceName,
             list: listNameById.get(task.list_id) ?? null,
-            sublist: sublistNameById.get(rootSublistId(task, flatList)) ?? null,
+            sublist: sublistNameById.get(rootSublistId(task, flatList) ?? '') ?? null,
             parent_path: ancestorTitles.length > 0 ? ancestorTitles.join(' > ') : null,
             parent_id: task.parent_id ?? null,
         };
@@ -74,11 +76,11 @@ function enrichTasks(flatList, { spaceName, listNameById, sublistNameById, statu
  * Adding a new scope type only means adding a case below - every caller (CSV/JSON formatting,
  * the UI trigger) stays unchanged.
  *
- * @param {object} supabase - Supabase server client
+ * @param {SupabaseClient} supabase - Supabase server client
  * @param {object} scope
  * @param {'list'|'sublist'|'space'} scope.type
  * @param {string} scope.id
- * @returns {Promise<{scopeName: string, rows: object[]}|null>} Null if the scope id doesn't exist
+ * @returns {Promise<{scopeName: string, rows: Record<string, any>[]}|null>} Null if the scope id doesn't exist
  * @throws {Error} Generic SERVER_LOAD_FAILED error when a read fails, so a partial file is never served
  */
 export async function resolveExportScope(supabase, { type, id }) {

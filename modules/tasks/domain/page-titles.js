@@ -9,10 +9,12 @@ import { loadSpacesAndLists } from '@/lib/app-shell-data';
 export async function loadListName(listId) {
     try {
         const { lists } = await loadSpacesAndLists();
-        return lists.find((list) => list.id === listId)?.name ?? null;
+        return lists.find((/** @type {any} */ list) => list.id === listId)?.name ?? null;
     } catch (thrown) {
         // A title is not worth an error page; the page itself surfaces the real failure
-        console.error('[page-titles] could not read lists', { detail: thrown?.message });
+        console.error('[page-titles] could not read lists', {
+            detail: thrown instanceof Error ? thrown.message : undefined,
+        });
         return null;
     }
 }

@@ -25,8 +25,8 @@ import {
 /**
  * Cleans the title, priority and description the client sent, in the order the caller should hear about problems.
  *
- * @param {object} pickedUpdates - Allowlisted fields from `pickTaskUpdates`
- * @returns {{ failure: { error: string, code?: string } }|{ updates: object }} Cleaned fields, or why one failed
+ * @param {Record<string, any>} pickedUpdates - Allowlisted fields from `pickTaskUpdates`
+ * @returns {{ failure?: { error: string, code?: string }, updates?: Record<string, any> }} Cleaned fields, or why one failed
  */
 function cleanUpdateFields(pickedUpdates) {
     const updates = { ...pickedUpdates };
@@ -54,7 +54,7 @@ function cleanUpdateFields(pickedUpdates) {
 /**
  * Refuses marking a task done while any of its subtasks is not done.
  *
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {string} taskId - Task being updated
  * @param {string} statusId - Status the task is being moved to
  * @returns {Promise<{ error: string }|null>} The refusal, or null to proceed
@@ -76,7 +76,7 @@ async function blockDoneWithOpenSubtasks(supabase, taskId, statusId) {
 /**
  * Refuses moving a task into a sublist when it is a subtask or the sublist belongs to another list.
  *
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {string} taskId - Task being updated
  * @param {string} sublistId - Sublist the task is being placed in
  * @returns {Promise<{ error: string }|null>} The refusal, or null to proceed
@@ -94,9 +94,9 @@ async function blockInvalidSublistChange(supabase, taskId, sublistId) {
 /**
  * Adds the recurrence bookkeeping an update needs: a restarted count for a new schedule, and the next due date.
  *
- * @param {object} updates - Cleaned fields about to be written
- * @param {object} existingTask - The task row before this update
- * @returns {object} The updates, plus `recurrence_spawned_count` and `next_occurrence` where they apply
+ * @param {Record<string, any>} updates - Cleaned fields about to be written
+ * @param {Record<string, any>} existingTask - The task row before this update
+ * @returns {Record<string, any>} The updates, plus `recurrence_spawned_count` and `next_occurrence` where they apply
  */
 function withRecurrenceSchedule(updates, existingTask) {
     if (updates.is_recurring === false) return { ...updates, next_occurrence: null };
@@ -121,7 +121,7 @@ function withRecurrenceSchedule(updates, existingTask) {
  * Logs a failed task update and maps it to a user-safe result.
  *
  * @param {string} taskId - Task being updated, for the log line
- * @param {object} updates - Fields that were being written, logged by name only
+ * @param {Record<string, any>} updates - Fields that were being written, logged by name only
  * @param {{ code?: string, message?: string }|null} updateError - Error from the update, null when no row came back
  * @returns {{ data: null, error: string, code?: string }} Write-limit or generic failure
  */
@@ -152,9 +152,9 @@ function blockInvalidVersionStamp(expectedUpdatedAt) {
 /**
  * Explains why a version-checked update changed no row: the task is gone, or it changed after the client loaded it.
  *
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {string} taskId - Task being updated
- * @returns {Promise<{ data: object|null, error: string, code?: string, currentTask?: object }>} The refusal
+ * @returns {Promise<{ data: Record<string, any>|null, error: string, code?: string, currentTask?: Record<string, any> }>} The refusal
  */
 async function describeRefusedVersionedUpdate(supabase, taskId) {
     const { data: currentTask } = await supabase
@@ -176,11 +176,11 @@ async function describeRefusedVersionedUpdate(supabase, taskId) {
 /**
  * Writes the update; with a version stamp it only applies if the task is still at that version.
  *
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {string} taskId - Task being updated
- * @param {object} updates - Cleaned fields to write
+ * @param {Record<string, any>} updates - Cleaned fields to write
  * @param {string|undefined} expectedUpdatedAt - Version the client loaded, or nothing to overwrite regardless
- * @returns {Promise<{ data: object|null, error: string|null, code?: string, currentTask?: object }>} The saved row
+ * @returns {Promise<{ data: Record<string, any>|null, error: string|null, code?: string, currentTask?: Record<string, any> }>} The saved row
  */
 async function saveTaskUpdate(supabase, taskId, updates, expectedUpdatedAt) {
     const isVersionChecked = expectedUpdatedAt !== undefined && expectedUpdatedAt !== null;
@@ -199,11 +199,11 @@ async function saveTaskUpdate(supabase, taskId, updates, expectedUpdatedAt) {
  * Updates specific fields on an existing task.
  *
  * @param {string} taskId - Task ID to update
- * @param {object} fields - Partial task fields to update
- * @param {object} [options]
+ * @param {Record<string, any>} fields - Partial task fields to update
+ * @param {Record<string, any>} [options]
  * @param {string} [options.expectedUpdatedAt] - The `updated_at` the caller loaded; a newer task is refused with
  *   `TASK_EDIT_CONFLICT` and returned as `currentTask`. Leave out to overwrite regardless.
- * @returns {{ data: object|null, error: string|null, code: string|undefined, currentTask: object|undefined }}
+ * @returns {{ data: Record<string, any>|null, error: string|null, code: string|undefined, currentTask: Record<string, any>|undefined }}
  */
 export const updateTask = withAuthenticatedAction(
     '[tasks] update',
@@ -211,14 +211,16 @@ export const updateTask = withAuthenticatedAction(
     async (user, supabase, taskId, fields, options = {}) => {
         if (!taskId) return { data: null, error: 'Task ID is required' };
 
-        const { data: existingTask } = await supabase
+        const { data: existingTaskRow } = await supabase
             .from('tasks')
             .select(
                 'created_by, is_recurring, recurrence_rule, recurrence_spawned_count, lists(space_id, spaces(require_due_date))',
             )
             .eq('id', taskId)
             .maybeSingle();
-        if (!existingTask) return { data: null, error: 'Task not found' };
+        if (!existingTaskRow) return { data: null, error: 'Task not found' };
+        // The generic (schema-less) SupabaseClient types every joined relation as an array
+        const existingTask = /** @type {Record<string, any>} */ (existingTaskRow);
 
         const permissionBlock = await blockWriteInSpace(
             supabase,
@@ -241,26 +243,27 @@ export const updateTask = withAuthenticatedAction(
 
         const cleanedFields = cleanUpdateFields(pickTaskUpdates(fields));
         if (cleanedFields.failure) return { data: null, ...cleanedFields.failure };
+        const pickedUpdates = cleanedFields.updates ?? {};
 
-        if (cleanedFields.updates.status_id) {
+        if (pickedUpdates.status_id) {
             const doneBlock = await blockDoneWithOpenSubtasks(
                 supabase,
                 taskId,
-                cleanedFields.updates.status_id,
+                pickedUpdates.status_id,
             );
             if (doneBlock) return { data: null, ...doneBlock };
         }
 
-        if (cleanedFields.updates.sublist_id) {
+        if (pickedUpdates.sublist_id) {
             const sublistBlock = await blockInvalidSublistChange(
                 supabase,
                 taskId,
-                cleanedFields.updates.sublist_id,
+                pickedUpdates.sublist_id,
             );
             if (sublistBlock) return { data: null, ...sublistBlock };
         }
 
-        const updates = withRecurrenceSchedule(cleanedFields.updates, existingTask);
+        const updates = withRecurrenceSchedule(pickedUpdates, existingTask);
         return saveTaskUpdate(supabase, taskId, updates, options?.expectedUpdatedAt);
     },
 );

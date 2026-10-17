@@ -26,8 +26,8 @@ import { loadTaskForTagWrite } from '@/modules/tasks/load-task-for-tag-write';
 /**
  * Checks the fields that need no database read, in the order the caller should hear about them.
  *
- * @param {object} fields - Fields sent to `createTask`
- * @returns {{ failure: { error: string } }|{ title: string, description: string|null }} Cleaned text, or why it failed
+ * @param {Record<string, any>} fields - Fields sent to `createTask`
+ * @returns {{ failure?: { error: string }, title?: string, description?: string|null }} Cleaned text, or why it failed
  */
 function checkCreateFields(fields) {
     const titleCheck = checkTaskTitle(fields.title);
@@ -45,8 +45,8 @@ function checkCreateFields(fields) {
 /**
  * Checks what the space and the target rows allow: permission, due date, priority, subtask cap and sublist.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} fields - Fields sent to `createTask`
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {Record<string, any>} fields - Fields sent to `createTask`
  * @returns {Promise<{ error: string, code?: string }|null>} The refusal, or null to proceed
  * @throws {Error} Generic SERVER_LOAD_FAILED error when a permission or cap read fails
  */
@@ -86,8 +86,8 @@ async function blockCreateBySpaceRules(supabase, fields) {
 /**
  * Uses the position the client sent, or appends the task after its last sibling.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} fields - Fields sent to `createTask`
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {Record<string, any>} fields - Fields sent to `createTask`
  * @returns {Promise<number>} The position to store
  */
 async function resolveNewTaskPosition(supabase, fields) {
@@ -125,10 +125,10 @@ function toCreateTaskFailure(insertError, listId) {
 /**
  * Creates the task for an already signed-in user: validates, checks the space rules and inserts the row.
  *
- * @param {object} user - The signed-in user
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} fields - Fields sent to `createTask`
- * @returns {Promise<{ data: object|null, error: string|null, code?: string }>} The task, or why not
+ * @param {AuthUser} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {Record<string, any>} fields - Fields sent to `createTask`
+ * @returns {Promise<{ data: Record<string, any>|null, error: string|null, code?: string }>} The task, or why not
  */
 async function createTaskForUser(user, supabase, fields) {
     const clientId = readClientId(fields);
@@ -197,8 +197,8 @@ async function createTaskForUser(user, supabase, fields) {
  * @param {string|null} [fields.due_date] - ISO date string (YYYY-MM-DD), or null
  * @param {boolean} [fields.is_prioritised] - Defaults to false
  * @param {boolean} [fields.is_recurring]
- * @param {object} [fields.recurrence_rule]
- * @returns {{ data: object|null, error: string|null, code: string|undefined }}
+ * @param {Record<string, any>} [fields.recurrence_rule]
+ * @returns {{ data: Record<string, any>|null, error: string|null, code: string|undefined }}
  */
 export const createTask = withAuthenticatedAction(
     '[tasks] create',
@@ -209,9 +209,9 @@ export const createTask = withAuthenticatedAction(
 /**
  * Attaches the chosen tags to a just-saved task, reporting a failure instead of throwing.
  *
- * @param {object} user - The signed-in user
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} task - The saved task
+ * @param {AuthUser} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {Record<string, any>} task - The saved task
  * @param {unknown} tagIds - Tag ids sent by the client
  * @returns {Promise<string[]>} Messages for the tags that could not be attached, empty when all went well
  */
@@ -225,7 +225,7 @@ async function attachTagsToSavedTask(user, supabase, task, tagIds) {
     } catch (thrown) {
         console.error('[tasks] create with tags: attach threw', {
             taskId: task.id,
-            detail: thrown?.message,
+            detail: thrown instanceof Error ? thrown.message : undefined,
         });
         return ['Could not add the tags'];
     }
@@ -236,9 +236,9 @@ async function attachTagsToSavedTask(user, supabase, task, tagIds) {
  *
  * A failed tag attach never rolls back the task - the failure is reported in `tagErrors` instead.
  *
- * @param {object} fields - Same fields as `createTask`, plus:
+ * @param {Record<string, any>} fields - Same fields as `createTask`, plus:
  * @param {string[]} [fields.tagIds] - Ids of existing tags of the space, attached after the task is created
- * @returns {{ data: object|null, error: string|null, tagErrors: string[] }}
+ * @returns {{ data: Record<string, any>|null, error: string|null, tagErrors: string[] }}
  */
 export const createTaskWithTags = withAuthenticatedAction(
     '[tasks] create with tags',

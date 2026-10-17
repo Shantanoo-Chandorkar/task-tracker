@@ -4,10 +4,11 @@
  * Inlined from `@dnd-kit/sortable`'s `arrayMove` so the reorder engine has no drag dependency.
  * A negative `toIndex` counts from the end, matching the original.
  *
- * @param {object[]} rows - Rows in their current order.
+ * @template T
+ * @param {T[]} rows - Rows in their current order.
  * @param {number} fromIndex - Index of the row to move.
  * @param {number} toIndex - Index the row should end up at.
- * @returns {object[]} A new array with the row moved; the input is never mutated.
+ * @returns {T[]} A new array with the row moved; the input is never mutated.
  */
 export function arrayMove(rows, fromIndex, toIndex) {
     const reordered = rows.slice();

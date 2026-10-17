@@ -19,7 +19,7 @@ export function getDeleteToasts(type) {
 /**
  * Words the confirm popup for deleting a space or list, or leaving a space.
  *
- * @param {{ type: 'space'|'list'|'leave-space', name: string, counts: object|null }|null} deleteTarget - What the
+ * @param {{ type: 'space'|'list'|'leave-space', name: string, counts: Record<string, any>|null }|null} deleteTarget - What the
  *   user chose; `counts` holds `{ lists, tasks }` for a space and `{ tasks }` for a list, or null when unknown
  * @returns {{ title: string, description: string, confirmLabel: string }} Texts for the popup; a closed popup
  *   (null target) still gets the plain wording

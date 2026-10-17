@@ -11,7 +11,8 @@ export function getPositionBetween(beforePosition, afterPosition) {
     const nextSiblingPosition = afterPosition ?? null;
 
     if (previousSiblingPosition === null && nextSiblingPosition === null) return 1;
-    if (previousSiblingPosition === null) return nextSiblingPosition / 2;
+    // Both-null already returned above, so a null previous position means next is the only one set
+    if (previousSiblingPosition === null) return /** @type {number} */ (nextSiblingPosition) / 2;
     if (nextSiblingPosition === null) return previousSiblingPosition + 1;
     return (previousSiblingPosition + nextSiblingPosition) / 2;
 }

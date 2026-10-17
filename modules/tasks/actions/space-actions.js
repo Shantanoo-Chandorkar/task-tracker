@@ -15,7 +15,7 @@ import { SPACE_SETTINGS_OWNER_ONLY, SPACE_SUBTASK_CAP_INVALID } from '@/modules/
  * @param {string} [fields.id] - Optional client-made UUID; a retry with the same id returns the first try's row
  * @param {string} fields.name - Required space name
  * @param {string} [fields.color] - Hex color string, defaults to grey
- * @returns {{ data: object|null, error: string|null }}
+ * @returns {{ data: Record<string, any>|null, error: string|null }}
  */
 export const createSpace = withAuthenticatedAction(
     '[spaces] create',
@@ -67,8 +67,8 @@ export const createSpace = withAuthenticatedAction(
  * Updates specific fields on a space (name, color, position, require_due_date, max_subtasks_per_parent).
  *
  * @param {string} id - Space ID to update
- * @param {object} fields - Partial space fields to update
- * @returns {{ data: object|null, error: string|null, code: string|undefined }}
+ * @param {Record<string, any>} fields - Partial space fields to update
+ * @returns {{ data: Record<string, any>|null, error: string|null, code: string|undefined }}
  */
 export const updateSpace = withAuthenticatedAction(
     '[spaces] update',

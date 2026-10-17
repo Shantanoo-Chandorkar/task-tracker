@@ -5,9 +5,9 @@ import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
  *
  * Counted in the database (RLS still applies) so it stays correct past the PostgREST row cap.
  *
- * @param {object} supabase - Supabase server client
- * @param {object[]} lists - Lists to annotate
- * @returns {Promise<object[]>} The same lists, each with a `task_count` added
+ * @param {SupabaseClient} supabase - Supabase server client
+ * @param {Record<string, any>[]} lists - Lists to annotate
+ * @returns {Promise<Record<string, any>[]>} The same lists, each with a `task_count` added
  * @throws {Error} Generic SERVER_LOAD_FAILED error when the count query fails
  */
 export async function attachTaskCounts(supabase, lists) {

@@ -31,7 +31,7 @@ export const deleteTask = withAuthenticatedAction(
 
         const permissionBlock = await blockWriteInSpace(
             supabase,
-            existingTask.lists?.space_id,
+            /** @type {any} */ (existingTask).lists?.space_id,
             user.id,
             existingTask.created_by,
         );
@@ -76,7 +76,7 @@ export const deleteTaskAndReparentChildren = withAuthenticatedAction(
 
         const permissionBlock = await blockWriteInSpace(
             supabase,
-            task.lists?.space_id,
+            /** @type {any} */ (task).lists?.space_id,
             user.id,
             task.created_by,
         );

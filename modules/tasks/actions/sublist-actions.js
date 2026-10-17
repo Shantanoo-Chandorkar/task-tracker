@@ -20,7 +20,7 @@ import {
  * @param {string} fields.name - Required sublist name
  * @param {string} fields.list_id - Required parent list ID
  * @param {string} [fields.color] - Hex color string, defaults to grey
- * @returns {{ data: object|null, error: string|null }}
+ * @returns {{ data: Record<string, any>|null, error: string|null }}
  */
 export const createSublist = withAuthenticatedAction(
     '[sublists] create',
@@ -82,8 +82,8 @@ export const createSublist = withAuthenticatedAction(
  * Updates specific fields on a sublist (name, color, position).
  *
  * @param {string} sublistId - Sublist ID to update
- * @param {object} fields - Partial sublist fields to update
- * @returns {{ data: object|null, error: string|null }}
+ * @param {Record<string, any>} fields - Partial sublist fields to update
+ * @returns {{ data: Record<string, any>|null, error: string|null }}
  */
 export const updateSublist = withAuthenticatedAction(
     '[sublists] update',
@@ -107,7 +107,7 @@ export const updateSublist = withAuthenticatedAction(
 
         const permissionLevel = await resolveSpacePermission(
             supabase,
-            existingSublist.lists?.space_id,
+            /** @type {any} */ (existingSublist).lists?.space_id,
         );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingSublist.created_by === user.id,
@@ -158,7 +158,7 @@ export const deleteSublist = withAuthenticatedAction(
 
         const permissionLevel = await resolveSpacePermission(
             supabase,
-            existingSublist.lists?.space_id,
+            /** @type {any} */ (existingSublist).lists?.space_id,
         );
         const permissionBlock = blockWriteForPermission(permissionLevel, {
             isOwnRow: existingSublist.created_by === user.id,

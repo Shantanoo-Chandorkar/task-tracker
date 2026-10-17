@@ -15,11 +15,11 @@ import { toTaskRateLimitResult } from '@/modules/tasks/domain/task-rate-limit';
  *
  * Gated on root-task ownership only - RLS still blocks any descendant the caller doesn't own.
  *
- * @param {object} user - Signed-in user
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - Signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {string} taskId - Root task of the cascade
  * @param {object} cascade - What this cascade writes
- * @param {(supabase: object, spaceId: string) => Promise<string|null>} cascade.lookupStatusId - Finds the status id
+ * @param {(supabase: SupabaseClient, spaceId: string) => Promise<string|null>} cascade.lookupStatusId - Finds the status id
  * @param {string} cascade.missingStatusError - Message when the space has no such status
  * @param {string} cascade.logLabel - Prefix for the failure log line
  * @param {string} cascade.failureError - Message for an unexpected database failure

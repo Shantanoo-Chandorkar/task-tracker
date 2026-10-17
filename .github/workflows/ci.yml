@@ -20,6 +20,8 @@ jobs:
 
             - run: npm run lint
 
+            - run: npm run typecheck
+
             - run: npm run format:check
 
             # Vitest only: Playwright specs are deliberately never run in CI, they take too long

@@ -6,7 +6,7 @@ import { arrayMove } from './array-move';
  * @param {{ id: string }[]} rows - The sibling rows in the order they are shown
  * @param {string} activeId - Id of the dragged row
  * @param {string} overId - Id of the row it was dropped on
- * @returns {{ reorderedRows: object[], reorderedIds: string[] }|null} The rows in their new order, or null when
+ * @returns {{ reorderedRows: Record<string, any>[], reorderedIds: string[] }|null} The rows in their new order, or null when
  *   either id is not in the group (the list can change mid-drag)
  */
 export function planRowReorder(rows, activeId, overId) {

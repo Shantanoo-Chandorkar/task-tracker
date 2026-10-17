@@ -9,10 +9,12 @@ import {
     parseISO,
 } from 'date-fns';
 
+/** @type {{ weekStartsOn: 1 }} */
 const WEEK_STARTS_ON_MONDAY = { weekStartsOn: 1 };
 const OLDER_THAN_DAYS = 30;
 
 const FILTER_DIMENSIONS = ['statusIds', 'tagIds', 'due', 'created', 'memberIds'];
+/** @type {Record<string, string>} */
 const URL_PARAM_BY_DIMENSION = {
     statusIds: 'status',
     tagIds: 'tag',
@@ -51,18 +53,22 @@ export const CREATED_BUCKETS = [
  * @returns {{statusIds: string[], tagIds: string[], due: string[], created: string[], memberIds: string[]}}
  */
 export function parseTaskFilters(searchParams) {
+    /** @type {Record<string, string[]>} */
     const filters = {};
     for (const dimension of FILTER_DIMENSIONS) {
         const raw = searchParams.get(URL_PARAM_BY_DIMENSION[dimension]);
         filters[dimension] = raw ? raw.split(',').filter(Boolean) : [];
     }
-    return filters;
+    // Every dimension above was just assigned, so the shape always matches the named return type
+    return /** @type {{statusIds: string[], tagIds: string[], due: string[], created: string[], memberIds: string[]}} */ (
+        filters
+    );
 }
 
 /**
  * Builds the query string for a filters object, omitting any empty dimension.
  *
- * @param {object} filters - Same shape as `parseTaskFilters` returns
+ * @param {Record<string, any>} filters - Same shape as `parseTaskFilters` returns
  * @returns {string} Query string, e.g. "status=done&tag=urgent" (no leading "?")
  */
 export function filtersToSearchString(filters) {
@@ -77,7 +83,7 @@ export function filtersToSearchString(filters) {
 /**
  * Total number of individually selected filter values across every dimension.
  *
- * @param {object} filters - Same shape as `parseTaskFilters` returns
+ * @param {Record<string, any>} filters - Same shape as `parseTaskFilters` returns
  * @returns {number} Count shown as the filter sheet trigger's badge
  */
 export function countActiveFilters(filters) {
@@ -90,7 +96,7 @@ export function countActiveFilters(filters) {
 /**
  * Whether a task falls in the "overdue" bucket - has a due date in the past and isn't done.
  *
- * @param {object} task - Task with a `due_date` and `status_id`
+ * @param {Record<string, any>} task - Task with a `due_date` and `status_id`
  * @param {string|null} doneStatusId - The space's "done" status id, or null if unconfigured
  * @returns {boolean}
  */
@@ -103,7 +109,7 @@ export function isOverdue(task, doneStatusId) {
 /**
  * Whether a task's due date is today.
  *
- * @param {object} task - Task with a `due_date`
+ * @param {Record<string, any>} task - Task with a `due_date`
  * @returns {boolean}
  */
 export function isDueToday(task) {
@@ -118,7 +124,7 @@ export function isDueToday(task) {
 /**
  * Whether a task's due date falls within the current week (Monday-Sunday).
  *
- * @param {object} task - Task with a `due_date`
+ * @param {Record<string, any>} task - Task with a `due_date`
  * @returns {boolean}
  */
 export function isDueThisWeek(task) {
@@ -133,7 +139,7 @@ export function isDueThisWeek(task) {
 /**
  * Whether a task has no due date set.
  *
- * @param {object} task - Task with a `due_date`
+ * @param {Record<string, any>} task - Task with a `due_date`
  * @returns {boolean}
  */
 export function hasNoDueDate(task) {
@@ -143,7 +149,7 @@ export function hasNoDueDate(task) {
 /**
  * Whether a task was created today.
  *
- * @param {object} task - Task with a `created_at`
+ * @param {Record<string, any>} task - Task with a `created_at`
  * @returns {boolean}
  */
 export function isCreatedToday(task) {
@@ -158,7 +164,7 @@ export function isCreatedToday(task) {
 /**
  * Whether a task was created in the last 7 days - a rolling window, not a calendar-week boundary.
  *
- * @param {object} task - Task with a `created_at`
+ * @param {Record<string, any>} task - Task with a `created_at`
  * @returns {boolean}
  */
 export function isCreatedLast7Days(task) {
@@ -172,7 +178,7 @@ export function isCreatedLast7Days(task) {
 /**
  * Whether a task was created within the current week (Monday-Sunday).
  *
- * @param {object} task - Task with a `created_at`
+ * @param {Record<string, any>} task - Task with a `created_at`
  * @returns {boolean}
  */
 export function isCreatedThisWeek(task) {
@@ -187,7 +193,7 @@ export function isCreatedThisWeek(task) {
 /**
  * Whether a task was created within the current calendar month.
  *
- * @param {object} task - Task with a `created_at`
+ * @param {Record<string, any>} task - Task with a `created_at`
  * @returns {boolean}
  */
 export function isCreatedThisMonth(task) {
@@ -200,7 +206,7 @@ export function isCreatedThisMonth(task) {
 /**
  * Whether a task is older than a fixed 30-day rolling window - not a calendar-month boundary.
  *
- * @param {object} task - Task with a `created_at`
+ * @param {Record<string, any>} task - Task with a `created_at`
  * @returns {boolean}
  */
 export function isCreatedOlderThanMonth(task) {
@@ -208,6 +214,7 @@ export function isCreatedOlderThanMonth(task) {
     return isBefore(parseISO(task.created_at), subDays(new Date(), OLDER_THAN_DAYS));
 }
 
+/** @type {Record<string, (task: Record<string, any>, doneStatusId: string|null) => boolean>} */
 const DUE_BUCKET_PREDICATES = {
     overdue: isOverdue,
     today: isDueToday,
@@ -215,6 +222,7 @@ const DUE_BUCKET_PREDICATES = {
     none: (task) => hasNoDueDate(task),
 };
 
+/** @type {Record<string, (task: Record<string, any>) => boolean>} */
 const CREATED_BUCKET_PREDICATES = {
     today: isCreatedToday,
     last7days: isCreatedLast7Days,
@@ -227,8 +235,9 @@ const CREATED_BUCKET_PREDICATES = {
  * Whether a single task matches every active filter dimension (AND across dimensions, OR within).
  * A dimension with no values selected always passes.
  *
- * @param {object} task - Task to test (status_id, tags, due_date, created_at, created_by)
- * @param {object} filters - Same shape as `parseTaskFilters` returns
+ * @param {Record<string, any>} task - Task to test (status_id, tags, due_date, created_at, created_by)
+ * @param {{statusIds: string[], tagIds: string[], due: string[], created: string[], memberIds: string[]}} filters
+ *   Same shape as `parseTaskFilters` returns
  * @param {object} context
  * @param {string|null} context.doneStatusId - The space's "done" status id, for the overdue bucket
  * @returns {boolean}
@@ -239,7 +248,9 @@ export function taskMatchesFilters(task, filters, { doneStatusId }) {
     }
 
     if (filters.tagIds.length > 0) {
-        const taskTagIds = (task.tags ?? []).map((tag) => tag.id);
+        /** @type {Record<string, any>[]} */
+        const taskTags = task.tags ?? [];
+        const taskTagIds = taskTags.map((tag) => tag.id);
         if (!filters.tagIds.some((tagId) => taskTagIds.includes(tagId))) return false;
     }
 

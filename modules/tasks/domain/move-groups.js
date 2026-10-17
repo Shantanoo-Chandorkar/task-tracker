@@ -9,10 +9,10 @@ import { NESTING_MODE, FINITE_MAX_DEPTH } from '@/modules/tasks/domain/nesting-d
  * Works out where a task can be moved, grouped by sublist, for the "Move to..." sheet.
  *
  * @param {object} params
- * @param {object} params.task - The task that would move.
- * @param {object[]} params.flatList - Every task in the list, flat.
- * @param {object[]} params.sublists - The list's sublists.
- * @returns {{ id: string|null, name: string, color: string, roots: object[], canMoveToRoot: boolean }[]}
+ * @param {Record<string, any>} params.task - The task that would move.
+ * @param {Record<string, any>[]} params.flatList - Every task in the list, flat.
+ * @param {Record<string, any>[]} params.sublists - The list's sublists.
+ * @returns {{ id: string|null, name: string, color: string, roots: Record<string, any>[], canMoveToRoot: boolean }[]}
  *   Groups with something to pick, the task's current sublist first; `id` is null for the Main List.
  */
 export function buildMoveGroups({ task, flatList, sublists }) {
@@ -26,17 +26,20 @@ export function buildMoveGroups({ task, flatList, sublists }) {
     const moveTargetRoots = buildMoveTargetTree(flatList, task, maxAllowedDepth);
     const knownSublistIds = new Set(sublists.map((sublist) => sublist.id));
     // A root pointing at a sublist that no longer exists falls back to the Main List group.
+    /** @param {Record<string, any>} root */
     const getGroupIdForRoot = (root) =>
         knownSublistIds.has(root.sublist_id) ? root.sublist_id : null;
 
-    const targetGroups = [
+    /** @type {{id: string|null, name: string, color: string}[]} */
+    const targetGroupSeeds = [
         { id: null, name: 'Main List', color: 'var(--primary)' },
         ...sublists.map((sublist) => ({
             id: sublist.id,
             name: sublist.name,
             color: sublist.color,
         })),
-    ].map((group) => ({
+    ];
+    const targetGroups = targetGroupSeeds.map((group) => ({
         ...group,
         roots: moveTargetRoots.filter((root) => getGroupIdForRoot(root) === group.id),
     }));
@@ -45,7 +48,7 @@ export function buildMoveGroups({ task, flatList, sublists }) {
         targetGroups.find((targetGroup) => targetGroup.id === currentSublistId),
         ...targetGroups.filter((targetGroup) => targetGroup.id !== currentSublistId),
     ]
-        .filter(Boolean)
+        .filter((group) => group !== undefined)
         .map((group) => ({
             ...group,
             canMoveToRoot: isRootTask && group.id !== task.sublist_id,

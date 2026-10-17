@@ -1,6 +1,7 @@
 import { recurrenceRulesMatch } from '@/modules/tasks/domain/recurrence';
 
 // The fields the edit dialog writes, with the name the user sees; each says how to tell that it changed.
+/** @type {{ label: string, hasChanged: (before: Record<string, any>, after: Record<string, any>) => boolean }[]} */
 const EDITABLE_FIELDS = [
     { label: 'Title', hasChanged: (before, after) => (before.title ?? '') !== (after.title ?? '') },
     {
@@ -41,8 +42,8 @@ export function isValidVersionStamp(versionStamp) {
 /**
  * Names the edit-dialog fields that differ between the task the user opened and the task as it is now.
  *
- * @param {object} openedTask - The task as the dialog loaded it
- * @param {object} currentTask - The task as it is stored now
+ * @param {Record<string, any>} openedTask - The task as the dialog loaded it
+ * @param {Record<string, any>} currentTask - The task as it is stored now
  * @returns {string[]} Display names of the changed fields, empty when only something outside the dialog moved
  */
 export function describeTaskChanges(openedTask, currentTask) {

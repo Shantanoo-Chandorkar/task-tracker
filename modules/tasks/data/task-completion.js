@@ -3,7 +3,7 @@ import { findDescendantIds } from '@/modules/tasks/domain/task-relations';
 /**
  * Looks up the id of a space's built-in "done" status.
  *
- * @param {object} supabase - Supabase server client
+ * @param {SupabaseClient} supabase - Supabase server client
  * @param {string} spaceId - Space to look the done status up in
  * @returns {Promise<string|null>} The done status id, or null if not configured
  */
@@ -20,7 +20,7 @@ export async function getDoneStatusId(supabase, spaceId) {
 /**
  * Looks up the id of a space's default status - the target for an "uncomplete" cascade.
  *
- * @param {object} supabase - Supabase server client
+ * @param {SupabaseClient} supabase - Supabase server client
  * @param {string} spaceId - Space to look the default status up in
  * @returns {Promise<string|null>} The default status id, or null if not configured
  */
@@ -38,9 +38,9 @@ export async function getDefaultStatusId(supabase, spaceId) {
  * Fetches a task's list_id/space_id/created_by plus a lightweight id/parent_id view of every
  * task in that list - enough to walk the tree with `findDescendantIds` without pulling full rows.
  *
- * @param {object} supabase - Supabase server client
+ * @param {SupabaseClient} supabase - Supabase server client
  * @param {string} taskId - Task whose list-mates are being fetched
- * @returns {Promise<{ task: object|null, listTasks: object[] }>} The task row (with space_id, created_by) and its list's tree shape
+ * @returns {Promise<{ task: Record<string, any>|null, listTasks: Record<string, any>[] }>} The task row (with space_id, created_by) and its list's tree shape
  */
 export async function getTaskListTree(supabase, taskId) {
     const { data: task } = await supabase
@@ -50,7 +50,7 @@ export async function getTaskListTree(supabase, taskId) {
         .single();
     if (!task) return { task: null, listTasks: [] };
 
-    const { data: listTasks = [] } = await supabase
+    const { data: listTasksData } = await supabase
         .from('tasks')
         .select('id, parent_id')
         .eq('list_id', task.list_id);
@@ -58,10 +58,10 @@ export async function getTaskListTree(supabase, taskId) {
     return {
         task: {
             list_id: task.list_id,
-            space_id: task.lists?.space_id ?? null,
+            space_id: /** @type {any} */ (task).lists?.space_id ?? null,
             created_by: task.created_by,
         },
-        listTasks,
+        listTasks: listTasksData ?? [],
     };
 }
 
@@ -69,7 +69,7 @@ export async function getTaskListTree(supabase, taskId) {
  * Checks whether a task can be marked done - true only when every descendant, any depth,
  * is already in the done status.
  *
- * @param {object} supabase - Supabase server client
+ * @param {SupabaseClient} supabase - Supabase server client
  * @param {string} taskId - Task being marked done
  * @param {string} doneStatusId - The id of the "done" status
  * @returns {Promise<boolean>} Whether the task is safe to mark done
@@ -81,22 +81,22 @@ export async function canMarkTaskDone(supabase, taskId, doneStatusId) {
     const descendantIds = findDescendantIds(taskId, listTasks);
     if (descendantIds.size === 0) return true;
 
-    const { data: incompleteDescendants = [] } = await supabase
+    const { data: incompleteDescendants } = await supabase
         .from('tasks')
         .select('id')
         .in('id', Array.from(descendantIds))
         .neq('status_id', doneStatusId);
 
-    return incompleteDescendants.length === 0;
+    return (incompleteDescendants ?? []).length === 0;
 }
 
 /**
  * Returns descendant tasks (any depth) of a task that are not yet in the given done status.
  *
  * @param {string} taskId - Root task to check
- * @param {object[]} flatList - Flat array of all tasks
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks
  * @param {string} doneStatusId - The id of the "done" status
- * @returns {object[]} Descendant tasks still not done
+ * @returns {Record<string, any>[]} Descendant tasks still not done
  */
 export function findIncompleteDescendants(taskId, flatList, doneStatusId) {
     const descendantIds = findDescendantIds(taskId, flatList);
@@ -108,9 +108,9 @@ export function findIncompleteDescendants(taskId, flatList, doneStatusId) {
  * The inverse of `findIncompleteDescendants` - used to preview/perform an uncomplete cascade.
  *
  * @param {string} taskId - Root task to check
- * @param {object[]} flatList - Flat array of all tasks
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks
  * @param {string} doneStatusId - The id of the "done" status
- * @returns {object[]} Descendant tasks currently done
+ * @returns {Record<string, any>[]} Descendant tasks currently done
  */
 export function findCompletedDescendants(taskId, flatList, doneStatusId) {
     const descendantIds = findDescendantIds(taskId, flatList);

@@ -4,6 +4,7 @@ import { RRule } from 'rrule';
  * Maps the stored JSONB frequency strings to rrule frequency constants.
  * rrule uses numeric constants (0=YEARLY, 1=MONTHLY, 2=WEEKLY, 3=DAILY).
  */
+/** @type {Record<string, any>} */
 const FREQ_MAP = {
     DAILY: RRule.DAILY,
     WEEKLY: RRule.WEEKLY,
@@ -14,6 +15,7 @@ const FREQ_MAP = {
 /**
  * Maps weekday strings to rrule weekday objects.
  */
+/** @type {Record<string, any>} */
 const WEEKDAY_MAP = {
     MO: RRule.MO,
     TU: RRule.TU,
@@ -37,6 +39,7 @@ const WEEKDAY_MAP = {
  * @returns {RRule} Configured RRule instance
  */
 function buildRRule(ruleJson, spawnedCount = 0) {
+    /** @type {Record<string, any>} */
     const options = {
         freq: FREQ_MAP[ruleJson.freq] ?? RRule.DAILY,
         interval: ruleJson.interval ?? 1,
@@ -58,14 +61,14 @@ function buildRRule(ruleJson, spawnedCount = 0) {
 /**
  * Computes the next occurrence date for a recurring task after the current moment.
  *
- * @param {object} ruleJson - Stored recurrence rule from the database
+ * @param {Record<string, any>} ruleJson - Stored recurrence rule from the database
  * @param {number} [spawnedCount] - Copies already made; with a `count` rule the original task is occurrence one
  * @returns {Date|null} Next occurrence date, or null if no future occurrences exist
  */
 export function computeNextOccurrence(ruleJson, spawnedCount = 0) {
     if (!ruleJson) return null;
     try {
-        const rule = buildRRule(ruleJson, spawnedCount);
+        const rule = buildRRule(/** @type {any} */ (ruleJson), spawnedCount);
         return rule.after(new Date());
     } catch {
         return null;
@@ -76,11 +79,12 @@ export function computeNextOccurrence(ruleJson, spawnedCount = 0) {
  * Whether two stored recurrence rules describe the same schedule, ignoring key order
  * (Postgres jsonb reorders keys, so a plain string comparison would call equal rules different).
  *
- * @param {object|null|undefined} firstRule - One rule, or none
- * @param {object|null|undefined} secondRule - The other rule, or none
+ * @param {Record<string, any>|null|undefined} firstRule - One rule, or none
+ * @param {Record<string, any>|null|undefined} secondRule - The other rule, or none
  * @returns {boolean} True when both are missing or both have the same keys and values
  */
 export function recurrenceRulesMatch(firstRule, secondRule) {
+    /** @param {Record<string, any>|null|undefined} rule */
     const canonicalJson = (rule) =>
         JSON.stringify(rule ?? null, (_key, value) =>
             value && typeof value === 'object' && !Array.isArray(value)
@@ -98,19 +102,20 @@ export function recurrenceRulesMatch(firstRule, secondRule) {
  * Returns a human-readable English description of the recurrence rule.
  * Example: "every week on Monday, Wednesday"
  *
- * @param {object} ruleJson - Stored recurrence rule from the database
+ * @param {Record<string, any>} ruleJson - Stored recurrence rule from the database
  * @returns {string} Human-readable label, or empty string if rule is invalid
  */
 export function humanReadableLabel(ruleJson) {
     if (!ruleJson) return '';
     try {
-        const rule = buildRRule(ruleJson);
+        const rule = buildRRule(/** @type {any} */ (ruleJson));
         return rule.toText();
     } catch {
         return '';
     }
 }
 
+/** @type {Record<string, string>} */
 const FREQUENCY_LABEL_BY_CODE = {
     DAILY: 'Daily',
     WEEKLY: 'Weekly',
@@ -121,7 +126,7 @@ const FREQUENCY_LABEL_BY_CODE = {
 /**
  * Returns the one-word frequency name for a recurrence rule, for compact pills.
  *
- * @param {object} ruleJson - Stored recurrence rule from the database
+ * @param {Record<string, any>} ruleJson - Stored recurrence rule from the database
  * @returns {string} 'Daily' | 'Weekly' | 'Monthly' | 'Yearly', or empty string if the rule is missing or unknown
  */
 export function recurrenceFrequencyLabel(ruleJson) {

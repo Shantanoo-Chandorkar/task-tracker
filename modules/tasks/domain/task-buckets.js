@@ -4,11 +4,12 @@ import { taskMatchesFilters } from '@/modules/tasks/domain/task-filters';
 /**
  * Counts every task per status, at any depth - a subtask's status can differ from its parent's.
  *
- * @param {object[]} statuses - Statuses with at least an id
- * @param {object[]} flatList - Flat array of all tasks in the list
+ * @param {Record<string, any>[]} statuses - Statuses with at least an id
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks in the list
  * @returns {Object<string, number>} Task count per status id, 0 for a status nothing uses
  */
 export function countTasksByStatusId(statuses, flatList) {
+    /** @type {Record<string, number>} */
     const countsByStatusId = {};
     for (const status of statuses) countsByStatusId[status.id] = 0;
     for (const task of flatList) {
@@ -21,7 +22,7 @@ export function countTasksByStatusId(statuses, flatList) {
  * Builds the "N STATUS · N STATUS" summary shown on a sublist header, most populous status first.
  *
  * @param {Map<string, number>} countsByStatusId - Task count per status id, any depth
- * @param {object[]} statuses - Statuses with at least id/name
+ * @param {Record<string, any>[]} statuses - Statuses with at least id/name
  * @returns {string} Summary text, empty when the bucket has no status-tagged tasks
  */
 export function describeBucketBreakdown(countsByStatusId, statuses) {
@@ -36,15 +37,16 @@ export function describeBucketBreakdown(countsByStatusId, statuses) {
 /**
  * Groups tasks by status id with one pass; tasks with no status go under the key 'none'.
  *
- * @param {object[]} tasks - Tasks to group
- * @returns {Map<string, object[]>} Tasks per status id
+ * @param {Record<string, any>[]} tasks - Tasks to group
+ * @returns {Map<string, Record<string, any>[]>} Tasks per status id
  */
 function groupByStatus(tasks) {
+    /** @type {Map<string, Record<string, any>[]>} */
     const tasksByStatusId = new Map();
     for (const task of tasks) {
         const key = task.status_id ?? 'none';
         if (!tasksByStatusId.has(key)) tasksByStatusId.set(key, []);
-        tasksByStatusId.get(key).push(task);
+        tasksByStatusId.get(key)?.push(task);
     }
     return tasksByStatusId;
 }
@@ -56,10 +58,11 @@ function groupByStatus(tasks) {
  * it or any of its descendants matches.
  *
  * @param {object} params
- * @param {object[]} params.rootTasks - Root tasks of the tree, each with its children
- * @param {object[]} params.flatList - Flat array of all tasks in the list
- * @param {object[]} params.sublists - The list's sublists, in display order
- * @param {object} params.filters - Active task filters
+ * @param {Record<string, any>[]} params.rootTasks - Root tasks of the tree, each with its children
+ * @param {Record<string, any>[]} params.flatList - Flat array of all tasks in the list
+ * @param {Record<string, any>[]} params.sublists - The list's sublists, in display order
+ * @param {{statusIds: string[], tagIds: string[], due: string[], created: string[], memberIds: string[]}} params.filters
+ *   Active task filters
  * @param {boolean} params.hasActiveFilters - Whether any filter is on
  * @param {string|null} params.doneStatusId - The space's done status, which "overdue" filtering needs
  * @returns {{ key: string, sublist: object|null, tasks: object[], tasksByStatusId: Map<string, object[]>,
@@ -77,32 +80,54 @@ export function buildTaskBuckets({
     const descendantIdsByTaskId = buildDescendantIdsByTaskId(flatList);
     const tasksById = new Map(flatList.map((task) => [task.id, task]));
 
+    /**
+     * @param {Record<string, any>} rootTask
+     * @returns {boolean}
+     */
     function rootMatchesFilters(rootTask) {
         const context = { doneStatusId };
         if (taskMatchesFilters(rootTask, filters, context)) return true;
-        for (const descendantId of descendantIdsByTaskId.get(rootTask.id)) {
-            if (taskMatchesFilters(tasksById.get(descendantId), filters, context)) return true;
+        for (const descendantId of descendantIdsByTaskId.get(rootTask.id) ?? []) {
+            const descendantTask = tasksById.get(descendantId);
+            if (descendantTask && taskMatchesFilters(descendantTask, filters, context)) {
+                return true;
+            }
         }
         return false;
     }
 
-    // Totals include every descendant - a root task's own subtasks belong to its sublist too.
+    /**
+     * Totals include every descendant - a root task's own subtasks belong to its sublist too.
+     *
+     * @param {Record<string, any>[]} rootTasksInBucket
+     * @returns {{ total: number, countsByStatusId: Map<string, number> }}
+     */
     function countAllDepth(rootTasksInBucket) {
         let total = rootTasksInBucket.length;
+        /** @type {Map<string, number>} */
         const countsByStatusId = new Map();
+        /** @param {Record<string, any>} task */
         function tally(task) {
             const key = task.status_id ?? 'none';
             countsByStatusId.set(key, (countsByStatusId.get(key) ?? 0) + 1);
         }
         for (const rootTask of rootTasksInBucket) {
             tally(rootTask);
-            const descendantIds = descendantIdsByTaskId.get(rootTask.id);
+            const descendantIds = descendantIdsByTaskId.get(rootTask.id) ?? new Set();
             total += descendantIds.size;
-            for (const descendantId of descendantIds) tally(tasksById.get(descendantId));
+            for (const descendantId of descendantIds) {
+                const descendantTask = tasksById.get(descendantId);
+                if (descendantTask) tally(descendantTask);
+            }
         }
         return { total, countsByStatusId };
     }
 
+    /**
+     * @param {string} key
+     * @param {Record<string, any>|null} sublist
+     * @param {Record<string, any>[]} bucketRootTasks
+     */
     function buildBucket(key, sublist, bucketRootTasks) {
         const allDepth = countAllDepth(bucketRootTasks);
         return {

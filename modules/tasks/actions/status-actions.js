@@ -5,8 +5,8 @@ import { createLabelActions } from '@/modules/tasks/create-label-actions';
 /**
  * Refuses a status delete that would leave the space without a usable status.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {{ space_id: string, is_default: boolean, code: string|null }} status - The status being deleted
+ * @param {Record<string, any>} supabase - Request-scoped Supabase client
+ * @param {Record<string, any>} status - The status being deleted (space_id, is_default, code)
  * @returns {Promise<{ error: string }|null>} The refusal, or null when the delete may go ahead
  */
 async function refuseUndeletableStatus(supabase, status) {
@@ -16,7 +16,7 @@ async function refuseUndeletableStatus(supabase, status) {
         .select('*', { count: 'exact', head: true })
         .eq('space_id', status.space_id);
 
-    if (count <= 1) return { error: 'Cannot delete the last remaining status' };
+    if ((count ?? 0) <= 1) return { error: 'Cannot delete the last remaining status' };
     if (status.is_default) return { error: 'Cannot delete the default status' };
     if (status.code) return { error: 'Cannot delete a built-in status' };
     return null;
@@ -39,7 +39,7 @@ const statusActions = createLabelActions({
  * @param {string} fields.name - Required status name
  * @param {string} fields.space_id - Required space this status belongs to
  * @param {string} [fields.color] - `#rrggbb`, defaults to grey
- * @returns {{ data: object|null, error: string|null }}
+ * @returns {{ data: Record<string, any>|null, error: string|null }}
  */
 export const createStatus = statusActions.create;
 
@@ -47,8 +47,8 @@ export const createStatus = statusActions.create;
  * Updates the name, colour or position of a status.
  *
  * @param {string} id - Status ID to update
- * @param {object} fields - Partial fields to update (name, color, position only)
- * @returns {{ data: object|null, error: string|null }}
+ * @param {Record<string, any>} fields - Partial fields to update (name, color, position only)
+ * @returns {{ data: Record<string, any>|null, error: string|null }}
  */
 export const updateStatus = statusActions.update;
 

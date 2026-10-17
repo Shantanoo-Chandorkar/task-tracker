@@ -17,10 +17,10 @@ const SAVE_FAILED_FAILURE = { error: 'Failed to save the new order', code: REORD
 /**
  * Loads the rows to reorder, refusing the whole request when any is missing or the caller may not change it.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
- * @param {object} target - What is being reordered, see `saveOrderedRows`
- * @returns {Promise<{ savedRows: object[] }|{ failure: object }>} The rows as stored, or the failure to return
+ * @param {any} supabase - Supabase client; dynamic table name here blows up SupabaseClient's generic depth
+ * @param {AuthUser} user - The signed-in user
+ * @param {Record<string, any>} target - What is being reordered, see `saveOrderedRows`
+ * @returns {Promise<{ savedRows?: Record<string, any>[], failure?: { error: string, code?: string } }>} The rows as stored, or the failure to return
  * @throws {Error} Generic SERVER_LOAD_FAILED error when the read fails
  */
 async function loadRowsForReorder(supabase, user, target) {
@@ -50,8 +50,8 @@ async function loadRowsForReorder(supabase, user, target) {
  *
  * Not atomic: if one update fails the others may already be saved, and the client reloads to show the truth.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {object} target
  * @param {string} target.table - Table of the rows
  * @param {string} target.creatorColumn - Column holding who made the row (`owner_id` for spaces)
@@ -67,7 +67,9 @@ async function saveOrderedRows(supabase, user, target) {
     if (loadOutcome.failure) return loadOutcome.failure;
 
     // Saved positions come from the database, never from the client
-    const savedPositionById = new Map(loadOutcome.savedRows.map((row) => [row.id, row.position]));
+    const savedPositionById = new Map(
+        (loadOutcome.savedRows ?? []).map((row) => [row.id, row.position]),
+    );
     const positionChanges = getPositionChanges(
         target.orderedIds.map((id) => ({ id, position: savedPositionById.get(id) })),
     );
@@ -95,9 +97,14 @@ async function saveOrderedRows(supabase, user, target) {
 /**
  * Reorders rows that live in a space: needs write access to the space, and `restricted` users only their own rows.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {object} target - Like `saveOrderedRows`, with `spaceId` instead of `permissionLevel`
+ * @param {string} target.table - Table of the rows
+ * @param {string} target.creatorColumn - Column holding who made the row
+ * @param {string} target.scopeColumn - Column the rows must share with `scopeValue`
+ * @param {string} target.scopeValue - Id every row must belong to
+ * @param {string[]} target.orderedIds - Row ids in the wanted order, already validated
  * @param {string} target.spaceId - Space the rows belong to
  * @returns {Promise<{ error: string|null, code?: string }>} `{ error: null }` when saved, else the refusal
  */
@@ -113,8 +120,8 @@ async function reorderRowsInSpace(supabase, user, { spaceId, ...target }) {
 /**
  * Saves a new order for the caller's own spaces.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {unknown} orderedIds - Space ids in the wanted order
  * @returns {Promise<{ error: string|null, code?: string }>} `{ error: null }` when saved, else the refusal
  */
@@ -128,15 +135,15 @@ export async function reorderOwnedSpaces(supabase, user, orderedIds) {
         scopeColumn: 'owner_id',
         scopeValue: user.id,
         permissionLevel: 'owner',
-        orderedIds: validation.ids,
+        orderedIds: validation.ids ?? [],
     });
 }
 
 /**
  * Saves a new order for the lists of one space.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {unknown} spaceId - Space the lists belong to
  * @param {unknown} orderedIds - List ids in the wanted order
  * @returns {Promise<{ error: string|null, code?: string }>} `{ error: null }` when saved, else the refusal
@@ -145,21 +152,23 @@ export async function reorderListsInSpace(supabase, user, spaceId, orderedIds) {
     const validation = validateOrderedIds(orderedIds, [spaceId]);
     if (validation.failure) return validation.failure;
 
+    // validateOrderedIds already checked spaceId is a real UUID string via scopeIds
+    const validatedSpaceId = /** @type {string} */ (spaceId);
     return reorderRowsInSpace(supabase, user, {
         table: 'lists',
         creatorColumn: 'created_by',
         scopeColumn: 'space_id',
-        scopeValue: spaceId,
-        spaceId,
-        orderedIds: validation.ids,
+        scopeValue: validatedSpaceId,
+        spaceId: validatedSpaceId,
+        orderedIds: validation.ids ?? [],
     });
 }
 
 /**
  * Saves a new order for the labels (statuses or tags) of one space.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {string} table - `statuses` or `tags`
  * @param {unknown} spaceId - Space the labels belong to
  * @param {unknown} orderedIds - Label ids in the wanted order
@@ -169,21 +178,23 @@ async function reorderLabelsInSpace(supabase, user, table, spaceId, orderedIds) 
     const validation = validateOrderedIds(orderedIds, [spaceId]);
     if (validation.failure) return validation.failure;
 
+    // validateOrderedIds already checked spaceId is a real UUID string via scopeIds
+    const validatedSpaceId = /** @type {string} */ (spaceId);
     return reorderRowsInSpace(supabase, user, {
         table,
         creatorColumn: 'created_by',
         scopeColumn: 'space_id',
-        scopeValue: spaceId,
-        spaceId,
-        orderedIds: validation.ids,
+        scopeValue: validatedSpaceId,
+        spaceId: validatedSpaceId,
+        orderedIds: validation.ids ?? [],
     });
 }
 
 /**
  * Saves a new order for the statuses of one space.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {unknown} spaceId - Space the statuses belong to
  * @param {unknown} orderedIds - Status ids in the wanted order
  * @returns {Promise<{ error: string|null, code?: string }>} `{ error: null }` when saved, else the refusal
@@ -195,8 +206,8 @@ export function reorderStatusesInSpace(supabase, user, spaceId, orderedIds) {
 /**
  * Saves a new order for the tags of one space.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {unknown} spaceId - Space the tags belong to
  * @param {unknown} orderedIds - Tag ids in the wanted order
  * @returns {Promise<{ error: string|null, code?: string }>} `{ error: null }` when saved, else the refusal
@@ -208,8 +219,8 @@ export function reorderTagsInSpace(supabase, user, spaceId, orderedIds) {
 /**
  * Saves a new order for the sublists of one list.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {unknown} listId - List the sublists belong to
  * @param {unknown} orderedIds - Sublist ids in the wanted order
  * @returns {Promise<{ error: string|null, code?: string }>} `{ error: null }` when saved, else the refusal
@@ -225,8 +236,9 @@ export async function reorderSublistsInList(supabase, user, listId, orderedIds) 
         table: 'sublists',
         creatorColumn: 'created_by',
         scopeColumn: 'list_id',
-        scopeValue: listId,
+        // validateOrderedIds already checked listId is a real UUID string via scopeIds
+        scopeValue: /** @type {string} */ (listId),
         spaceId,
-        orderedIds: validation.ids,
+        orderedIds: validation.ids ?? [],
     });
 }

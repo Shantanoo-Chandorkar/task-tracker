@@ -4,8 +4,8 @@ import { findDescendantIds } from '@/modules/tasks/domain/task-relations';
 /**
  * Counts how many levels sit below a task (0 for a task with no subtasks), using each task's stored depth.
  *
- * @param {object} task - Task whose subtree to measure (uses id and depth)
- * @param {object[]} flatList - Flat array of all tasks in the list
+ * @param {Record<string, any>} task - Task whose subtree to measure (uses id and depth)
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks in the list
  * @returns {number} Depth of the deepest descendant minus the task's own depth
  */
 function getSubtreeHeight(task, flatList) {
@@ -22,10 +22,10 @@ function getSubtreeHeight(task, flatList) {
  * The direct parent stays in the tree, flagged `isCurrentParent`, so its other children keep their real parent row.
  * Targets that would push the moving subtree past `maxAllowedDepth` are flagged `isTooDeep`.
  *
- * @param {object[]} flatList - Flat array of all tasks in the list
- * @param {object} movingTask - The task being moved (uses id, parent_id and depth)
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks in the list
+ * @param {Record<string, any>} movingTask - The task being moved (uses id, parent_id and depth)
  * @param {number} [maxAllowedDepth] - Deepest allowed task depth; omit for no limit
- * @returns {object[]} Root nodes with nested `children`, carrying `isCurrentParent` and `isTooDeep` flags
+ * @returns {Record<string, any>[]} Root nodes with nested `children`, carrying `isCurrentParent` and `isTooDeep` flags
  */
 export function buildMoveTargetTree(flatList, movingTask, maxAllowedDepth = Infinity) {
     const subtreeHeight = getSubtreeHeight(movingTask, flatList);
@@ -47,7 +47,7 @@ export function buildMoveTargetTree(flatList, movingTask, maxAllowedDepth = Infi
 /**
  * Tells whether the user may pick a node as the move destination.
  *
- * @param {object} node - Node from `buildMoveTargetTree`
+ * @param {Record<string, any>} node - Node from `buildMoveTargetTree`
  * @returns {boolean} False for the current parent and for targets that would exceed the depth limit
  */
 export function isMoveTargetSelectable(node) {
@@ -57,7 +57,7 @@ export function isMoveTargetSelectable(node) {
 /**
  * Tells whether a move-target tree has at least one task the user can actually pick.
  *
- * @param {object[]} nodes - Nodes from `buildMoveTargetTree`
+ * @param {Record<string, any>[]} nodes - Nodes from `buildMoveTargetTree`
  * @returns {boolean} True if any node in the tree is selectable
  */
 export function hasSelectableMoveTarget(nodes) {
@@ -71,7 +71,7 @@ export function hasSelectableMoveTarget(nodes) {
  *
  * Plain substring match, never a RegExp, so characters like "." or "(" in the query stay literal.
  *
- * @param {object[]} roots - Root nodes from `buildMoveTargetTree`
+ * @param {Record<string, any>[]} roots - Root nodes from `buildMoveTargetTree`
  * @param {string} query - Search text typed by the user
  * @returns {{ id: string, title: string, breadcrumb: string[] }[]} Matches in tree order, with ancestor titles
  */
@@ -79,12 +79,13 @@ export function findMatchingMoveTargets(roots, query) {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return [];
 
+    /** @type {{ id: string, title: string, breadcrumb: string[] }[]} */
     const matches = [];
 
     /**
      * Walks the nodes depth-first, recording each pickable title match with its ancestor titles.
      *
-     * @param {object[]} nodes - Sibling nodes to check
+     * @param {Record<string, any>[]} nodes - Sibling nodes to check
      * @param {string[]} ancestorTitles - Titles of the nodes above these siblings, outermost first
      */
     function collectMatches(nodes, ancestorTitles) {

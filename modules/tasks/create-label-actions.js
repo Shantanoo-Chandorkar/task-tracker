@@ -23,7 +23,7 @@ import { loadLabelForWrite } from './load-label-for-write';
  * @param {string} config.noun - Capitalised singular for messages, e.g. 'Status'
  * @param {string} config.logName - Plural lowercase name for server log lines, e.g. 'statuses'
  * @param {string} [config.deleteColumns] - Extra columns `guardDelete` needs on the row being deleted
- * @param {(supabase: object, label: object) => Promise<{ error: string }|null>} [config.guardDelete] - Refuses a
+ * @param {(supabase: Record<string, any>, label: Record<string, any>) => Promise<{ error: string }|null>} [config.guardDelete] - Refuses a
  *   delete the kind does not allow (e.g. the last status); runs after the permission check
  * @param {{ idRequired?: string, notFound?: string }} [config.codes] - Stable codes for the id and not-found failures
  * @param {{ error: string, code: string }} [config.nameTakenFailure] - What to return when the database refuses a name
@@ -51,7 +51,7 @@ export function createLabelActions({
      * @param {string} fields.name - Required name
      * @param {string} fields.space_id - Required space
      * @param {string} [fields.color] - `#rrggbb`, defaults to grey
-     * @returns {{ data: object|null, error: string|null, code?: string }}
+     * @returns {{ data: Record<string, any>|null, error: string|null, code?: string }}
      */
     const create = withAuthenticatedAction(
         `[${logName}] create`,
@@ -108,8 +108,8 @@ export function createLabelActions({
      * Updates the name, colour or position of a label. Nothing else can be written through this action.
      *
      * @param {string} id - Label to update
-     * @param {object} fields - Partial fields; only `name`, `color` and `position` are read
-     * @returns {{ data: object|null, error: string|null, code?: string }}
+     * @param {Record<string, any>} fields - Partial fields; only `name`, `color` and `position` are read
+     * @returns {{ data: Record<string, any>|null, error: string|null, code?: string }}
      */
     const update = withAuthenticatedAction(
         `[${logName}] update`,
@@ -193,6 +193,7 @@ export function createLabelActions({
     return { create, update, remove };
 }
 
+/** @param {string|undefined} code */
 function codeEntry(code) {
     return code ? { code } : {};
 }

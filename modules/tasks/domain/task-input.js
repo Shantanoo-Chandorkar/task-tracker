@@ -21,7 +21,7 @@ const UPDATABLE_FIELD_NAMES = [
  * Cleans a task title and checks it is present and short enough.
  *
  * @param {unknown} rawTitle - Title as sent by the client
- * @returns {{ title: string }|{ error: string }} The cleaned title, or why it was rejected
+ * @returns {{ title?: string, error?: string }} The cleaned title, or why it was rejected
  */
 export function checkTaskTitle(rawTitle) {
     const title = sanitizeString(rawTitle, true);
@@ -35,7 +35,7 @@ export function checkTaskTitle(rawTitle) {
  * Cleans a rich-text description and checks it is short enough.
  *
  * @param {unknown} rawDescription - Description HTML as sent by the client
- * @returns {{ description: string|null }|{ error: string }} The safe HTML (null when empty), or why it was rejected
+ * @returns {{ description?: string|null, error?: string }} The safe HTML (null when empty), or why it was rejected
  */
 export function checkTaskDescription(rawDescription) {
     const description = sanitizeRichText(rawDescription);
@@ -57,10 +57,11 @@ export function checkPriorityFlag(isPrioritised) {
 /**
  * Picks the allowlisted fields the client actually sent (an omitted field stays out of the update).
  *
- * @param {object} fields - Partial task fields as sent by the client
- * @returns {object} Only the allowlisted fields whose value is not undefined
+ * @param {Record<string, any>} fields - Partial task fields as sent by the client
+ * @returns {Record<string, any>} Only the allowlisted fields whose value is not undefined
  */
 export function pickTaskUpdates(fields) {
+    /** @type {Record<string, any>} */
     const updates = {};
     for (const fieldName of UPDATABLE_FIELD_NAMES) {
         if (fields[fieldName] !== undefined) updates[fieldName] = fields[fieldName];
@@ -71,7 +72,7 @@ export function pickTaskUpdates(fields) {
 /**
  * Computes when a recurring task is next due, as the ISO string the database stores.
  *
- * @param {object} recurrenceRule - Stored recurrence rule
+ * @param {Record<string, any>} recurrenceRule - Stored recurrence rule
  * @param {number} [spawnedCount] - Copies already made from this task
  * @returns {string|null} ISO timestamp, or null when no future occurrence exists
  */

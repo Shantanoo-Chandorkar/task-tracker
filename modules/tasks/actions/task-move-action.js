@@ -28,22 +28,24 @@ import {
  *
  * Only some moves need the whole list, so nothing is read until a check asks for it.
  *
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {string} listId - List whose tasks are loaded
- * @returns {() => Promise<object[]>} Returns the same pending read on every call
+ * @returns {() => Promise<Record<string, any>[]>} Returns the same pending read on every call
  * @throws {Error} Generic SERVER_LOAD_FAILED error (from the returned loader) when the read fails
  */
 function createListTaskLinksLoader(supabase, listId) {
     let listTaskLinksPromise;
     return () => {
-        listTaskLinksPromise ??= fetchAllRows(({ from, to }) =>
-            supabase
-                .from('tasks')
-                .select('id, parent_id, depth, sublist_id')
-                .eq('list_id', listId)
-                .order('id', { ascending: true })
-                .range(from, to),
-        ).then((listTaskLinksResult) => {
+        listTaskLinksPromise ??= fetchAllRows(
+            /** @type {(range: { from: number, to: number }) => any} */
+            ({ from, to }) =>
+                supabase
+                    .from('tasks')
+                    .select('id, parent_id, depth, sublist_id')
+                    .eq('list_id', listId)
+                    .order('id', { ascending: true })
+                    .range(from, to),
+        ).then((/** @type {any} */ listTaskLinksResult) => {
             throwIfQueryFailed('[tasks] move', listTaskLinksResult);
             return listTaskLinksResult.data;
         });
@@ -54,21 +56,26 @@ function createListTaskLinksLoader(supabase, listId) {
 /**
  * Works out which sublist a root-level task lands in: the explicit one, the promoted task's old root's, or its own.
  *
- * @param {object} task - The task being moved
+ * @param {Record<string, any>} task - The task being moved
  * @param {string|null|undefined} explicitSublistId - Sublist the caller asked for; undefined means "not specified"
- * @param {() => Promise<object[]>} loadListTaskLinks - Reads the list's tasks when a promotion needs them
+ * @param {() => Promise<Record<string, any>[]>} loadListTaskLinks - Reads the list's tasks when a promotion needs them
  * @returns {Promise<string|null>} The sublist id, or null for the main list
  */
 async function resolveRootSublistId(task, explicitSublistId, loadListTaskLinks) {
     if (explicitSublistId !== undefined) return explicitSublistId ?? null;
-    if (task.parent_id) return resolveRootAncestorSublistId(task.id, await loadListTaskLinks());
+    if (task.parent_id) {
+        return resolveRootAncestorSublistId(
+            task.id,
+            /** @type {any} */ (await loadListTaskLinks()),
+        );
+    }
     return task.sublist_id ?? null;
 }
 
 /**
  * Reads the siblings (id and position) the moved task will sit among, in position order.
  *
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {object} target - Where the task is going
  * @param {string} target.taskId - Task being moved, excluded from its new siblings
  * @param {string|null} target.newParentId - New parent, or null for a root-level move
@@ -97,16 +104,19 @@ async function loadNewSiblings(supabase, { taskId, newParentId, listId, sublistI
 /**
  * Refuses a move that would create a cycle, break the subtask cap, or push the subtree past the depth limit.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} task - The task being moved (with depth and parent_id)
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {Record<string, any>} task - The task being moved (with depth and parent_id)
  * @param {string|null|undefined} newParentId - Parent the task is being moved under
- * @param {() => Promise<object[]>} loadListTaskLinks - Reads the list's tasks when a check needs them
+ * @param {() => Promise<Record<string, any>[]>} loadListTaskLinks - Reads the list's tasks when a check needs them
  * @returns {Promise<{ error: string, code?: string }|null>} The refusal, or null to proceed
  */
 async function blockInvalidMoveShape(supabase, task, newParentId, loadListTaskLinks) {
     // Defense in depth - a self/descendant reparent creates a cycle that hangs every tree walker.
     if (newParentId === task.id) return { error: 'A task cannot be its own parent' };
-    if (newParentId && wouldCreateCycle(task.id, newParentId, await loadListTaskLinks())) {
+    if (
+        newParentId &&
+        wouldCreateCycle(task.id, newParentId, /** @type {any} */ (await loadListTaskLinks()))
+    ) {
         return { error: 'Cannot move a task into its own descendant' };
     }
 
@@ -120,9 +130,9 @@ async function blockInvalidMoveShape(supabase, task, newParentId, loadListTaskLi
 /**
  * Refuses a move that would push the task, or its deepest descendant, past the maximum nesting depth.
  *
- * @param {object} task - The task being moved (with depth)
+ * @param {Record<string, any>} task - The task being moved (with depth)
  * @param {number} newDepth - Depth the task would have after the move
- * @param {() => Promise<object[]>} loadListTaskLinks - Reads the list's tasks when the check needs them
+ * @param {() => Promise<Record<string, any>[]>} loadListTaskLinks - Reads the list's tasks when the check needs them
  * @returns {Promise<{ error: string }|null>} The refusal, or null to proceed
  */
 async function blockMoveBeyondDepthLimit(task, newDepth, loadListTaskLinks) {
@@ -131,9 +141,9 @@ async function blockMoveBeyondDepthLimit(task, newDepth, loadListTaskLinks) {
     if (NESTING_MODE !== 'finite' || depthDelta <= 0) return null;
 
     const depthExceeded = exceedsMaxDepthAfterMove({
-        task,
+        task: /** @type {any} */ (task),
         depthDelta,
-        listTaskLinks: await loadListTaskLinks(),
+        listTaskLinks: /** @type {any} */ (await loadListTaskLinks()),
         maxDepth: FINITE_MAX_DEPTH,
     });
     return depthExceeded ? { error: 'Move would exceed maximum nesting depth' } : null;
@@ -143,13 +153,13 @@ async function blockMoveBeyondDepthLimit(task, newDepth, loadListTaskLinks) {
  * Moves a task to a new parent, list, and/or sibling position, recomputing depth for it and every descendant.
  *
  * @param {string} taskId - Task to move
- * @param {object} fields
+ * @param {Record<string, any>} fields
  * @param {string|null} [fields.newParentId] - New parent task, or null/omitted to move to root
  * @param {string|null} [fields.afterSiblingId] - Sibling to insert after, or null to append
  * @param {boolean} [fields.shouldPrependToStart] - Insert as the first sibling instead
  * @param {string} [fields.listId] - Target list, defaults to the task's current list
  * @param {string|null} [fields.sublistId] - Target sublist for a root-level move
- * @returns {{ data: object|null, error: string|null, code?: string }}
+ * @returns {{ data: Record<string, any>|null, error: string|null, code?: string }}
  */
 export const moveTask = withAuthenticatedAction(
     '[tasks] move',

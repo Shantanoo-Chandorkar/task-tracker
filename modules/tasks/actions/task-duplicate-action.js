@@ -20,20 +20,22 @@ import { TASK_NOT_FOUND, TASK_DUPLICATE_FAILED } from '@/modules/tasks/errors';
 /**
  * Refuses a copy whose subtree would pass the depth limit or whose parent is already at the subtask cap.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} task - The task being copied (with list_id, depth and parent_id)
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {Record<string, any>} task - The task being copied (with list_id, depth and parent_id)
  * @returns {Promise<{ error: string, code?: string }|null>} The refusal, or null to proceed
  * @throws {Error} Generic SERVER_LOAD_FAILED error when a cap read fails
  */
 async function blockInvalidDuplicateShape(supabase, task) {
     // Depth check needs only ids and parents; paged so a list past 1000 rows is not cut short.
-    const { data: listTaskLinks, error: listTaskLinksError } = await fetchAllRows(({ from, to }) =>
-        supabase
-            .from('tasks')
-            .select('id, parent_id')
-            .eq('list_id', task.list_id)
-            .order('id', { ascending: true })
-            .range(from, to),
+    const { data: listTaskLinks, error: listTaskLinksError } = await fetchAllRows(
+        /** @type {(range: { from: number, to: number }) => any} */
+        ({ from, to }) =>
+            supabase
+                .from('tasks')
+                .select('id, parent_id')
+                .eq('list_id', task.list_id)
+                .order('id', { ascending: true })
+                .range(from, to),
     );
     if (listTaskLinksError) {
         console.error('[duplicateTask] subtree read failed', {
@@ -62,8 +64,8 @@ async function blockInvalidDuplicateShape(supabase, task) {
 /**
  * Finds the position right after the original task, between it and its next sibling.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} task - The task being copied (with list_id, parent_id, sublist_id and position)
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {Record<string, any>} task - The task being copied (with list_id, parent_id, sublist_id and position)
  * @returns {Promise<number>} The position for the copy's root
  */
 async function resolveCopyPosition(supabase, task) {
@@ -82,8 +84,8 @@ async function resolveCopyPosition(supabase, task) {
             : siblingsQuery.is('sublist_id', null);
     }
 
-    const { data: siblings = [] } = await siblingsQuery;
-    const nextSibling = siblings.find((sibling) => sibling.position > task.position);
+    const { data: siblings } = await siblingsQuery;
+    const nextSibling = (siblings ?? []).find((sibling) => sibling.position > task.position);
     return getPositionBetween(task.position, nextSibling?.position ?? null);
 }
 
@@ -96,7 +98,7 @@ async function resolveCopyPosition(supabase, task) {
  *
  * @param {string} taskId - Task to duplicate
  * @param {string} [newRootId] - Optional client-made UUID for the copy; a retry with it finds the first try's copy
- * @returns {{ error: string|null, code: string|undefined }}
+ * @returns {Promise<{ error: string|null, code?: string }>}
  */
 export async function duplicateTask(taskId, newRootId) {
     const user = await getCurrentUser();
@@ -146,7 +148,10 @@ export async function duplicateTask(taskId, newRootId) {
 
         return { error: null };
     } catch (thrown) {
-        console.error('[tasks] duplicate threw', { taskId, detail: thrown?.message });
+        console.error('[tasks] duplicate threw', {
+            taskId,
+            detail: thrown instanceof Error ? thrown.message : undefined,
+        });
         return { error: 'Failed to duplicate task', code: TASK_DUPLICATE_FAILED };
     }
 }

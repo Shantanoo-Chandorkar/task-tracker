@@ -20,8 +20,8 @@ const CSV_COLUMNS = [
  * Needed internally by `flatToTree` to link parent/child, but titles and `parent_path` already
  * convey a task's place in the hierarchy to users.
  *
- * @param {object[]} nodes - Tree nodes with `children` arrays
- * @returns {object[]} Same tree, each node's `id`/`parent_id` removed
+ * @param {Record<string, any>[]} nodes - Tree nodes with `children` arrays
+ * @returns {Record<string, any>[]} Same tree, each node's `id`/`parent_id` removed
  */
 function stripIds(nodes) {
     return nodes.map(({ id, parent_id, children, ...rest }) => ({
@@ -68,7 +68,7 @@ function slugify(scopeName) {
  * same `flatToTree` the app's own task tree uses.
  * Both use human-readable context (space/list/sublist/parent_path) - titles, not ids, identify a task.
  *
- * @param {{scopeName: string, rows: object[]}} scope - Result of `resolveExportScope`
+ * @param {{scopeName: string, rows: Record<string, any>[]}} scope - Result of `resolveExportScope`
  * @param {'csv'|'json'} format
  * @returns {{body: string, contentType: string, filename: string}}
  */

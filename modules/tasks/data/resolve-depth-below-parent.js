@@ -1,7 +1,7 @@
 /**
  * Works out how deep a task placed under a parent sits: one below the parent, or 0 for a root task.
  *
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {string|null|undefined} parentId - Parent task, if any
  * @returns {Promise<number>} The depth the child would have
  */

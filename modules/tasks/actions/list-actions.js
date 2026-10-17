@@ -20,7 +20,7 @@ import {
  * @param {string} fields.name - Required list name
  * @param {string} fields.space_id - Required parent space ID
  * @param {string} [fields.color] - Hex color string, defaults to grey
- * @returns {{ data: object|null, error: string|null }}
+ * @returns {{ data: Record<string, any>|null, error: string|null }}
  */
 export const createList = withAuthenticatedAction(
     '[lists] create',
@@ -81,8 +81,8 @@ export const createList = withAuthenticatedAction(
  * Updates specific fields on a list (name, color, position).
  *
  * @param {string} id - List ID to update
- * @param {object} fields - Partial list fields to update
- * @returns {{ data: object|null, error: string|null }}
+ * @param {Record<string, any>} fields - Partial list fields to update
+ * @returns {{ data: Record<string, any>|null, error: string|null }}
  */
 export const updateList = withAuthenticatedAction(
     '[lists] update',

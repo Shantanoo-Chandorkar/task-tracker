@@ -1,8 +1,8 @@
 /**
  * Moves prioritised tasks ahead of unprioritised ones, keeping each group's existing order.
  *
- * @param {object[]} tasks - Sibling tasks already in position order
- * @returns {object[]} New array with prioritised tasks first
+ * @param {Record<string, any>[]} tasks - Sibling tasks already in position order
+ * @returns {Record<string, any>[]} New array with prioritised tasks first
  */
 function sortPrioritisedTasksFirst(tasks) {
     return [
@@ -14,7 +14,7 @@ function sortPrioritisedTasksFirst(tasks) {
 /**
  * Tells the UI where to draw the divider between the prioritised and unprioritised tiers.
  *
- * @param {object[]} siblings - Sibling tasks in display order (prioritised first)
+ * @param {Record<string, any>[]} siblings - Sibling tasks in display order (prioritised first)
  * @param {number} siblingIndex - Position of the sibling about to be rendered
  * @returns {boolean} True when this is the first unprioritised sibling and a prioritised one precedes it
  */
@@ -28,8 +28,8 @@ export function isStartOfUnprioritisedTier(siblings, siblingIndex) {
  * Uses an O(n) Map-based algorithm - no nested loops.
  * Sibling groups come out prioritised-first, so a prioritised parent carries its subtree.
  *
- * @param {object[]} flatList - Flat array of tasks with id and parent_id fields
- * @returns {object[]} Nested array of root tasks, each with a populated `children` array
+ * @param {Record<string, any>[]} flatList - Flat array of tasks with id and parent_id fields
+ * @returns {Record<string, any>[]} Nested array of root tasks, each with a populated `children` array
  */
 export function flatToTree(flatList) {
     const nodeByTaskId = new Map();
@@ -78,8 +78,8 @@ function haveSameItems(firstItems, secondItems) {
 /**
  * Tells whether two tree nodes carry the same task data, ignoring `children`.
  *
- * @param {object} firstNode
- * @param {object} secondNode
+ * @param {Record<string, any>} firstNode
+ * @param {Record<string, any>} secondNode
  * @returns {boolean}
  */
 function haveSameTaskFields(firstNode, secondNode) {
@@ -94,15 +94,19 @@ function haveSameTaskFields(firstNode, secondNode) {
 /**
  * Makes a `flatToTree` that reuses the node of every unchanged task, so memoized rows can skip re-rendering.
  *
- * @returns {(flatList: object[]) => object[]} Builds the tree like `flatToTree`, reusing unchanged nodes.
+ * @returns {(flatList: Record<string, any>[]) => Record<string, any>[]} Builds the tree like `flatToTree`, reusing unchanged nodes.
  */
 export function createStableTreeBuilder() {
+    /** @type {Map<string, Record<string, any>>} */
     let previousNodesById = new Map();
+    /** @type {Record<string, any>[]} */
     let previousRoots = [];
 
     return function buildStableTree(flatList) {
+        /** @type {Map<string, Record<string, any>>} */
         const nodesById = new Map();
 
+        /** @param {Record<string, any>} freshNode */
         function reuseUnchanged(freshNode) {
             freshNode.children = freshNode.children.map(reuseUnchanged);
             const previousNode = previousNodesById.get(freshNode.id);
@@ -131,6 +135,7 @@ export function createStableTreeBuilder() {
  * @returns {(rows: {id: string}[]) => string[]} Gives the rows' ids, reusing the previous array when equal.
  */
 export function createStableIdsReader() {
+    /** @type {string[]} */
     let previousIds = [];
 
     return function readStableIds(rows) {

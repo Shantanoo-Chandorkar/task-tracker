@@ -3,7 +3,7 @@
  *
  * @param {{ id: string }[]|undefined} siblingRows - Rows in the order they are shown, all in the same sortable list.
  * @param {string} rowId - Id of the row that would move.
- * @param {(row: object, neighbourRow: object) => boolean} [canSwap] - Return false to refuse a neighbour.
+ * @param {(row: Record<string, any>, neighbourRow: Record<string, any>) => boolean} [canSwap] - Return false to refuse a neighbour.
  * @returns {{ previousId: string|null, nextId: string|null }} Neighbour ids, null where the row cannot move that way.
  */
 export function getMoveTargets(siblingRows, rowId, canSwap = () => true) {

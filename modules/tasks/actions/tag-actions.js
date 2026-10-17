@@ -32,7 +32,7 @@ const tagActions = createLabelActions({
  * @param {string} fields.name - Required tag name, unique per space ignoring case
  * @param {string} fields.space_id - Required space this tag belongs to
  * @param {string} [fields.color] - `#rrggbb`, defaults to grey
- * @returns {{ data: object|null, error: string|null, code?: string }}
+ * @returns {{ data: Record<string, any>|null, error: string|null, code?: string }}
  */
 export const createTag = tagActions.create;
 
@@ -40,8 +40,8 @@ export const createTag = tagActions.create;
  * Updates the name, colour or position of a tag.
  *
  * @param {string} id - Tag to update
- * @param {object} fields - Partial fields to update (name, color, position only)
- * @returns {{ data: object|null, error: string|null, code?: string }}
+ * @param {Record<string, any>} fields - Partial fields to update (name, color, position only)
+ * @returns {{ data: Record<string, any>|null, error: string|null, code?: string }}
  */
 export const updateTag = tagActions.update;
 

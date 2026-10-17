@@ -14,7 +14,7 @@ const INVALID_ORDER_FAILURE = {
  *
  * @param {unknown} orderedIds - Ids in the order the client wants them
  * @param {unknown[]} [scopeIds] - Ids of the parent the rows belong to (space or list), each checked too
- * @returns {{ ids: string[] }|{ failure: { error: string, code: string } }} The ids, or the failure to return
+ * @returns {{ ids?: string[], failure?: { error: string, code: string } }} The ids, or the failure to return
  */
 export function validateOrderedIds(orderedIds, scopeIds = []) {
     const isValid =

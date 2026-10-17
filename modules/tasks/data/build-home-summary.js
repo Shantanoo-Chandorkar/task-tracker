@@ -15,9 +15,9 @@ const TASK_COLUMNS =
 /**
  * Trims a task row to the fields the Home screen shows, with its list details attached.
  *
- * @param {object} task - Task row with a joined `statuses` object.
- * @param {object} list - The list the task belongs to.
- * @returns {object} Task summary safe to send to the browser.
+ * @param {Record<string, any>} task - Task row with a joined `statuses` object.
+ * @param {Record<string, any>} list - The list the task belongs to.
+ * @returns {Record<string, any>} Task summary safe to send to the browser.
  */
 function toTaskSummary(task, list) {
     return {
@@ -37,33 +37,34 @@ function toTaskSummary(task, list) {
 /**
  * Finds the top-level ancestor of a task among the fetched tasks.
  *
- * @param {object} task - Task to start from.
- * @param {Map<string, object>} tasksById - Fetched tasks keyed by task id.
- * @returns {object|null} The root task, or null when a parent was not fetched.
+ * @param {Record<string, any>} task - Task to start from.
+ * @param {Map<string, Record<string, any>>} tasksById - Fetched tasks keyed by task id.
+ * @returns {Record<string, any>|null} The root task, or null when a parent was not fetched.
  */
 function findRootTask(task, tasksById) {
     const visitedTaskIds = new Set();
+    /** @type {Record<string, any>|undefined} */
     let currentTask = task;
 
-    while (currentTask.parent_id) {
+    while (currentTask?.parent_id) {
         // A parent loop would otherwise never end
         if (visitedTaskIds.has(currentTask.id)) return null;
         visitedTaskIds.add(currentTask.id);
         currentTask = tasksById.get(currentTask.parent_id);
         if (!currentTask) return null;
     }
-    return currentTask;
+    return currentTask ?? null;
 }
 
 /**
  * Builds the Home screen data from already-fetched rows. Pure, so it can be tested without a database.
  *
  * @param {object} rows
- * @param {object[]} rows.recentTasks - Newest-changed tasks first, each with a joined `statuses` object.
- * @param {object[]} rows.priorityCandidates - Starred tasks, newest-changed first, each with `statuses`.
- * @param {object[]} rows.lists - Every list the user can see, each with `task_count`.
- * @param {object[]} rows.sublists - Every sublist the user can see.
- * @returns {{ priorityTasks: object[], recentTasks: object[], recentLists: object[], recentSublists: object[] }}
+ * @param {Record<string, any>[]} rows.recentTasks - Newest-changed tasks first, each with a joined `statuses` object.
+ * @param {Record<string, any>[]} rows.priorityCandidates - Starred tasks, newest-changed first, each with `statuses`.
+ * @param {Record<string, any>[]} rows.lists - Every list the user can see, each with `task_count`.
+ * @param {Record<string, any>[]} rows.sublists - Every sublist the user can see.
+ * @returns {{ priorityTasks: Record<string, any>[], recentTasks: Record<string, any>[], recentLists: Record<string, any>[], recentSublists: Record<string, any>[] }}
  */
 export function buildHomeSummary({ recentTasks, priorityCandidates, lists, sublists }) {
     const listsById = new Map(lists.map((list) => [list.id, list]));
@@ -73,18 +74,24 @@ export function buildHomeSummary({ recentTasks, priorityCandidates, lists, subli
     const priorityTasks = priorityCandidates
         .filter((task) => task.statuses?.code !== 'done' && listsById.has(task.list_id))
         .slice(0, PRIORITY_TASK_LIMIT)
-        .map((task) => toTaskSummary(task, listsById.get(task.list_id)));
+        // listsById.has() was just checked above, so .get() is never undefined here
+        .map((task) =>
+            toTaskSummary(task, /** @type {Record<string, any>} */ (listsById.get(task.list_id))),
+        );
 
     const recentTaskSummaries = recentTasks
         .filter((task) => listsById.has(task.list_id))
         .slice(0, RECENT_TASK_LIMIT)
-        .map((task) => toTaskSummary(task, listsById.get(task.list_id)));
+        .map((task) =>
+            toTaskSummary(task, /** @type {Record<string, any>} */ (listsById.get(task.list_id))),
+        );
 
     const recentListIds = [...new Set(recentTasks.map((task) => task.list_id))]
         .filter((listId) => listsById.has(listId))
         .slice(0, RECENT_LIST_LIMIT);
 
     // ponytail: a nested task whose root is outside the scanned tasks does not bump its sublist
+    /** @type {string[]} */
     const recentSublistIds = [];
     for (const task of recentTasks) {
         const rootTask = findRootTask(task, recentTasksById);
@@ -99,11 +106,17 @@ export function buildHomeSummary({ recentTasks, priorityCandidates, lists, subli
         priorityTasks,
         recentTasks: recentTaskSummaries,
         recentLists: recentListIds.map((listId) => {
-            const { id, name, color, space_id, task_count } = listsById.get(listId);
+            // recentListIds was filtered to ids listsById.has(), so .get() is never undefined here
+            const { id, name, color, space_id, task_count } = /** @type {Record<string, any>} */ (
+                listsById.get(listId)
+            );
             return { id, name, color: color ?? null, space_id, task_count: task_count ?? 0 };
         }),
         recentSublists: recentSublistIds.map((sublistId) => {
-            const { id, name, color, list_id } = sublistsById.get(sublistId);
+            // recentSublistIds only ever gets ids sublistsById.has(), so .get() is never undefined here
+            const { id, name, color, list_id } = /** @type {Record<string, any>} */ (
+                sublistsById.get(sublistId)
+            );
             return {
                 id,
                 name,
@@ -119,8 +132,8 @@ export function buildHomeSummary({ recentTasks, priorityCandidates, lists, subli
  * Fetches what the Home screen needs and builds its summary. Shared by the Home page and `/api/home`.
  * Row access is limited to the caller by the database's row-level security.
  *
- * @param {object} supabase - Supabase server client.
- * @returns {Promise<{ data: object|null, error: string|null }>} The summary, or a generic error message.
+ * @param {SupabaseClient} supabase - Supabase server client.
+ * @returns {Promise<{ data: Record<string, any>|null, error: string|null }>} The summary, or a generic error message.
  */
 export async function loadHomeSummary(supabase) {
     try {
@@ -149,8 +162,8 @@ export async function loadHomeSummary(supabase) {
         ].find((queryResult) => queryResult.error);
         if (failedQueryResult) {
             console.error('[home] load failed', {
-                code: failedQueryResult.error.code,
-                detail: failedQueryResult.error.message,
+                code: failedQueryResult.error?.code,
+                detail: failedQueryResult.error?.message,
             });
             return { data: null, error: 'Failed to load home' };
         }
@@ -166,7 +179,9 @@ export async function loadHomeSummary(supabase) {
 
         return { data: { ...homeSummary, generated_at: new Date().toISOString() }, error: null };
     } catch (thrown) {
-        console.error('[home] load threw', { detail: thrown?.message });
+        console.error('[home] load threw', {
+            detail: thrown instanceof Error ? thrown.message : undefined,
+        });
         return { data: null, error: 'Failed to load home' };
     }
 }

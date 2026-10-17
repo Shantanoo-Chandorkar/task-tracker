@@ -1,9 +1,9 @@
 /**
  * Computes the position for a new row appended to the end of its sibling group (highest + 1).
  *
- * @param {object} supabase - Supabase client
+ * @param {SupabaseClient} supabase - Supabase client
  * @param {string} table - Table name
- * @param {object} filters - Column/value pairs narrowing the sibling group; a `null` value means that column is null
+ * @param {Record<string, any>} filters - Column/value pairs narrowing the sibling group; a `null` value means that column is null
  * @param {number} [emptyValue] - Position to use when there are no existing siblings (default 0)
  * @returns {Promise<number>} The next position value
  */

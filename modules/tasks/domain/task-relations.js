@@ -3,8 +3,8 @@
  * Returns ancestors from immediate parent to root (closest first).
  *
  * @param {string} taskId - The task to find ancestors for
- * @param {object[]} flatList - Flat array of all tasks
- * @returns {object[]} Ancestors ordered from immediate parent to root
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks
+ * @returns {Record<string, any>[]} Ancestors ordered from immediate parent to root
  */
 export function findAncestors(taskId, flatList) {
     const taskById = new Map(flatList.map((task) => [task.id, task]));
@@ -24,10 +24,11 @@ export function findAncestors(taskId, flatList) {
 /**
  * Maps every task id to the ids of all its descendants in one pass, instead of rescanning the list per task.
  *
- * @param {object[]} flatList - Flat array of all tasks
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks
  * @returns {Map<string, Set<string>>} Descendant ids per task id; a task with no children maps to an empty set
  */
 export function buildDescendantIdsByTaskId(flatList) {
+    /** @type {Map<string, string[]>} */
     const childIdsByParentId = new Map();
     for (const task of flatList) {
         if (task.parent_id === null || task.parent_id === undefined) continue;
@@ -36,7 +37,9 @@ export function buildDescendantIdsByTaskId(flatList) {
         else childIdsByParentId.set(task.parent_id, [task.id]);
     }
 
+    /** @type {Map<string, Set<string>>} */
     const descendantIdsByTaskId = new Map();
+    /** @param {string} taskId */
     function collectDescendantIds(taskId) {
         const knownDescendantIds = descendantIdsByTaskId.get(taskId);
         if (knownDescendantIds) return knownDescendantIds;
@@ -60,7 +63,7 @@ export function buildDescendantIdsByTaskId(flatList) {
  * Used to exclude descendants from valid reparent targets, preventing cycles.
  *
  * @param {string} taskId - The root task to find descendants for
- * @param {object[]} flatList - Flat array of all tasks
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks
  * @returns {Set<string>} Set of descendant task IDs (does not include taskId itself)
  */
 export function findDescendantIds(taskId, flatList) {
@@ -83,7 +86,7 @@ export function findDescendantIds(taskId, flatList) {
  * Counts a sublist's tasks, including nested subtasks reachable only via their root ancestor's sublist_id.
  *
  * @param {string} sublistId - The sublist to count tasks for
- * @param {object[]} flatList - Flat tasks for the sublist's list, with id, parent_id, sublist_id
+ * @param {Record<string, any>[]} flatList - Flat tasks for the sublist's list, with id, parent_id, sublist_id
  * @returns {number} Total number of tasks (root + all descendants) in the sublist
  */
 export function countSublistTasks(sublistId, flatList) {
@@ -100,8 +103,8 @@ export function countSublistTasks(sublistId, flatList) {
  * Used as the source snapshot for duplicating a task.
  *
  * @param {string} taskId - The root task of the subtree to clone
- * @param {object[]} flatList - Flat array of all tasks
- * @returns {object|null} Deep clone of the subtree, or null if task not found
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks
+ * @returns {Record<string, any>|null} Deep clone of the subtree, or null if task not found
  */
 export function deepCloneSubtree(taskId, flatList) {
     const task = flatList.find((task) => task.id === taskId);
@@ -118,7 +121,7 @@ export function deepCloneSubtree(taskId, flatList) {
 /**
  * Deepest relative depth in a subtree snapshot (0 = root with no children).
  *
- * @param {object} node - Snapshot node with an optional children array
+ * @param {Record<string, any>} node - Snapshot node with an optional children array
  * @returns {number} Deepest relative depth in this subtree
  */
 export function snapshotMaxRelativeDepth(node) {

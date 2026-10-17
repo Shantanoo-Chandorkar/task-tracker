@@ -7,11 +7,11 @@ import {
 /**
  * Finds a task's space and checks the caller may change the task, which is what tagging or untagging it does.
  *
- * @param {object} supabase - Request-scoped Supabase client
- * @param {object} user - The signed-in user
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
+ * @param {AuthUser} user - The signed-in user
  * @param {string} taskId - Task being tagged or untagged
- * @returns {Promise<{ spaceId: string, failure: null }|{ spaceId: null, failure: object }>} The task's space, or the
- *   failure to return to the caller (not found, or the permission refusal)
+ * @returns {Promise<{ spaceId: string, failure: null }|{ spaceId: null, failure: { error: string, code?: string } }>}
+ *   The task's space, or the failure to return to the caller (not found, or the permission refusal)
  * @throws {Error} Generic SERVER_LOAD_FAILED error when a read fails
  */
 export async function loadTaskForTagWrite(supabase, user, taskId) {

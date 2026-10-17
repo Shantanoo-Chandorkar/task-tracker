@@ -13,7 +13,7 @@ const TAG_LIMIT_FAILURE = {
  * Turns the client's tag ids into a list of distinct uuids, or the failure to return.
  *
  * @param {unknown} rawTagIds - Tag ids sent by the client
- * @returns {{ tagIds: string[], failure: null }|{ tagIds: null, failure: object }} Distinct ids, or why not
+ * @returns {{ tagIds: string[], failure: null }|{ tagIds: null, failure: { error: string, code: string } }} Distinct ids, or why not
  */
 function readDistinctTagIds(rawTagIds) {
     if (!Array.isArray(rawTagIds) || !rawTagIds.every(isUuid)) {
@@ -29,7 +29,7 @@ function readDistinctTagIds(rawTagIds) {
  * Attaches existing tags of a task's own space to the task in one write; tags already on the task are left alone.
  * The caller must already have checked that the user may change the task.
  *
- * @param {object} supabase - Request-scoped Supabase client
+ * @param {SupabaseClient} supabase - Request-scoped Supabase client
  * @param {object} target
  * @param {string} target.taskId - Task to tag
  * @param {string} target.spaceId - Space the task belongs to; every tag must belong to it as well

@@ -6,7 +6,7 @@ import { arrayMove } from '@/modules/tasks/domain/array-move';
  * Siblings share a parent and a sublist. A drop onto a task of the other priority tier is ignored, because the
  * star changes tier, not the drag.
  *
- * @param {object[]} flatList - Flat array of all tasks, ordered by depth and position
+ * @param {Record<string, any>[]} flatList - Flat array of all tasks, ordered by depth and position
  * @param {string} activeId - Id of the dragged task
  * @param {string} overId - Id of the task it was dropped on
  * @returns {{ activeTask: object, reorderedSiblingIds: string[], afterSiblingId: string|null,
@@ -40,8 +40,8 @@ export function planTaskReorder(flatList, activeId, overId) {
 /**
  * Tells whether two tasks share a parent and a sublist.
  *
- * @param {object} firstTask - Task to compare (parent_id and sublist_id)
- * @param {object} secondTask - Task to compare against
+ * @param {Record<string, any>} firstTask - Task to compare (parent_id and sublist_id)
+ * @param {Record<string, any>} secondTask - Task to compare against
  * @returns {boolean} True when they are siblings (or the same task)
  */
 function isSiblingOf(firstTask, secondTask) {
@@ -54,16 +54,18 @@ function isSiblingOf(firstTask, secondTask) {
 /**
  * Rewrites the task list so the siblings of one task appear in a new order, leaving every other task in place.
  *
- * @param {object[]} currentTasks - Flat array of all tasks
- * @param {object} activeTask - A task whose siblings are being reordered (parent_id and sublist_id)
+ * @param {Record<string, any>[]} currentTasks - Flat array of all tasks
+ * @param {Record<string, any>} activeTask - A task whose siblings are being reordered (parent_id and sublist_id)
  * @param {string[]} reorderedSiblingIds - Ids of those siblings in their new order
- * @returns {object[]} A new array with the siblings' slots refilled in the new order
+ * @returns {Record<string, any>[]} A new array with the siblings' slots refilled in the new order
  */
 export function applyTaskReorder(currentTasks, activeTask, reorderedSiblingIds) {
     const tasksById = new Map(currentTasks.map((task) => [task.id, task]));
     const reorderedSiblings = reorderedSiblingIds.map((taskId) => tasksById.get(taskId));
     let siblingCursor = 0;
     return currentTasks.map((task) =>
-        isSiblingOf(activeTask, task) ? reorderedSiblings[siblingCursor++] : task,
+        isSiblingOf(activeTask, task)
+            ? /** @type {Record<string, any>} */ (reorderedSiblings[siblingCursor++])
+            : task,
     );
 }

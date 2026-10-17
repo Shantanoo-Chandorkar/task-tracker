@@ -1,3 +1,7 @@
+/**
+ * @type {Record<string, { loadingMessage: string, successMessage: string, description: string,
+ *   confirmLabel: string, title: (label: string) => string }>}
+ */
 const COPY_BY_ACTION = {
     reject: {
         loadingMessage: 'Rejecting...',
