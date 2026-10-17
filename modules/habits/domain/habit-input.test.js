@@ -260,7 +260,7 @@ describe('pickHabitUpdates', () => {
                 target_value: undefined,
                 archived_at: null,
             }),
-        ).toEqual({ title: 'Read', archived_at: null });
+        ).toEqual({ title: 'Read' });
     });
 
     it('is empty for an empty input', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     UNIT_CODES,
+    UNIT_OPTIONS,
     isValidUnitCode,
     getUnitDimension,
     toCanonicalValue,
@@ -16,6 +17,17 @@ describe('isValidUnitCode', () => {
 
     it.each([[undefined], [null], [42], ['parsecs'], ['']])('rejects %j', (value) => {
         expect(isValidUnitCode(value)).toBe(false);
+    });
+});
+
+describe('UNIT_OPTIONS', () => {
+    it('lists every unit code exactly once, each with its label and dimension', () => {
+        expect(UNIT_OPTIONS).toHaveLength(UNIT_CODES.length);
+        for (const unitCode of UNIT_CODES) {
+            const option = UNIT_OPTIONS.find((candidate) => candidate.code === unitCode);
+            expect(option.dimension).toBe(getUnitDimension(unitCode));
+            expect(option.label).toBeTruthy();
+        }
     });
 });
 

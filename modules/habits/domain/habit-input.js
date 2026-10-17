@@ -52,7 +52,6 @@ const HABIT_UPDATABLE_FIELD_NAMES = [
     'unit_code',
     'recurrence',
     'started_on',
-    'archived_at',
 ];
 
 const HABIT_CATEGORY_UPDATABLE_FIELD_NAMES = ['name', 'color', 'position'];
@@ -164,8 +163,12 @@ export function checkHabitTargetValue(rawTargetValue, measureKind) {
     return { targetValue };
 }
 
-/** @type {Record<string, string[]>} */
-const UNIT_DIMENSIONS_BY_MEASURE_KIND = {
+/**
+ * Which unit dimensions each measure kind accepts - shared with the UI so the picker filters the same list.
+ *
+ * @type {Record<string, string[]>}
+ */
+export const UNIT_DIMENSIONS_BY_MEASURE_KIND = {
     quantity: ['distance', 'mass', 'volume'],
     duration: ['duration'],
 };

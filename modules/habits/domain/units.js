@@ -24,6 +24,17 @@ const UNIT_DEFINITIONS = {
 export const UNIT_CODES = Object.keys(UNIT_DEFINITIONS);
 
 /**
+ * Unit codes as a flat, display-ready list, so a unit picker shares the validator's own definitions.
+ *
+ * @type {{ code: string, label: string, dimension: string }[]}
+ */
+export const UNIT_OPTIONS = Object.entries(UNIT_DEFINITIONS).map(([code, definition]) => ({
+    code,
+    label: definition.label,
+    dimension: definition.dimension,
+}));
+
+/**
  * Checks that a value is a known unit code.
  *
  * @param {unknown} unitCode - Value to check, e.g. a `habits.unit_code` column value.
