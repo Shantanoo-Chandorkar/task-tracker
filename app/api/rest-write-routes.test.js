@@ -4,6 +4,7 @@ import { join, relative, sep } from 'node:path';
 
 // The UI fetches only task PATCH and move (Server Actions queue, cannot abort); the rest serve e2e specs.
 const ALLOWED_WRITE_ROUTES = [
+    'habits/[id]/route.js: DELETE PATCH',
     'lists/[id]/route.js: DELETE PATCH',
     'sublists/[id]/route.js: DELETE PATCH',
     'statuses/[id]/route.js: DELETE PATCH',
