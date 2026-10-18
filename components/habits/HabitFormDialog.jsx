@@ -50,7 +50,7 @@ const MEASURE_KIND_LABELS = {
     binary: 'Yes / no',
     count: 'A count',
     quantity: 'An amount with a unit',
-    duration: 'A length of time',
+    duration: 'Time',
 };
 
 // One line shown below the Select, for the currently chosen kind only - not all four at once.
