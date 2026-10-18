@@ -182,6 +182,16 @@ describe('HabitListView edit/delete parity', () => {
         await waitFor(() => expect(deleteHabit).toHaveBeenCalledWith('habit-daily'));
     });
 
+    it('opens the back-fill dialog with a date stepper from the row menu', async () => {
+        renderView();
+
+        openRowMenu('Meditate');
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Log a different day' }));
+
+        expect(screen.getByRole('heading', { name: 'Meditate' })).toBeTruthy();
+        expect(screen.getByLabelText('Previous day')).toBeTruthy();
+    });
+
     it('keeps the popup open and shows the message when the delete is refused', async () => {
         deleteHabit.mockResolvedValue({ error: 'Not allowed' });
         renderView();

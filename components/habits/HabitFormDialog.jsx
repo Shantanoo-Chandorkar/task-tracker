@@ -10,6 +10,7 @@ import { getBrowserTodayLocalDate } from '@/modules/habits/domain/browser-local-
 import { UNIT_DIMENSIONS_BY_MEASURE_KIND } from '@/modules/habits/domain/habit-input';
 import { MEASURE_KINDS } from '@/modules/habits/domain/measures/index';
 import { UNIT_OPTIONS } from '@/modules/habits/domain/units';
+import { toDisplayHabitValue } from '@/modules/habits/domain/habit-display';
 import {
     DEFAULT_HABIT_COLOR,
     HABIT_DESCRIPTION_MAX,
@@ -82,6 +83,7 @@ const FIELD_ERROR_CODES = {
     HABIT_CATEGORY_NOT_FOUND: 'category',
     HABIT_ENTRY_DATE_INVALID: 'startedOn',
     HABIT_ENTRY_DATE_IN_FUTURE: 'startedOn',
+    HABIT_POLARITY_MEASURE_MISMATCH: 'measureKind',
 };
 
 /** @param {string} measureKind */
@@ -139,7 +141,11 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
             setCategoryId(habit?.category_id ?? '');
             setPolarity(habit?.polarity ?? 'build');
             setMeasureKind(habit?.measure_kind ?? 'binary');
-            setTargetValue(habit?.target_value ?? '');
+            const displayTargetValue = toDisplayHabitValue(
+                { measure_kind: habit?.measure_kind ?? 'binary', unit_code: habitUnitCode || null },
+                habit?.target_value ?? null,
+            );
+            setTargetValue(displayTargetValue ?? '');
             setUnitCode(habitUnitCode && isBuiltInUnit ? habitUnitCode : '');
             setUnitMode(habitUnitCode && !isBuiltInUnit ? 'custom' : 'builtin');
             setCustomUnitLabel(habitUnitCode && !isBuiltInUnit ? habitUnitCode : '');
@@ -159,6 +165,15 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
         setUnitCode('');
         setUnitMode('builtin');
         setCustomUnitLabel('');
+        // A quit habit can only track yes/no for now (decision B4) - no dead-end combination.
+        if (nextMeasureKind !== 'binary' && polarity === 'quit') setPolarity('build');
+    }
+
+    function handlePolarityChange(nextPolarity) {
+        setPolarity(nextPolarity);
+        if (nextPolarity === 'quit' && measureKind !== 'binary') {
+            handleMeasureKindChange('binary');
+        }
     }
 
     function handleUnitChange(value) {
@@ -342,7 +357,7 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
                         {({ controlId }) => (
                             <Select
                                 value={polarity}
-                                onValueChange={setPolarity}
+                                onValueChange={handlePolarityChange}
                                 disabled={submitting}
                             >
                                 <SelectTrigger id={controlId} className="w-full min-w-0">
@@ -397,6 +412,7 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
                 <p className="text-xs text-muted-foreground -mt-2">
                     {MEASURE_KIND_HINTS[measureKind]}
                 </p>
+                <FormError>{fieldErrors.measureKind}</FormError>
 
                 {measureKind !== 'binary' && (
                     <div className={usesUnit ? 'grid grid-cols-2 gap-4' : ''}>

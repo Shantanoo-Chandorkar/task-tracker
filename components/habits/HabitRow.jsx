@@ -7,7 +7,7 @@ import RowActionsMenu from '@/components/custom/RowActionsMenu';
 import HabitCheckInControl from './HabitCheckInControl';
 
 /**
- * One habit row: color dot, title, category, current streak, its check-in control, and an Edit/Delete menu.
+ * One habit row: color dot, title, category, current streak, its check-in control, and a row menu.
  * A dumb renderer - the caller owns the edit/delete dialog state, same as `HabitCategoryRow`.
  *
  * @param {object} props
@@ -19,6 +19,7 @@ import HabitCheckInControl from './HabitCheckInControl';
  * @param {boolean} [props.showCategory] - False when a category header already shown it (grouped views).
  * @param {(habit: object) => void} props.onEditRequest - Called with the habit to open it for editing.
  * @param {(habit: object) => void} props.onDeleteRequest - Called with the habit to ask for delete confirmation.
+ * @param {(habit: object) => void} props.onLogPastDayRequest - Called with the habit to back-fill a past day.
  */
 export default function HabitRow({
     habit,
@@ -29,6 +30,7 @@ export default function HabitRow({
     showCategory = true,
     onEditRequest,
     onDeleteRequest,
+    onLogPastDayRequest,
 }) {
     const { currentStreak } = computeStreaks(habit, entries, todayLocalDate);
 
@@ -53,9 +55,16 @@ export default function HabitRow({
                     )}
                 </div>
             </div>
-            <HabitCheckInControl habit={habit} todayEntry={todayEntry} />
+            <HabitCheckInControl
+                habit={habit}
+                todayEntry={todayEntry}
+                todayLocalDate={todayLocalDate}
+            />
             <RowActionsMenu label={`More actions for ${habit.title}`} isCompact>
                 <DropdownMenuItem onClick={() => onEditRequest(habit)}>Edit</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onLogPastDayRequest(habit)}>
+                    Log a different day
+                </DropdownMenuItem>
                 <DropdownMenuItem
                     onSelect={() => onDeleteRequest(habit)}
                     className="text-destructive focus:text-destructive"

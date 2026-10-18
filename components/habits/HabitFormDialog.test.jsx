@@ -227,6 +227,56 @@ describe('HabitFormDialog measure-kind hint', () => {
     });
 });
 
+describe('HabitFormDialog canonical unit conversion', () => {
+    it('prefills the target value in the stored unit, converted back from canonical storage', () => {
+        renderDialog({
+            habit: buildCountHabit({
+                measure_kind: 'quantity',
+                unit_code: 'km',
+                target_value: 5000,
+            }),
+        });
+
+        expect(screen.getByRole('spinbutton').value).toBe('5');
+    });
+
+    it('leaves a custom (non-built-in) unit’s target value unconverted', () => {
+        renderDialog({
+            habit: buildCountHabit({
+                measure_kind: 'quantity',
+                unit_code: 'cups',
+                target_value: 8,
+            }),
+        });
+
+        expect(screen.getByRole('spinbutton').value).toBe('8');
+    });
+});
+
+describe('HabitFormDialog quit restricted to binary (decision B4)', () => {
+    it('resets polarity to build when a non-binary measure kind is picked while quit', async () => {
+        renderDialog({ habit: buildCountHabit({ polarity: 'quit', measure_kind: 'binary' }) });
+
+        fireEvent.click(screen.getByRole('combobox', { name: /what are you tracking/i }));
+        fireEvent.click(await screen.findByRole('option', { name: 'A count' }));
+
+        expect(screen.getByRole('combobox', { name: /direction/i }).textContent).toBe(
+            'Build this habit',
+        );
+    });
+
+    it('resets the measure kind to binary when quit is picked while a non-binary kind is set', async () => {
+        renderDialog({ habit: buildCountHabit() });
+
+        fireEvent.click(screen.getByRole('combobox', { name: /direction/i }));
+        fireEvent.click(await screen.findByRole('option', { name: 'Quit this habit' }));
+
+        expect(screen.getByRole('combobox', { name: /what are you tracking/i }).textContent).toBe(
+            'Yes / no',
+        );
+    });
+});
+
 describe('HabitFormDialog custom unit', () => {
     it('prefills a non-built-in stored unit into the custom unit text field', () => {
         renderDialog({

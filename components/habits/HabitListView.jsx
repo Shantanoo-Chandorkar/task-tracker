@@ -15,6 +15,7 @@ import HabitRow from './HabitRow';
 import HabitViewTabs from './HabitViewTabs';
 import HabitFormDialog from './HabitFormDialog';
 import HabitDeleteDialog from './HabitDeleteDialog';
+import HabitEntryDialog from './HabitEntryDialog';
 
 const UNCATEGORIZED_KEY = 'uncategorized';
 
@@ -62,6 +63,7 @@ export default function HabitListView() {
     const [view, setView] = useState('today');
     const [formDialog, setFormDialog] = useState({ open: false, habit: null });
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [pastDayTarget, setPastDayTarget] = useState(null);
     const deleteConfirm = useConfirmAction(Boolean(deleteTarget));
     const todayLocalDate = getBrowserTodayLocalDate();
     const { data: habits = [], isLoading: isLoadingHabits } = useHabitsQuery();
@@ -121,6 +123,7 @@ export default function HabitListView() {
                 showCategory={showCategory}
                 onEditRequest={(editedHabit) => setFormDialog({ open: true, habit: editedHabit })}
                 onDeleteRequest={setDeleteTarget}
+                onLogPastDayRequest={setPastDayTarget}
             />
         );
     }
@@ -182,6 +185,17 @@ export default function HabitListView() {
                 isPending={deleteConfirm.isPending}
                 errorMessage={deleteConfirm.errorMessage}
             />
+
+            {pastDayTarget && (
+                <HabitEntryDialog
+                    open
+                    onClose={() => setPastDayTarget(null)}
+                    habit={pastDayTarget}
+                    entries={entriesByHabitId.get(pastDayTarget.id) ?? []}
+                    todayLocalDate={todayLocalDate}
+                    allowDateNavigation
+                />
+            )}
         </div>
     );
 }

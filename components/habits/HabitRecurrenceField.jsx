@@ -111,17 +111,22 @@ export function HabitRecurrenceDetails({ recurrence, onChange, todayLocalDate, d
 
     if (recurrence.kind === 'times_per_week') {
         return (
-            <Input
-                type="number"
-                min={1}
-                max={7}
-                value={recurrence.count ?? ''}
-                disabled={disabled}
-                aria-label="Times per week"
-                onChange={(event) =>
-                    onChange({ kind: 'times_per_week', count: Number(event.target.value) })
-                }
-            />
+            <div className="flex items-center gap-2">
+                <Input
+                    type="number"
+                    min={1}
+                    max={7}
+                    value={recurrence.count ?? ''}
+                    disabled={disabled}
+                    aria-label="Times per week"
+                    onChange={(event) =>
+                        onChange({ kind: 'times_per_week', count: Number(event.target.value) })
+                    }
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    times a week
+                </span>
+            </div>
         );
     }
 
