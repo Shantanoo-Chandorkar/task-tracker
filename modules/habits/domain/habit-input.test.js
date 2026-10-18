@@ -142,7 +142,7 @@ describe('checkHabitUnitCode', () => {
     });
 
     it('rejects a unit from the wrong dimension for a quantity habit', () => {
-        // 'min' is a duration unit, not distance/mass/volume.
+        // 'min' is a real, recognised duration unit code - just not a distance one.
         expect(checkHabitUnitCode('min', 'quantity').code).toBe('HABIT_UNIT_CODE_INVALID');
     });
 
@@ -160,6 +160,30 @@ describe('checkHabitUnitCode', () => {
 
     it('rejects a unit from the wrong dimension for a duration habit', () => {
         expect(checkHabitUnitCode('km', 'duration').code).toBe('HABIT_UNIT_CODE_INVALID');
+    });
+
+    it('accepts an unrecognised unit as a free-text custom unit (decision B3.1)', () => {
+        expect(checkHabitUnitCode('cups', 'quantity')).toEqual({ unitCode: 'cups' });
+        expect(checkHabitUnitCode('laps', 'duration')).toEqual({ unitCode: 'laps' });
+    });
+
+    it('sanitizes a custom unit the same way other text fields are (trims, strips tags)', () => {
+        expect(checkHabitUnitCode('  <b>kg</b>  ', 'quantity')).toEqual({ unitCode: 'kg' });
+    });
+
+    it('rejects an empty or whitespace-only custom unit', () => {
+        expect(checkHabitUnitCode('   ', 'quantity').code).toBe('HABIT_UNIT_CODE_INVALID');
+    });
+
+    it('rejects a custom unit over 30 characters', () => {
+        expect(checkHabitUnitCode('a'.repeat(31), 'quantity').code).toBe(
+            'HABIT_UNIT_CODE_TOO_LONG',
+        );
+    });
+
+    it('accepts a custom unit at exactly 30 characters', () => {
+        const thirtyChars = 'a'.repeat(30);
+        expect(checkHabitUnitCode(thirtyChars, 'quantity')).toEqual({ unitCode: thirtyChars });
     });
 });
 

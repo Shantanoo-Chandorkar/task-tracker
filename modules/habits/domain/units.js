@@ -1,20 +1,12 @@
 /**
  * Canonical base unit per dimension; `unit_code` only governs display, so a unit switch never rewrites history.
+ * Deliberately small (decision B3.1) - anything outside it falls back to a free-text custom unit.
  */
 /** @type {Record<string, { dimension: string, canonicalPerUnit: number, label: string }>} */
 const UNIT_DEFINITIONS = {
     // distance - canonical: metres
-    m: { dimension: 'distance', canonicalPerUnit: 1, label: 'm' },
     km: { dimension: 'distance', canonicalPerUnit: 1000, label: 'km' },
     mi: { dimension: 'distance', canonicalPerUnit: 1609.344, label: 'mi' },
-    // mass - canonical: grams
-    g: { dimension: 'mass', canonicalPerUnit: 1, label: 'g' },
-    kg: { dimension: 'mass', canonicalPerUnit: 1000, label: 'kg' },
-    lb: { dimension: 'mass', canonicalPerUnit: 453.592, label: 'lb' },
-    // volume - canonical: millilitres
-    ml: { dimension: 'volume', canonicalPerUnit: 1, label: 'ml' },
-    l: { dimension: 'volume', canonicalPerUnit: 1000, label: 'l' },
-    fl_oz: { dimension: 'volume', canonicalPerUnit: 29.5735, label: 'fl oz' },
     // duration - canonical: seconds
     sec: { dimension: 'duration', canonicalPerUnit: 1, label: 'sec' },
     min: { dimension: 'duration', canonicalPerUnit: 60, label: 'min' },

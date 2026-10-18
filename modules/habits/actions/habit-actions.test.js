@@ -137,6 +137,19 @@ describe('createHabit', () => {
         expect(createResult.data).toMatchObject({ measure_kind: 'quantity', unit_code: 'km' });
     });
 
+    it('accepts a free-text custom unit when none of the built-ins fit (decision B3.1)', async () => {
+        const { createHabit } = await habitActions();
+
+        const createResult = await createHabit({
+            title: 'Drink water',
+            measure_kind: 'quantity',
+            target_value: 8,
+            unit_code: 'cups',
+        });
+
+        expect(createResult.data).toMatchObject({ measure_kind: 'quantity', unit_code: 'cups' });
+    });
+
     it('refuses a target value on a binary habit', async () => {
         const { createHabit } = await habitActions();
 
@@ -333,6 +346,49 @@ describe('updateHabit', () => {
             target_value: 10,
         });
         expect(updateResult.data).toMatchObject({ measure_kind: 'count', target_value: 10 });
+    });
+
+    it('clears a stale target value and unit when switching to binary, not reusing the old ones', async () => {
+        setUpWorld({
+            habits: [
+                buildHabitRow('habit-1', {
+                    measure_kind: 'quantity',
+                    target_value: 10,
+                    unit_code: 'km',
+                }),
+            ],
+        });
+        const { updateHabit } = await habitActions();
+
+        const updateResult = await updateHabit('habit-1', { measure_kind: 'binary' });
+
+        expect(updateResult.error).toBeNull();
+        expect(updateResult.data).toMatchObject({
+            measure_kind: 'binary',
+            target_value: null,
+            unit_code: null,
+        });
+    });
+
+    it('does not carry a stale unit over when switching to a measure kind that forbids one', async () => {
+        setUpWorld({
+            habits: [
+                buildHabitRow('habit-1', {
+                    measure_kind: 'quantity',
+                    target_value: 10,
+                    unit_code: 'km',
+                }),
+            ],
+        });
+        const { updateHabit } = await habitActions();
+
+        const updateResult = await updateHabit('habit-1', {
+            measure_kind: 'count',
+            target_value: 20,
+        });
+
+        expect(updateResult.error).toBeNull();
+        expect(updateResult.data).toMatchObject({ measure_kind: 'count', unit_code: null });
     });
 
     it('re-checks an unrelated field against the habit’s existing measure kind', async () => {

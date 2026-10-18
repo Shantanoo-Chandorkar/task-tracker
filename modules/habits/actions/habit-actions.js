@@ -227,12 +227,16 @@ export const updateHabit = withAuthenticatedAction(
             measureKind = measureKindCheck.measureKind;
             updates.measure_kind = measureKind;
         }
+        // A changed measure kind invalidates the old target/unit - re-check only, never reuse them.
+        const isMeasureKindUnchanged = measureKind === existingHabit.measure_kind;
 
         if (fields.target_value !== undefined || fields.measure_kind !== undefined) {
             const targetValueToCheck =
                 fields.target_value !== undefined
                     ? fields.target_value
-                    : existingHabit.target_value;
+                    : isMeasureKindUnchanged
+                      ? existingHabit.target_value
+                      : undefined;
             const targetValueCheck = checkHabitTargetValue(targetValueToCheck, measureKind);
             if (targetValueCheck.error) return { data: null, ...targetValueCheck };
             updates.target_value = targetValueCheck.targetValue;
@@ -240,7 +244,11 @@ export const updateHabit = withAuthenticatedAction(
 
         if (fields.unit_code !== undefined || fields.measure_kind !== undefined) {
             const unitCodeToCheck =
-                fields.unit_code !== undefined ? fields.unit_code : existingHabit.unit_code;
+                fields.unit_code !== undefined
+                    ? fields.unit_code
+                    : isMeasureKindUnchanged
+                      ? existingHabit.unit_code
+                      : undefined;
             const unitCodeCheck = checkHabitUnitCode(unitCodeToCheck, measureKind);
             if (unitCodeCheck.error) return { data: null, ...unitCodeCheck };
             updates.unit_code = unitCodeCheck.unitCode;

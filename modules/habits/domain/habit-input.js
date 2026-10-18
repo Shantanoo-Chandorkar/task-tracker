@@ -12,6 +12,7 @@ import {
     HABIT_UNIT_CODE_REQUIRED,
     HABIT_UNIT_CODE_INVALID,
     HABIT_UNIT_CODE_NOT_ALLOWED,
+    HABIT_UNIT_CODE_TOO_LONG,
     HABIT_RECURRENCE_INVALID,
     HABIT_ENTRY_DATE_INVALID,
     HABIT_ENTRY_DATE_IN_FUTURE,
@@ -163,19 +164,22 @@ export function checkHabitTargetValue(rawTargetValue, measureKind) {
     return { targetValue };
 }
 
+const UNIT_CODE_MAX_LENGTH = 30;
+
 /**
- * Which unit dimensions each measure kind accepts - shared with the UI so the picker filters the same list.
+ * Which built-in unit dimensions each measure kind accepts - shared with the UI so the picker filters the same list.
+ * A unit outside these isn't rejected outright - `checkHabitUnitCode` falls back to a custom, unconverted label.
  *
  * @type {Record<string, string[]>}
  */
 export const UNIT_DIMENSIONS_BY_MEASURE_KIND = {
-    quantity: ['distance', 'mass', 'volume'],
+    quantity: ['distance'],
     duration: ['duration'],
 };
 
 /**
  * Checks a habit's unit code against its measure kind.
- * Required for quantity, optional for duration (display only), barred for binary and count.
+ * An unmatched value isn't rejected - it becomes a free-text custom unit (decision B3.1), stored as-is.
  *
  * @param {unknown} rawUnitCode - Value sent by the client.
  * @param {string} measureKind - The habit's (already validated) measure kind.
@@ -200,13 +204,26 @@ export function checkHabitUnitCode(rawUnitCode, measureKind) {
         if (measureKind === 'duration') return { unitCode: null };
         return { error: 'A unit is required', code: HABIT_UNIT_CODE_REQUIRED };
     }
-    if (!isValidUnitCode(rawUnitCode)) {
+    if (isValidUnitCode(rawUnitCode)) {
+        if (allowedDimensions.includes(getUnitDimension(rawUnitCode) ?? '')) {
+            return { unitCode: rawUnitCode };
+        }
+        // A real but wrong-dimension code is rejected outright, not silently treated as free text.
         return { error: 'Unrecognised unit for this measure', code: HABIT_UNIT_CODE_INVALID };
     }
-    if (!allowedDimensions.includes(getUnitDimension(rawUnitCode) ?? '')) {
+
+    const customUnit = sanitizeString(rawUnitCode, true);
+    if (!customUnit) {
         return { error: 'Unrecognised unit for this measure', code: HABIT_UNIT_CODE_INVALID };
     }
-    return { unitCode: rawUnitCode };
+    const lengthFailure = checkMaxLength(
+        customUnit,
+        UNIT_CODE_MAX_LENGTH,
+        'Unit',
+        HABIT_UNIT_CODE_TOO_LONG,
+    );
+    if (lengthFailure) return lengthFailure;
+    return { unitCode: customUnit };
 }
 
 /** @type {Record<string, (rawRecurrence: Record<string, any>) => { recurrence: Record<string, any> }|null>} */

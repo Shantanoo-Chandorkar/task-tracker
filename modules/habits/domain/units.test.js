@@ -34,8 +34,7 @@ describe('UNIT_OPTIONS', () => {
 describe('getUnitDimension', () => {
     it.each([
         ['km', 'distance'],
-        ['kg', 'mass'],
-        ['l', 'volume'],
+        ['mi', 'distance'],
         ['min', 'duration'],
     ])('%s belongs to %s', (unitCode, dimension) => {
         expect(getUnitDimension(unitCode)).toBe(dimension);
@@ -43,6 +42,12 @@ describe('getUnitDimension', () => {
 
     it('is null for an unknown unit code', () => {
         expect(getUnitDimension('parsecs')).toBeNull();
+    });
+
+    it('is null for a unit dropped in favour of the custom-unit fallback (decision B3.1)', () => {
+        for (const droppedCode of ['m', 'g', 'kg', 'lb', 'ml', 'l', 'fl_oz']) {
+            expect(getUnitDimension(droppedCode)).toBeNull();
+        }
     });
 });
 
@@ -58,8 +63,8 @@ describe('toCanonicalValue / fromCanonicalValue', () => {
     });
 
     it('is a no-op for a unit that is already canonical', () => {
-        expect(toCanonicalValue('m', 42)).toBe(42);
-        expect(fromCanonicalValue('g', 42)).toBe(42);
+        expect(toCanonicalValue('sec', 42)).toBe(42);
+        expect(fromCanonicalValue('sec', 42)).toBe(42);
     });
 
     it('is zero-value-safe', () => {
