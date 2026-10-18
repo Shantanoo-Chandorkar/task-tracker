@@ -5,6 +5,7 @@ import {
     checkHabitColor,
     checkHabitPolarity,
     checkHabitMeasureKind,
+    checkHabitPolarityMeasureCombination,
     checkHabitTargetValue,
     checkHabitUnitCode,
     checkHabitRecurrence,
@@ -91,6 +92,28 @@ describe('checkHabitMeasureKind', () => {
     it.each([[undefined], [null], ['scale']])('rejects %j', (rawMeasureKind) => {
         expect(checkHabitMeasureKind(rawMeasureKind).code).toBe('HABIT_INVALID_MEASURE_KIND');
     });
+});
+
+describe('checkHabitPolarityMeasureCombination', () => {
+    it('allows quit only with binary', () => {
+        expect(checkHabitPolarityMeasureCombination('quit', 'binary')).toBeNull();
+    });
+
+    it.each([['count'], ['quantity'], ['duration']])(
+        'rejects quit paired with %s (decision B4)',
+        (measureKind) => {
+            expect(checkHabitPolarityMeasureCombination('quit', measureKind).code).toBe(
+                'HABIT_POLARITY_MEASURE_MISMATCH',
+            );
+        },
+    );
+
+    it.each([['binary'], ['count'], ['quantity'], ['duration']])(
+        'allows build with every measure kind, including %s',
+        (measureKind) => {
+            expect(checkHabitPolarityMeasureCombination('build', measureKind)).toBeNull();
+        },
+    );
 });
 
 describe('checkHabitTargetValue', () => {

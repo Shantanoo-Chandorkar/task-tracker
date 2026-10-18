@@ -65,11 +65,11 @@ export function toCanonicalValue(unitCode, displayValue) {
  *
  * @param {string} unitCode - A recognised unit code.
  * @param {number} canonicalValue - Value as stored, in the dimension's canonical unit.
- * @returns {number} The equivalent value in `unitCode`.
+ * @returns {number} The equivalent value in `unitCode`, rounded to 6 decimals to avoid float noise.
  * @throws {Error} If `unitCode` is not recognised.
  */
 export function fromCanonicalValue(unitCode, canonicalValue) {
     const definition = UNIT_DEFINITIONS[unitCode];
     if (!definition) throw new Error(`Unknown unit code: ${unitCode}`);
-    return canonicalValue / definition.canonicalPerUnit;
+    return Math.round((canonicalValue / definition.canonicalPerUnit) * 1e6) / 1e6;
 }

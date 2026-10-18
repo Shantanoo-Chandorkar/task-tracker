@@ -21,6 +21,7 @@ import {
     HABIT_ENTRY_NOTE_TOO_LONG,
     HABIT_CATEGORY_NAME_REQUIRED,
     HABIT_CATEGORY_NAME_TOO_LONG,
+    HABIT_POLARITY_MEASURE_MISMATCH,
 } from '@/modules/habits/errors';
 import { RECURRENCE_KINDS } from './recurrence';
 import {
@@ -36,7 +37,7 @@ const TITLE_MAX_LENGTH = 200;
 const DESCRIPTION_MAX_LENGTH = 10000;
 const CATEGORY_NAME_MAX_LENGTH = 200;
 const NOTE_MAX_LENGTH = 2000;
-const DEFAULT_BACKFILL_WINDOW_DAYS = 30;
+export const DEFAULT_BACKFILL_WINDOW_DAYS = 30;
 
 // What an <input type="color"> sends; anything else would reach a style attribute unchecked
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -111,6 +112,24 @@ export function checkHabitColor(rawColor) {
 export function checkHabitPolarity(rawPolarity) {
     if (rawPolarity === 'build' || rawPolarity === 'quit') return { polarity: rawPolarity };
     return { error: "Polarity must be 'build' or 'quit'", code: HABIT_INVALID_POLARITY };
+}
+
+/**
+ * Checks a polarity/measure_kind pair is a combination the app currently supports.
+ * `quit` is binary-only for now - a "stay under a limit" quit habit is deferred (decision B4).
+ *
+ * @param {string} polarity - The habit's (already validated) polarity.
+ * @param {string} measureKind - The habit's (already validated) measure kind.
+ * @returns {{ error: string, code: string }|null} The refusal, or null when the pair is allowed.
+ */
+export function checkHabitPolarityMeasureCombination(polarity, measureKind) {
+    if (polarity === 'quit' && measureKind !== 'binary') {
+        return {
+            error: 'A quit habit can only track yes/no for now',
+            code: HABIT_POLARITY_MEASURE_MISMATCH,
+        };
+    }
+    return null;
 }
 
 /**
@@ -355,8 +374,8 @@ export function pickHabitCategoryUpdates(fields) {
  * @param {unknown} rawLocalDate - Value sent by the client.
  * @param {string} todayLocalDate - 'YYYY-MM-DD', the caller's current local date.
  * @param {number} [backfillWindowDays] - How many days into the past a check-in may land.
- * @returns {{ localDate?: string, error?: string, code?: string }} The valid date, or why it was
- *   rejected.
+ * @returns {{ localDate: string, error?: undefined, code?: undefined } |
+ *   { localDate?: undefined, error: string, code: string }} The valid date, or why it was rejected.
  */
 export function checkHabitEntryLocalDate(
     rawLocalDate,
