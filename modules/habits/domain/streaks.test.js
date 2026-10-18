@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeStreaks } from './streaks';
+import { computeStreaks, isHabitDaySuccessful, computeCompletionCounts } from './streaks';
 
 function entry(localDate) {
     return { local_date: localDate, value: 1 };
@@ -162,5 +162,95 @@ describe('computeStreaks - times_per_week recurrence', () => {
             currentStreak: 3,
             longestStreak: 3,
         });
+    });
+});
+
+describe('isHabitDaySuccessful', () => {
+    it('is true for a build habit with a logged entry', () => {
+        const habit = buildHabit();
+        const entriesByDate = new Map([['2026-10-05', entry('2026-10-05')]]);
+
+        expect(isHabitDaySuccessful(habit, entriesByDate, '2026-10-05')).toBe(true);
+    });
+
+    it('is false for a build habit with no logged entry', () => {
+        const habit = buildHabit();
+
+        expect(isHabitDaySuccessful(habit, new Map(), '2026-10-05')).toBe(false);
+    });
+
+    it('is true for a quit habit with no logged entry - absence is the success', () => {
+        const habit = buildHabit({ polarity: 'quit' });
+
+        expect(isHabitDaySuccessful(habit, new Map(), '2026-10-05')).toBe(true);
+    });
+
+    it('is false for a quit habit with a logged entry - a slip', () => {
+        const habit = buildHabit({ polarity: 'quit' });
+        const entriesByDate = new Map([['2026-10-05', entry('2026-10-05')]]);
+
+        expect(isHabitDaySuccessful(habit, entriesByDate, '2026-10-05')).toBe(false);
+    });
+});
+
+describe('computeCompletionCounts - daily recurrence', () => {
+    it('counts due and completed days inside the period', () => {
+        const habit = buildHabit();
+        const entries = [entry('2026-10-01'), entry('2026-10-02'), entry('2026-10-05')];
+
+        expect(
+            computeCompletionCounts(habit, entries, { start: '2026-10-01', end: '2026-10-05' }),
+        ).toEqual({ dueCount: 5, completedCount: 3 });
+    });
+
+    it('clamps the period start to started_on', () => {
+        const habit = buildHabit({ started_on: '2026-10-03' });
+        const entries = [entry('2026-10-03'), entry('2026-10-04')];
+
+        expect(
+            computeCompletionCounts(habit, entries, { start: '2026-10-01', end: '2026-10-05' }),
+        ).toEqual({ dueCount: 3, completedCount: 2 });
+    });
+
+    it('is zero/zero when the period ends before the habit started', () => {
+        const habit = buildHabit({ started_on: '2026-10-10' });
+
+        expect(
+            computeCompletionCounts(habit, [], { start: '2026-10-01', end: '2026-10-05' }),
+        ).toEqual({ dueCount: 0, completedCount: 0 });
+    });
+
+    it('is polarity-aware: a quit habit with no entries is fully completed', () => {
+        const habit = buildHabit({ polarity: 'quit' });
+
+        expect(
+            computeCompletionCounts(habit, [], { start: '2026-10-01', end: '2026-10-05' }),
+        ).toEqual({ dueCount: 5, completedCount: 5 });
+    });
+});
+
+describe('computeCompletionCounts - times_per_week recurrence', () => {
+    function weeklyHabit(overrides) {
+        return buildHabit({
+            recurrence: { kind: 'times_per_week', count: 3 },
+            started_on: '2026-09-28',
+            ...overrides,
+        });
+    }
+
+    it('counts due and completed weeks, not days', () => {
+        const habit = weeklyHabit();
+        const entries = [
+            // Week of 09-28: meets the target of 3.
+            entry('2026-09-28'),
+            entry('2026-09-29'),
+            entry('2026-09-30'),
+            // Week of 10-05: misses the target (only 1).
+            entry('2026-10-06'),
+        ];
+
+        expect(
+            computeCompletionCounts(habit, entries, { start: '2026-09-28', end: '2026-10-11' }),
+        ).toEqual({ dueCount: 2, completedCount: 1 });
     });
 });

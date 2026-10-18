@@ -88,6 +88,40 @@ function countSuccessesInWeek(habit, measure, entriesByDate, weekStartLocalDate)
 }
 
 /**
+ * Lists every Monday-start week beginning in a range, ascending - shared by the streak walk and
+ * the completion-count walk so the two can never drift apart.
+ *
+ * @param {string} firstWeekStartLocalDate - 'YYYY-MM-DD', a week's Monday.
+ * @param {string} lastWeekStartLocalDate - 'YYYY-MM-DD', a week's Monday.
+ * @returns {string[]} Week-start dates in ascending order; empty if the range is backwards.
+ */
+function listWeekStarts(firstWeekStartLocalDate, lastWeekStartLocalDate) {
+    /** @type {string[]} */
+    const weekStarts = [];
+    let cursor = firstWeekStartLocalDate;
+    while (!isLocalDateAfter(cursor, lastWeekStartLocalDate)) {
+        weekStarts.push(cursor);
+        cursor = addDaysToLocalDate(cursor, 7);
+    }
+    return weekStarts;
+}
+
+/**
+ * Whether one Monday-start week meets a `times_per_week` habit's target, polarity-aware.
+ *
+ * @param {Record<string, any>} habit - The habit, for its polarity.
+ * @param {{ isGoalMet: Function }} measure - The habit's measure strategy.
+ * @param {Map<string, object>} entriesByDate - Entries keyed by `local_date`.
+ * @param {string} weekStartLocalDate - 'YYYY-MM-DD' of that week's Monday.
+ * @param {number} targetCount - The habit's `recurrence.count`.
+ * @returns {boolean} True when the week counts as a success.
+ */
+function isWeekSuccessful(habit, measure, entriesByDate, weekStartLocalDate, targetCount) {
+    const successes = countSuccessesInWeek(habit, measure, entriesByDate, weekStartLocalDate);
+    return habit.polarity === 'quit' ? successes < targetCount : successes >= targetCount;
+}
+
+/**
  * Current and longest streak for a `times_per_week` habit, folded by week - there is no single due day.
  *
  * @param {Record<string, any>} habit - Needs recurrence (with `count`), polarity, measure_kind, started_on.
@@ -99,25 +133,18 @@ function computeWeeklyStreaks(habit, entriesByDate, todayLocalDate) {
     const measure = getMeasure(habit.measure_kind);
     const targetCount = habit.recurrence.count;
     const todayWeekStart = startOfLocalWeek(todayLocalDate);
-
-    /** @type {string[]} */
-    const weekStarts = [];
-    let cursor = startOfLocalWeek(habit.started_on);
-    while (!isLocalDateAfter(cursor, todayWeekStart)) {
-        weekStarts.push(cursor);
-        cursor = addDaysToLocalDate(cursor, 7);
-    }
-
-    /** @param {string} weekStart */
-    const isWeekSuccessful = (weekStart) => {
-        const successes = countSuccessesInWeek(habit, measure, entriesByDate, weekStart);
-        return habit.polarity === 'quit' ? successes < targetCount : successes >= targetCount;
-    };
+    const weekStarts = listWeekStarts(startOfLocalWeek(habit.started_on), todayWeekStart);
 
     let longestStreak = 0;
     let runningStreak = 0;
     for (const weekStart of weekStarts) {
-        const isSuccessful = isWeekSuccessful(weekStart);
+        const isSuccessful = isWeekSuccessful(
+            habit,
+            measure,
+            entriesByDate,
+            weekStart,
+            targetCount,
+        );
         if (isSuccessful) {
             runningStreak += 1;
             longestStreak = Math.max(longestStreak, runningStreak);
@@ -129,7 +156,13 @@ function computeWeeklyStreaks(habit, entriesByDate, todayLocalDate) {
     let currentStreak = 0;
     for (let i = weekStarts.length - 1; i >= 0; i -= 1) {
         const weekStart = weekStarts[i];
-        const isSuccessful = isWeekSuccessful(weekStart);
+        const isSuccessful = isWeekSuccessful(
+            habit,
+            measure,
+            entriesByDate,
+            weekStart,
+            targetCount,
+        );
         if (isSuccessful) {
             currentStreak += 1;
             continue;
@@ -145,7 +178,7 @@ function computeWeeklyStreaks(habit, entriesByDate, todayLocalDate) {
  * Current and longest streak for a habit, polarity- and recurrence-aware.
  *
  * @param {Record<string, any>} habit - The habit row (recurrence, polarity, measure_kind, target_value, started_on).
- * @param {Array<{ local_date: string, value: number }>} entries - All check-ins for this habit, any order.
+ * @param {Array<Record<string, any>>} entries - All check-ins for this habit, any order.
  * @param {string} todayLocalDate - 'YYYY-MM-DD', the caller's current local date.
  * @returns {{ currentStreak: number, longestStreak: number }}
  */
@@ -155,4 +188,56 @@ export function computeStreaks(habit, entries, todayLocalDate) {
         return computeWeeklyStreaks(habit, entriesByDate, todayLocalDate);
     }
     return computeDailyStreaks(habit, entriesByDate, todayLocalDate);
+}
+
+/**
+ * Whether a single day counts as a success for a habit - the public entry point Analytics uses to
+ * judge one day without re-deriving the measure lookup itself.
+ *
+ * @param {Record<string, any>} habit - The habit, for its polarity, target and measure_kind.
+ * @param {Map<string, Record<string, any>>} entriesByDate - Entries keyed by `local_date`.
+ * @param {string} localDate - 'YYYY-MM-DD' day to judge.
+ * @returns {boolean} True when the day counts as a success.
+ */
+export function isHabitDaySuccessful(habit, entriesByDate, localDate) {
+    // Trusted: habits_measure_kind_valid (migration 0044) guarantees measure_kind is recognised.
+    const measure = getMeasure(habit.measure_kind);
+    return isDaySuccessful(habit, measure, entriesByDate, localDate);
+}
+
+/**
+ * Due and completed counts for a habit within a period - the completion-rate KPI's building block.
+ * Clamped to `habit.started_on`, same clamp `computeStreaks` applies via `dueDatesBetween`.
+ *
+ * @param {Record<string, any>} habit - Needs recurrence, polarity, measure_kind, target_value, started_on.
+ * @param {Array<Record<string, any>>} entries - All check-ins for this habit, any order.
+ * @param {{ start: string, end: string }} period - Inclusive local-date window to count over.
+ * @returns {{ dueCount: number, completedCount: number }}
+ */
+export function computeCompletionCounts(habit, entries, period) {
+    const entriesByDate = new Map(entries.map((entry) => [entry.local_date, entry]));
+    // Trusted: habits_measure_kind_valid (migration 0044) guarantees measure_kind is recognised.
+    const measure = getMeasure(habit.measure_kind);
+    const periodStart = isLocalDateAfter(habit.started_on, period.start)
+        ? habit.started_on
+        : period.start;
+    if (isLocalDateAfter(periodStart, period.end)) return { dueCount: 0, completedCount: 0 };
+
+    if (habit.recurrence.kind === 'times_per_week') {
+        const targetCount = habit.recurrence.count;
+        const weekStarts = listWeekStarts(
+            startOfLocalWeek(periodStart),
+            startOfLocalWeek(period.end),
+        );
+        const completedCount = weekStarts.filter((weekStart) =>
+            isWeekSuccessful(habit, measure, entriesByDate, weekStart, targetCount),
+        ).length;
+        return { dueCount: weekStarts.length, completedCount };
+    }
+
+    const dueDates = dueDatesBetween(habit.recurrence, periodStart, period.end);
+    const completedCount = dueDates.filter((localDate) =>
+        isDaySuccessful(habit, measure, entriesByDate, localDate),
+    ).length;
+    return { dueCount: dueDates.length, completedCount };
 }
