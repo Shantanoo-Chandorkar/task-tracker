@@ -37,11 +37,19 @@ function buildSessionRow(id, overrides = {}) {
     };
 }
 
-function setUpWorld({ sessions, habits, tasks, fakeOptions } = {}) {
+const VALID_BLOCKS = [
+    { kind: 'work', label: 'Focus', durationSeconds: 1500 },
+    { kind: 'break', label: 'Break', durationSeconds: 300 },
+];
+
+function setUpWorld({ sessions, habits, tasks, templates, fakeOptions } = {}) {
     tables = {
         time_sessions: sessions ?? [],
         habits: habits ?? [{ id: 'habit-1', user_id: OWNER_ID }],
         tasks: tasks ?? [{ id: 'task-1', user_id: OWNER_ID }],
+        timer_templates: templates ?? [
+            { id: 'template-1', user_id: OWNER_ID, name: 'Pomodoro', blocks: VALID_BLOCKS },
+        ],
     };
     fake = createFakeSupabase({ tables, getCallerId: () => currentUserId, ...fakeOptions });
 }
@@ -127,6 +135,27 @@ describe('startTimeSession', () => {
         expect(startResult.data).toMatchObject({ habit_id: 'habit-1', task_id: null });
     });
 
+    it('starts a session following the caller’s own template, at block 0', async () => {
+        const { startTimeSession } = await timeSessionActions();
+
+        const startResult = await startTimeSession({
+            label: 'Deep work',
+            templateId: 'template-1',
+        });
+
+        expect(startResult.data).toMatchObject({ template_id: 'template-1', block_index: 0 });
+    });
+
+    it('rejects a template id that is not the caller’s own', async () => {
+        setUpWorld({ templates: [{ id: 'template-1', user_id: STRANGER_ID, blocks: [] }] });
+        const { startTimeSession } = await timeSessionActions();
+
+        expect(
+            await startTimeSession({ label: 'Deep work', templateId: 'template-1' }),
+        ).toMatchObject({ data: null, code: 'TIME_SESSION_TEMPLATE_INVALID' });
+        expect(fake.inserts).toHaveLength(0);
+    });
+
     it('rejects a label over 200 characters', async () => {
         const { startTimeSession } = await timeSessionActions();
 
@@ -158,16 +187,28 @@ describe('startTimeSession', () => {
         });
     });
 
-    it('does not apply the standalone-collision mapping to a habit-linked session', async () => {
+    it('turns a second live session on the same task into the stable already-live failure', async () => {
         setUpWorld({
             fakeOptions: { insertError: { code: '23505', message: 'duplicate key' } },
         });
         const { startTimeSession } = await timeSessionActions();
 
-        const startResult = await startTimeSession({ habitId: 'habit-1' });
+        expect(await startTimeSession({ taskId: 'task-1' })).toMatchObject({
+            data: null,
+            code: 'TIME_SESSION_TASK_ALREADY_LIVE',
+        });
+    });
 
-        expect(startResult.code).not.toBe('TIME_SESSION_STANDALONE_ALREADY_LIVE');
-        expect(startResult.error).toBe('Failed to start session');
+    it('turns a second live session on the same habit into the stable already-live failure', async () => {
+        setUpWorld({
+            fakeOptions: { insertError: { code: '23505', message: 'duplicate key' } },
+        });
+        const { startTimeSession } = await timeSessionActions();
+
+        expect(await startTimeSession({ habitId: 'habit-1' })).toMatchObject({
+            data: null,
+            code: 'TIME_SESSION_HABIT_ALREADY_LIVE',
+        });
     });
 
     it('turns a guest limit error into the friendly guest result', async () => {
@@ -357,5 +398,76 @@ describe('discardTimeSession', () => {
             code: 'TIME_SESSION_ALREADY_COMPLETED',
         });
         expect(tables.time_sessions).toHaveLength(1);
+    });
+});
+
+describe('advanceSessionBlock', () => {
+    it('needs a session id', async () => {
+        const { advanceSessionBlock } = await timeSessionActions();
+
+        expect(await advanceSessionBlock()).toMatchObject({
+            data: null,
+            code: 'TIME_SESSION_ID_REQUIRED',
+        });
+    });
+
+    it('refuses advancing a session with no template attached', async () => {
+        setUpWorld({ sessions: [buildSessionRow('session-1', { template_id: null })] });
+        const { advanceSessionBlock } = await timeSessionActions();
+
+        expect(await advanceSessionBlock('session-1')).toMatchObject({
+            data: null,
+            code: 'TIME_SESSION_TEMPLATE_INVALID',
+        });
+    });
+
+    it('moves to the next block', async () => {
+        setUpWorld({
+            sessions: [buildSessionRow('session-1', { template_id: 'template-1', block_index: 0 })],
+        });
+        const { advanceSessionBlock } = await timeSessionActions();
+
+        const advanceResult = await advanceSessionBlock('session-1');
+
+        expect(advanceResult.data).toMatchObject({ block_index: 1 });
+    });
+
+    it('refuses advancing past the last block', async () => {
+        setUpWorld({
+            sessions: [buildSessionRow('session-1', { template_id: 'template-1', block_index: 1 })],
+        });
+        const { advanceSessionBlock } = await timeSessionActions();
+
+        expect(await advanceSessionBlock('session-1')).toMatchObject({
+            data: null,
+            code: 'TIME_SESSION_NO_NEXT_BLOCK',
+        });
+    });
+
+    it('refuses advancing a completed session', async () => {
+        setUpWorld({
+            sessions: [
+                buildSessionRow('session-1', {
+                    template_id: 'template-1',
+                    block_index: 0,
+                    status: 'completed',
+                }),
+            ],
+        });
+        const { advanceSessionBlock } = await timeSessionActions();
+
+        expect(await advanceSessionBlock('session-1')).toMatchObject({
+            data: null,
+            code: 'TIME_SESSION_ALREADY_COMPLETED',
+        });
+    });
+
+    it('refuses an unknown session', async () => {
+        const { advanceSessionBlock } = await timeSessionActions();
+
+        expect(await advanceSessionBlock('session-missing')).toMatchObject({
+            data: null,
+            code: 'TIME_SESSION_NOT_FOUND',
+        });
     });
 });

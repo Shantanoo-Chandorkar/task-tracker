@@ -17,14 +17,20 @@ import {
     resolveSessionCompletion,
 } from '@/modules/timer/domain/session-input';
 import { computeElapsedSeconds } from '@/modules/timer/domain/session-clock';
+import { BlockSequence } from '@/modules/timer/domain/block-sequence';
 import { toTimeSessionRateLimitResult } from '@/modules/timer/domain/time-session-rate-limit';
 import {
     TIME_SESSION_ID_REQUIRED,
     TIME_SESSION_NOT_FOUND,
     TIME_SESSION_SUBJECT_INVALID,
     TIME_SESSION_STANDALONE_ALREADY_LIVE,
+    TIME_SESSION_TASK_ALREADY_LIVE,
+    TIME_SESSION_HABIT_ALREADY_LIVE,
+    TIME_SESSION_TEMPLATE_INVALID,
+    TIME_SESSION_NO_NEXT_BLOCK,
 } from '@/modules/timer/errors';
 import { loadTimeSessionForWrite } from '@/modules/timer/data/load-time-session-for-write';
+import { loadTimerTemplateForWrite } from '@/modules/timer/data/load-timer-template-for-write';
 
 const ID_REQUIRED_FAILURE = { error: 'Session ID is required', code: TIME_SESSION_ID_REQUIRED };
 const NOT_FOUND_FAILURE = { error: 'Session not found', code: TIME_SESSION_NOT_FOUND };
@@ -32,13 +38,33 @@ const STANDALONE_ALREADY_LIVE_FAILURE = {
     error: 'You already have a running or paused standalone session - finish or discard it first',
     code: TIME_SESSION_STANDALONE_ALREADY_LIVE,
 };
+const TASK_ALREADY_LIVE_FAILURE = {
+    error: 'This task already has a running or paused timer - finish or discard it first',
+    code: TIME_SESSION_TASK_ALREADY_LIVE,
+};
+const HABIT_ALREADY_LIVE_FAILURE = {
+    error: 'This habit already has a running or paused timer - finish or discard it first',
+    code: TIME_SESSION_HABIT_ALREADY_LIVE,
+};
+const TEMPLATE_NOT_FOUND_FAILURE = {
+    error: 'Template not found',
+    code: TIME_SESSION_TEMPLATE_INVALID,
+};
+const NO_TEMPLATE_FAILURE = {
+    error: 'This session has no template attached',
+    code: TIME_SESSION_TEMPLATE_INVALID,
+};
+const NO_NEXT_BLOCK_FAILURE = {
+    error: 'This is already the last block',
+    code: TIME_SESSION_NO_NEXT_BLOCK,
+};
 
 /**
- * Checks a row id belongs to the caller - RLS already scopes `habits`/`tasks`, so a miss here
- * means the id doesn't exist or isn't theirs, either way an invalid session subject.
+ * Checks a row id belongs to the caller - RLS already scopes every table here, so a miss means
+ * the id doesn't exist or isn't theirs, either way an invalid reference.
  *
  * @param {SupabaseClient} supabase - Request-scoped Supabase client.
- * @param {string} table - 'habits' or 'tasks'.
+ * @param {string} table - 'habits', 'tasks' or 'timer_templates'.
  * @param {string} id - Id sent by the client.
  * @returns {Promise<boolean>} True when the row is visible to the caller.
  */
@@ -63,15 +89,17 @@ function toTimeSessionWriteFailure(databaseError, genericError) {
 }
 
 /**
- * Starts a session for a habit, a task or a free-text label; a client-id retry returns the first row.
- * Only a label is reachable from the UI so far - C3 adds habit/task attachment.
- * The ownership checks below exist regardless, since this action is already callable.
+ * Starts a session for a habit, a task or a free-text label, optionally following a template's
+ * block sequence; a client-id retry returns the first row.
+ * Only a label and (since C3) a task are reachable from the UI so far - habit attachment has no
+ * UI yet. The ownership checks below exist regardless, since this action is already callable.
  *
  * @param {object} fields
  * @param {string} [fields.id] - Optional client-made UUID.
  * @param {string} [fields.habitId] - Habit to attach to; at most one of habitId/taskId may be sent.
  * @param {string} [fields.taskId] - Task to attach to.
  * @param {string} [fields.label] - Free-text label, mainly for a standalone session.
+ * @param {string} [fields.templateId] - Template whose blocks this session follows.
  * @returns {Promise<{ data: Record<string, any>|null, error: string|null, code?: string }>}
  */
 export const startTimeSession = withAuthenticatedAction(
@@ -104,6 +132,14 @@ export const startTimeSession = withAuthenticatedAction(
             return { data: null, error: 'Task not found', code: TIME_SESSION_SUBJECT_INVALID };
         }
 
+        const templateId = fields.templateId ?? null;
+        if (templateId !== null && typeof templateId !== 'string') {
+            return { data: null, ...TEMPLATE_NOT_FOUND_FAILURE };
+        }
+        if (templateId && !(await isOwnRow(supabase, 'timer_templates', templateId))) {
+            return { data: null, ...TEMPLATE_NOT_FOUND_FAILURE };
+        }
+
         const labelCheck = checkSessionLabel(fields.label);
         if (labelCheck.error) return { data: null, error: labelCheck.error, code: labelCheck.code };
 
@@ -117,6 +153,8 @@ export const startTimeSession = withAuthenticatedAction(
                 habit_id: subjectCheck.habitId,
                 task_id: subjectCheck.taskId,
                 label: labelCheck.label,
+                template_id: templateId,
+                block_index: templateId ? 0 : null,
                 status: 'running',
                 started_at: startedAt,
                 last_resumed_at: startedAt,
@@ -126,8 +164,10 @@ export const startTimeSession = withAuthenticatedAction(
             { clientId: clientId.id, ownerColumn: 'user_id', userId: user.id },
         );
         if (error) {
-            if (isStandalone && isUniqueViolation(error)) {
-                return { data: null, ...STANDALONE_ALREADY_LIVE_FAILURE };
+            if (isUniqueViolation(error)) {
+                if (isStandalone) return { data: null, ...STANDALONE_ALREADY_LIVE_FAILURE };
+                if (subjectCheck.taskId) return { data: null, ...TASK_ALREADY_LIVE_FAILURE };
+                if (subjectCheck.habitId) return { data: null, ...HABIT_ALREADY_LIVE_FAILURE };
             }
             return { data: null, ...toTimeSessionWriteFailure(error, 'Failed to start session') };
         }
@@ -308,4 +348,57 @@ export const discardTimeSession = withAuthenticatedAction(
         return { error: null };
     },
     { hasData: false },
+);
+
+/**
+ * Moves a templated session on to its next block. Purely a manual display bookmark - advancing
+ * never touches `accumulated_seconds`/`last_resumed_at`, since the session's own clock keeps
+ * running across a block change (no scheduler, decision 2).
+ *
+ * @param {string} id - Session to advance.
+ * @returns {Promise<{ data: Record<string, any>|null, error: string|null, code?: string }>}
+ */
+export const advanceSessionBlock = withAuthenticatedAction(
+    '[timer] advance session block',
+    'Unexpected error advancing to the next block',
+    async (user, supabase, id) => {
+        if (!id) return { data: null, ...ID_REQUIRED_FAILURE };
+
+        const { session, failure: loadFailure } = await loadTimeSessionForWrite(
+            supabase,
+            id,
+            NOT_FOUND_FAILURE,
+        );
+        if (loadFailure) return { data: null, ...loadFailure };
+
+        const notCompletedFailure = checkCanComplete(session);
+        if (notCompletedFailure) return { data: null, ...notCompletedFailure };
+
+        if (!session.template_id) return { data: null, ...NO_TEMPLATE_FAILURE };
+        const { template, failure: templateFailure } = await loadTimerTemplateForWrite(
+            supabase,
+            session.template_id,
+            TEMPLATE_NOT_FOUND_FAILURE,
+        );
+        if (templateFailure) return { data: null, ...templateFailure };
+
+        const nextIndex = new BlockSequence(template.blocks).nextIndex(session.block_index ?? 0);
+        if (nextIndex === null) return { data: null, ...NO_NEXT_BLOCK_FAILURE };
+
+        const { data: updatedSession, error } = await supabase
+            .from('time_sessions')
+            .update({ block_index: nextIndex })
+            .eq('id', id)
+            .select()
+            .maybeSingle();
+        if (error) {
+            return {
+                data: null,
+                ...toTimeSessionWriteFailure(error, 'Failed to advance to the next block'),
+            };
+        }
+        if (!updatedSession) return { data: null, ...NOT_FOUND_FAILURE };
+
+        return { data: updatedSession, error: null };
+    },
 );
