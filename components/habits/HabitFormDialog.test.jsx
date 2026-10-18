@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import HabitFormDialog from './HabitFormDialog';
 
 // Radix Select positions its listbox with ResizeObserver and scrollIntoView, which jsdom lacks
@@ -146,5 +147,114 @@ describe('HabitFormDialog edit mode', () => {
             expect.objectContaining({ title: 'Read more' }),
         );
         expect(updateHabit.mock.calls[0][1].id).toBeUndefined();
+    });
+});
+
+function buildCountHabit(overrides = {}) {
+    return {
+        id: 'habit-1',
+        title: 'Push-ups',
+        description: null,
+        color: '#6b7280',
+        category_id: null,
+        polarity: 'build',
+        measure_kind: 'count',
+        target_value: 20,
+        unit_code: null,
+        recurrence: { kind: 'daily' },
+        started_on: '2026-01-01',
+        ...overrides,
+    };
+}
+
+describe('HabitFormDialog target value', () => {
+    it('rejects a zero target value before ever calling the action, under Daily target', async () => {
+        renderDialog({ habit: buildCountHabit({ target_value: 0 }) });
+
+        await submitForm();
+
+        expect(screen.getByText('Target value must be a positive number')).toBeTruthy();
+        expect(updateHabit).not.toHaveBeenCalled();
+    });
+
+    it('allows a positive target value through to the action', async () => {
+        updateHabit.mockResolvedValue({ data: buildCountHabit(), error: null });
+        renderDialog({ habit: buildCountHabit() });
+
+        await submitForm();
+
+        expect(updateHabit).toHaveBeenCalledWith(
+            'habit-1',
+            expect.objectContaining({ target_value: 20 }),
+        );
+    });
+});
+
+describe('HabitFormDialog field-specific server errors', () => {
+    it('maps a field-specific error under its own field, without the generic toast', async () => {
+        updateHabit.mockResolvedValue({
+            data: null,
+            error: 'Unit cannot exceed 30 characters.',
+            code: 'HABIT_UNIT_CODE_TOO_LONG',
+        });
+        renderDialog({ habit: buildCountHabit() });
+
+        await submitForm();
+
+        expect(await screen.findByText('Unit cannot exceed 30 characters.')).toBeTruthy();
+        expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the generic toast and bottom error for an unmapped code', async () => {
+        updateHabit.mockResolvedValue({ data: null, error: 'Something went wrong', code: 'XYZ' });
+        renderDialog({ habit: buildCountHabit() });
+
+        await submitForm();
+
+        expect(await screen.findByText('Something went wrong')).toBeTruthy();
+        expect(toast.error).toHaveBeenCalled();
+    });
+});
+
+describe('HabitFormDialog measure-kind hint', () => {
+    it('shows one hint for the current measure kind, not every kind at once', () => {
+        renderDialog({ habit: buildCountHabit() });
+
+        expect(screen.getByText('e.g. reps, glasses, pages.')).toBeTruthy();
+        expect(
+            screen.queryByText('e.g. distance, weight, volume - pick a unit or type your own.'),
+        ).toBeNull();
+    });
+});
+
+describe('HabitFormDialog custom unit', () => {
+    it('prefills a non-built-in stored unit into the custom unit text field', () => {
+        renderDialog({
+            habit: buildCountHabit({ measure_kind: 'quantity', unit_code: 'cups' }),
+        });
+
+        expect(screen.getByLabelText('Custom unit').value).toBe('cups');
+    });
+
+    it('does not show the custom unit field for a built-in stored unit', () => {
+        renderDialog({
+            habit: buildCountHabit({ measure_kind: 'quantity', unit_code: 'km' }),
+        });
+
+        expect(screen.queryByLabelText('Custom unit')).toBeNull();
+    });
+
+    it('sends the custom unit text as unit_code on submit', async () => {
+        updateHabit.mockResolvedValue({ data: buildCountHabit(), error: null });
+        renderDialog({
+            habit: buildCountHabit({ measure_kind: 'quantity', unit_code: 'cups' }),
+        });
+
+        await submitForm();
+
+        expect(updateHabit).toHaveBeenCalledWith(
+            'habit-1',
+            expect.objectContaining({ unit_code: 'cups' }),
+        );
     });
 });

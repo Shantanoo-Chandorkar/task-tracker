@@ -34,7 +34,44 @@ function withDefaultsForKind(recurrence, todayLocalDate) {
 }
 
 /**
- * Picks a habit's recurrence rule, one of the four kinds modules/habits/domain/recurrence.js understands.
+ * Picks a habit's recurrence kind, one of the four modules/habits/domain/recurrence.js understands.
+ * Split from `HabitRecurrenceDetails` so a parent grid can place the weekday row outside either column.
+ *
+ * @param {object} props
+ * @param {{ kind: string }} props.recurrence - Current rule.
+ * @param {(recurrence: object) => void} props.onChange - Called with the updated rule.
+ * @param {string} props.todayLocalDate - 'YYYY-MM-DD', used as the default anchor for every_n_days.
+ * @param {boolean} [props.disabled] - Locks the control while saving.
+ */
+export function HabitRecurrenceTypeSelect({
+    recurrence,
+    onChange,
+    todayLocalDate,
+    disabled = false,
+}) {
+    return (
+        <Select
+            value={recurrence.kind}
+            onValueChange={(kind) => onChange(withDefaultsForKind({ kind }, todayLocalDate))}
+            disabled={disabled}
+        >
+            <SelectTrigger className="w-full min-w-0">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                {RECURRENCE_KINDS.map((kind) => (
+                    <SelectItem key={kind} value={kind}>
+                        {KIND_LABELS[kind]}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+/**
+ * The conditional control a recurrence kind needs: weekday buttons, a times-per-week count, or an
+ * every-N-days interval. Renders nothing for 'daily', which needs no extra input.
  *
  * @param {object} props
  * @param {{ kind: string }} props.recurrence - Current rule.
@@ -42,95 +79,75 @@ function withDefaultsForKind(recurrence, todayLocalDate) {
  * @param {string} props.todayLocalDate - 'YYYY-MM-DD', used as the default anchor for every_n_days.
  * @param {boolean} [props.disabled] - Locks every control while saving.
  */
-export default function HabitRecurrenceField({
-    recurrence,
-    onChange,
-    todayLocalDate,
-    disabled = false,
-}) {
-    return (
-        <div className="space-y-3">
-            <Select
-                value={recurrence.kind}
-                onValueChange={(kind) => onChange(withDefaultsForKind({ kind }, todayLocalDate))}
+export function HabitRecurrenceDetails({ recurrence, onChange, todayLocalDate, disabled = false }) {
+    if (recurrence.kind === 'weekdays') {
+        return (
+            <div className="flex gap-1.5" role="group" aria-label="Days of the week">
+                {WEEKDAY_LABELS.map((label, day) => {
+                    const isSelected = recurrence.days?.includes(day);
+                    return (
+                        <Button
+                            key={day}
+                            type="button"
+                            size="sm"
+                            variant={isSelected ? 'default' : 'outline'}
+                            disabled={disabled}
+                            aria-pressed={isSelected}
+                            className={cn('flex-1 px-0')}
+                            onClick={() => {
+                                const days = isSelected
+                                    ? recurrence.days.filter((selectedDay) => selectedDay !== day)
+                                    : [...(recurrence.days ?? []), day];
+                                if (days.length > 0) onChange({ kind: 'weekdays', days });
+                            }}
+                        >
+                            {label}
+                        </Button>
+                    );
+                })}
+            </div>
+        );
+    }
+
+    if (recurrence.kind === 'times_per_week') {
+        return (
+            <Input
+                type="number"
+                min={1}
+                max={7}
+                value={recurrence.count ?? ''}
                 disabled={disabled}
-            >
-                <SelectTrigger>
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {RECURRENCE_KINDS.map((kind) => (
-                        <SelectItem key={kind} value={kind}>
-                            {KIND_LABELS[kind]}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+                aria-label="Times per week"
+                onChange={(event) =>
+                    onChange({ kind: 'times_per_week', count: Number(event.target.value) })
+                }
+            />
+        );
+    }
 
-            {recurrence.kind === 'weekdays' && (
-                <div className="flex gap-1.5" role="group" aria-label="Days of the week">
-                    {WEEKDAY_LABELS.map((label, day) => {
-                        const isSelected = recurrence.days?.includes(day);
-                        return (
-                            <Button
-                                key={day}
-                                type="button"
-                                size="sm"
-                                variant={isSelected ? 'default' : 'outline'}
-                                disabled={disabled}
-                                aria-pressed={isSelected}
-                                className={cn('flex-1 px-0')}
-                                onClick={() => {
-                                    const days = isSelected
-                                        ? recurrence.days.filter(
-                                              (selectedDay) => selectedDay !== day,
-                                          )
-                                        : [...(recurrence.days ?? []), day];
-                                    if (days.length > 0) onChange({ kind: 'weekdays', days });
-                                }}
-                            >
-                                {label}
-                            </Button>
-                        );
-                    })}
-                </div>
-            )}
-
-            {recurrence.kind === 'times_per_week' && (
+    if (recurrence.kind === 'every_n_days') {
+        return (
+            <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">Every</span>
                 <Input
                     type="number"
                     min={1}
-                    max={7}
-                    value={recurrence.count ?? ''}
+                    max={365}
+                    value={recurrence.n ?? ''}
                     disabled={disabled}
-                    aria-label="Times per week"
+                    aria-label="Number of days"
                     onChange={(event) =>
-                        onChange({ kind: 'times_per_week', count: Number(event.target.value) })
+                        onChange({
+                            kind: 'every_n_days',
+                            n: Number(event.target.value),
+                            anchor: recurrence.anchor ?? todayLocalDate,
+                        })
                     }
                 />
-            )}
+                <span className="text-sm text-muted-foreground whitespace-nowrap">days</span>
+            </div>
+        );
+    }
 
-            {recurrence.kind === 'every_n_days' && (
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">Every</span>
-                    <Input
-                        type="number"
-                        min={1}
-                        max={365}
-                        value={recurrence.n ?? ''}
-                        disabled={disabled}
-                        aria-label="Number of days"
-                        onChange={(event) =>
-                            onChange({
-                                kind: 'every_n_days',
-                                n: Number(event.target.value),
-                                anchor: recurrence.anchor ?? todayLocalDate,
-                            })
-                        }
-                    />
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">days</span>
-                </div>
-            )}
-        </div>
-    );
+    return null;
 }

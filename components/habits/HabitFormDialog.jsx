@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useHabitCategoriesQuery } from '@/hooks/useHabitCategoriesQuery';
 import { createHabit, updateHabit } from '@/modules/habits/actions/habit-actions';
+import { getBrowserTodayLocalDate } from '@/modules/habits/domain/browser-local-date';
 import { UNIT_DIMENSIONS_BY_MEASURE_KIND } from '@/modules/habits/domain/habit-input';
 import { MEASURE_KINDS } from '@/modules/habits/domain/measures/index';
 import { UNIT_OPTIONS } from '@/modules/habits/domain/units';
@@ -32,7 +33,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import HabitRecurrenceField from './HabitRecurrenceField';
+import { HabitRecurrenceTypeSelect, HabitRecurrenceDetails } from './HabitRecurrenceField';
 
 // Tiptap is heavy and only needed once this dialog actually opens, same as TaskFormDialog.
 const RichTextEditor = dynamic(() => import('@/components/custom/RichTextEditor'), {
@@ -46,9 +47,17 @@ const RichTextEditor = dynamic(() => import('@/components/custom/RichTextEditor'
 
 const MEASURE_KIND_LABELS = {
     binary: 'Yes / no',
-    count: 'A count (reps, glasses, pages...)',
-    quantity: 'An amount with a unit (distance, weight, volume)',
+    count: 'A count',
+    quantity: 'An amount with a unit',
     duration: 'A length of time',
+};
+
+// One line shown below the Select, for the currently chosen kind only - not all four at once.
+const MEASURE_KIND_HINTS = {
+    binary: 'A simple done/not-done check-in.',
+    count: 'e.g. reps, glasses, pages.',
+    quantity: 'e.g. distance, weight, volume - pick a unit or type your own.',
+    duration: 'How long you spent on it.',
 };
 
 const POLARITY_OPTIONS = [
@@ -56,13 +65,24 @@ const POLARITY_OPTIONS = [
     { value: 'quit', label: 'Quit this habit' },
 ];
 
-/** @returns {string} 'YYYY-MM-DD' in the browser's own local time, as a UI default/max only. */
-function getBrowserTodayLocalDate() {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${now.getFullYear()}-${month}-${day}`;
-}
+// Sentinel Select value for "type my own unit" - never a real unit_code, so it can't collide.
+const CUSTOM_UNIT_VALUE = '__custom__';
+
+// Maps a server error code to its field's inline error; anything unmapped falls back to the bottom error.
+const FIELD_ERROR_CODES = {
+    HABIT_DESCRIPTION_TOO_LONG: 'description',
+    HABIT_TARGET_VALUE_REQUIRED: 'targetValue',
+    HABIT_TARGET_VALUE_INVALID: 'targetValue',
+    HABIT_TARGET_VALUE_NOT_ALLOWED: 'targetValue',
+    HABIT_UNIT_CODE_REQUIRED: 'unitCode',
+    HABIT_UNIT_CODE_INVALID: 'unitCode',
+    HABIT_UNIT_CODE_NOT_ALLOWED: 'unitCode',
+    HABIT_UNIT_CODE_TOO_LONG: 'unitCode',
+    HABIT_RECURRENCE_INVALID: 'recurrence',
+    HABIT_CATEGORY_NOT_FOUND: 'category',
+    HABIT_ENTRY_DATE_INVALID: 'startedOn',
+    HABIT_ENTRY_DATE_IN_FUTURE: 'startedOn',
+};
 
 /** @param {string} measureKind */
 function unitOptionsForMeasureKind(measureKind) {
@@ -93,11 +113,14 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
     const [measureKind, setMeasureKind] = useState('binary');
     const [targetValue, setTargetValue] = useState('');
     const [unitCode, setUnitCode] = useState('');
+    const [unitMode, setUnitMode] = useState('builtin');
+    const [customUnitLabel, setCustomUnitLabel] = useState('');
     const [recurrence, setRecurrence] = useState({ kind: 'daily' });
     const [startedOn, setStartedOn] = useState(todayLocalDate);
     const [submitting, setSubmitting] = useState(false);
     const [titleError, setTitleError] = useState('');
     const [formError, setFormError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({});
     const [createRequestId, setCreateRequestId] = useState(() => createClientId());
 
     const isEditing = Boolean(habit);
@@ -106,6 +129,10 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
     if (resetKey !== lastResetKey) {
         setLastResetKey(resetKey);
         if (open) {
+            const habitUnitCode = habit?.unit_code ?? '';
+            const isBuiltInUnit = unitOptionsForMeasureKind(habit?.measure_kind ?? 'binary').some(
+                (option) => option.code === habitUnitCode,
+            );
             setTitle(habit?.title ?? '');
             setDescription(habit?.description ?? '');
             setColor(habit?.color ?? DEFAULT_HABIT_COLOR);
@@ -113,11 +140,14 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
             setPolarity(habit?.polarity ?? 'build');
             setMeasureKind(habit?.measure_kind ?? 'binary');
             setTargetValue(habit?.target_value ?? '');
-            setUnitCode(habit?.unit_code ?? '');
+            setUnitCode(habitUnitCode && isBuiltInUnit ? habitUnitCode : '');
+            setUnitMode(habitUnitCode && !isBuiltInUnit ? 'custom' : 'builtin');
+            setCustomUnitLabel(habitUnitCode && !isBuiltInUnit ? habitUnitCode : '');
             setRecurrence(habit?.recurrence ?? { kind: 'daily' });
             setStartedOn(habit?.started_on ?? todayLocalDate);
             setTitleError('');
             setFormError('');
+            setFieldErrors({});
             setSubmitting(false);
             setCreateRequestId(createClientId());
         }
@@ -127,6 +157,19 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
         setMeasureKind(nextMeasureKind);
         setTargetValue('');
         setUnitCode('');
+        setUnitMode('builtin');
+        setCustomUnitLabel('');
+    }
+
+    function handleUnitChange(value) {
+        if (value === CUSTOM_UNIT_VALUE) {
+            setUnitMode('custom');
+            setUnitCode('');
+            return;
+        }
+        setUnitMode('builtin');
+        setCustomUnitLabel('');
+        setUnitCode(value === 'none' ? '' : value);
     }
 
     async function handleSubmit(event) {
@@ -138,9 +181,16 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
             return;
         }
 
+        if (measureKind !== 'binary' && !(Number(targetValue) > 0)) {
+            setFieldErrors({ targetValue: 'Target value must be a positive number' });
+            return;
+        }
+
         setFormError('');
+        setFieldErrors({});
         setSubmitting(true);
 
+        const effectiveUnitCode = unitMode === 'custom' ? customUnitLabel.trim() : unitCode;
         const fields = {
             title: title.trim(),
             description: description.trim() || null,
@@ -149,20 +199,27 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
             polarity,
             measure_kind: measureKind,
             target_value: measureKind === 'binary' ? undefined : Number(targetValue),
-            unit_code: unitCode || undefined,
+            unit_code: effectiveUnitCode || undefined,
             recurrence,
             started_on: startedOn,
             ...(isEditing ? {} : { ...(createRequestId && { id: createRequestId }) }),
         };
 
         try {
-            const { data: savedHabit, error } = isEditing
-                ? await updateHabit(habit.id, fields)
-                : await createHabit(fields);
+            const {
+                data: savedHabit,
+                error,
+                code,
+            } = isEditing ? await updateHabit(habit.id, fields) : await createHabit(fields);
 
             if (error) {
-                setFormError(error);
-                toast.error(isEditing ? 'Failed to update habit' : 'Failed to create habit');
+                const fieldKey = FIELD_ERROR_CODES[code];
+                if (fieldKey) {
+                    setFieldErrors({ [fieldKey]: error });
+                } else {
+                    setFormError(error);
+                    toast.error(isEditing ? 'Failed to update habit' : 'Failed to create habit');
+                }
                 setSubmitting(false);
                 return;
             }
@@ -185,6 +242,7 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
     }
 
     const unitOptions = unitOptionsForMeasureKind(measureKind);
+    const usesUnit = Boolean(UNIT_DIMENSIONS_BY_MEASURE_KIND[measureKind]);
 
     return (
         <ModalShell
@@ -229,6 +287,7 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
                     label="Description (optional)"
                     currentLength={description.length}
                     maxLength={HABIT_DESCRIPTION_MAX}
+                    error={fieldErrors.description}
                 >
                     {() => (
                         <EditorErrorBoundary
@@ -258,7 +317,7 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
                                 }
                                 disabled={submitting}
                             >
-                                <SelectTrigger id={controlId}>
+                                <SelectTrigger id={controlId} className="w-full min-w-0">
                                     <SelectValue placeholder="No category" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -286,7 +345,7 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
                                 onValueChange={setPolarity}
                                 disabled={submitting}
                             >
-                                <SelectTrigger id={controlId}>
+                                <SelectTrigger id={controlId} className="w-full min-w-0">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -300,86 +359,132 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
                         )}
                     </LabeledField>
                 </div>
+                <FormError>{fieldErrors.category}</FormError>
 
-                <LabeledField label="What are you tracking?">
-                    {({ controlId }) => (
-                        <Select
-                            value={measureKind}
-                            onValueChange={handleMeasureKindChange}
-                            disabled={submitting}
-                        >
-                            <SelectTrigger id={controlId}>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {MEASURE_KINDS.map((kind) => (
-                                    <SelectItem key={kind} value={kind}>
-                                        {MEASURE_KIND_LABELS[kind]}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                </LabeledField>
+                <div className="grid grid-cols-2 gap-4">
+                    <LabeledField label="What are you tracking?">
+                        {({ controlId }) => (
+                            <Select
+                                value={measureKind}
+                                onValueChange={handleMeasureKindChange}
+                                disabled={submitting}
+                            >
+                                <SelectTrigger id={controlId} className="w-full min-w-0">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {MEASURE_KINDS.map((kind) => (
+                                        <SelectItem key={kind} value={kind}>
+                                            {MEASURE_KIND_LABELS[kind]}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </LabeledField>
+
+                    <LabeledField label="Repeats">
+                        {() => (
+                            <HabitRecurrenceTypeSelect
+                                recurrence={recurrence}
+                                onChange={setRecurrence}
+                                todayLocalDate={todayLocalDate}
+                                disabled={submitting}
+                            />
+                        )}
+                    </LabeledField>
+                </div>
+                <p className="text-xs text-muted-foreground -mt-2">
+                    {MEASURE_KIND_HINTS[measureKind]}
+                </p>
 
                 {measureKind !== 'binary' && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className={usesUnit ? 'grid grid-cols-2 gap-4' : ''}>
                         <LabeledField label="Daily target">
                             {({ controlId }) => (
-                                <Input
-                                    id={controlId}
-                                    type="number"
-                                    min={0}
-                                    step="any"
-                                    value={targetValue}
-                                    disabled={submitting}
-                                    onChange={(event) => setTargetValue(event.target.value)}
-                                />
+                                <>
+                                    <Input
+                                        id={controlId}
+                                        type="number"
+                                        min={0}
+                                        step="any"
+                                        value={targetValue}
+                                        disabled={submitting}
+                                        onChange={(event) => setTargetValue(event.target.value)}
+                                    />
+                                    <FormError>{fieldErrors.targetValue}</FormError>
+                                </>
                             )}
                         </LabeledField>
 
-                        {unitOptions.length > 0 && (
+                        {usesUnit && (
                             <LabeledField
                                 label={measureKind === 'duration' ? 'Unit (optional)' : 'Unit'}
                             >
                                 {({ controlId }) => (
-                                    <Select
-                                        value={unitCode || 'none'}
-                                        onValueChange={(value) =>
-                                            setUnitCode(value === 'none' ? '' : value)
-                                        }
-                                        disabled={submitting}
-                                    >
-                                        <SelectTrigger id={controlId}>
-                                            <SelectValue placeholder="Choose a unit" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {measureKind === 'duration' && (
-                                                <SelectItem value="none">No unit</SelectItem>
-                                            )}
-                                            {unitOptions.map((option) => (
-                                                <SelectItem key={option.code} value={option.code}>
-                                                    {option.label}
+                                    <>
+                                        <Select
+                                            value={
+                                                unitMode === 'custom'
+                                                    ? CUSTOM_UNIT_VALUE
+                                                    : unitCode || 'none'
+                                            }
+                                            onValueChange={handleUnitChange}
+                                            disabled={submitting}
+                                        >
+                                            <SelectTrigger
+                                                id={controlId}
+                                                className="w-full min-w-0"
+                                            >
+                                                <SelectValue placeholder="Choose a unit" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {measureKind === 'duration' && (
+                                                    <SelectItem value="none">No unit</SelectItem>
+                                                )}
+                                                {unitOptions.map((option) => (
+                                                    <SelectItem
+                                                        key={option.code}
+                                                        value={option.code}
+                                                    >
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
+                                                <SelectItem value={CUSTOM_UNIT_VALUE}>
+                                                    Other (type your own)
                                                 </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                            </SelectContent>
+                                        </Select>
+                                        {unitMode === 'custom' && (
+                                            <Input
+                                                autoFocus
+                                                value={customUnitLabel}
+                                                disabled={submitting}
+                                                placeholder="e.g. cups"
+                                                maxLength={30}
+                                                className="mt-2"
+                                                aria-label="Custom unit"
+                                                onChange={(event) =>
+                                                    setCustomUnitLabel(event.target.value)
+                                                }
+                                            />
+                                        )}
+                                    </>
                                 )}
                             </LabeledField>
                         )}
                     </div>
                 )}
+                {/* Outside `usesUnit` on purpose - a unit error must still show even for a kind without the field */}
+                <FormError>{fieldErrors.unitCode}</FormError>
 
-                <LabeledField label="Repeats">
-                    {() => (
-                        <HabitRecurrenceField
-                            recurrence={recurrence}
-                            onChange={setRecurrence}
-                            todayLocalDate={todayLocalDate}
-                            disabled={submitting}
-                        />
-                    )}
-                </LabeledField>
+                <HabitRecurrenceDetails
+                    recurrence={recurrence}
+                    onChange={setRecurrence}
+                    todayLocalDate={todayLocalDate}
+                    disabled={submitting}
+                />
+                <FormError>{fieldErrors.recurrence}</FormError>
 
                 <LabeledField label="Start date">
                     {({ controlId }) => (
@@ -393,6 +498,7 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
                         />
                     )}
                 </LabeledField>
+                <FormError>{fieldErrors.startedOn}</FormError>
 
                 <FormError>{formError}</FormError>
             </form>
