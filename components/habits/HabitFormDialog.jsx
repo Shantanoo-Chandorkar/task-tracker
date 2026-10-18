@@ -10,7 +10,6 @@ import { getBrowserTodayLocalDate } from '@/modules/habits/domain/browser-local-
 import { UNIT_DIMENSIONS_BY_MEASURE_KIND } from '@/modules/habits/domain/habit-input';
 import { MEASURE_KINDS } from '@/modules/habits/domain/measures/index';
 import { UNIT_OPTIONS } from '@/modules/habits/domain/units';
-import { toDisplayHabitValue } from '@/modules/habits/domain/habit-display';
 import {
     DEFAULT_HABIT_COLOR,
     HABIT_DESCRIPTION_MAX,
@@ -141,11 +140,7 @@ export default function HabitFormDialog({ open, onClose, habit = null }) {
             setCategoryId(habit?.category_id ?? '');
             setPolarity(habit?.polarity ?? 'build');
             setMeasureKind(habit?.measure_kind ?? 'binary');
-            const displayTargetValue = toDisplayHabitValue(
-                { measure_kind: habit?.measure_kind ?? 'binary', unit_code: habitUnitCode || null },
-                habit?.target_value ?? null,
-            );
-            setTargetValue(displayTargetValue ?? '');
+            setTargetValue(habit?.target_value ?? '');
             setUnitCode(habitUnitCode && isBuiltInUnit ? habitUnitCode : '');
             setUnitMode(habitUnitCode && !isBuiltInUnit ? 'custom' : 'builtin');
             setCustomUnitLabel(habitUnitCode && !isBuiltInUnit ? habitUnitCode : '');

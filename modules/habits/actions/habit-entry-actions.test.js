@@ -282,12 +282,12 @@ describe('setHabitEntryValue', () => {
         expect(result.data).toMatchObject({ local_date: TODAY, value: 15 });
     });
 
-    it('converts a quantity value from its display unit to canonical storage', async () => {
+    it('stores a quantity value exactly as sent, with no unit conversion', async () => {
         setUpWorld({
             habits: [
                 buildHabitRow('habit-1', {
                     measure_kind: 'quantity',
-                    target_value: 5000,
+                    target_value: 5,
                     unit_code: 'km',
                 }),
             ],
@@ -296,7 +296,7 @@ describe('setHabitEntryValue', () => {
 
         const result = await setHabitEntryValue('habit-1', TODAY, 2.5);
 
-        expect(result.data.value).toBe(2500);
+        expect(result.data.value).toBe(2.5);
     });
 
     it('updates (not duplicates) an existing entry for the same day', async () => {

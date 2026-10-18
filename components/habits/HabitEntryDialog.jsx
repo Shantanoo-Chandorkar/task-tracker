@@ -8,23 +8,22 @@ import { Loader } from '@/components/custom/Loader';
 import FormError from '@/components/custom/FormError';
 import { useHabitCheckIn } from '@/hooks/useHabitCheckIn';
 import { useHabitEntryValue } from '@/hooks/useHabitEntryValue';
-import {
-    toDisplayHabitValue,
-    IMPLICIT_DURATION_UNIT_CODE,
-} from '@/modules/habits/domain/habit-display';
 import { UNIT_OPTIONS } from '@/modules/habits/domain/units';
 import { DEFAULT_BACKFILL_WINDOW_DAYS } from '@/modules/habits/domain/habit-input';
 import { addDaysToLocalDate } from '@/modules/habits/domain/local-date';
-import DateStepper from './DateStepper';
+import DatePillStrip from './DatePillStrip';
+
+// Cosmetic default label for a unit-less duration habit - never affects the stored value.
+const IMPLICIT_DURATION_UNIT_LABEL = 'min';
 
 /** @param {object} habit */
 function resolveUnitLabel(habit) {
     if (habit.measure_kind === 'count') return null;
-    const unitCode =
-        habit.unit_code || (habit.measure_kind === 'duration' ? IMPLICIT_DURATION_UNIT_CODE : null);
-    if (!unitCode) return null;
-    const option = UNIT_OPTIONS.find((candidate) => candidate.code === unitCode);
-    return option ? option.label : unitCode;
+    if (!habit.unit_code) {
+        return habit.measure_kind === 'duration' ? IMPLICIT_DURATION_UNIT_LABEL : null;
+    }
+    const option = UNIT_OPTIONS.find((candidate) => candidate.code === habit.unit_code);
+    return option ? option.label : habit.unit_code;
 }
 
 /**
@@ -38,7 +37,7 @@ function resolveUnitLabel(habit) {
  * @param {object} props.habit - The habit being logged.
  * @param {object[]} props.entries - This habit's own entries (any order), to find a day's existing one.
  * @param {string} props.todayLocalDate - 'YYYY-MM-DD', the caller's current local date.
- * @param {boolean} [props.allowDateNavigation] - Shows a date stepper bounded to the back-fill window.
+ * @param {boolean} [props.allowDateNavigation] - Shows a day-picker strip bounded to the back-fill window.
  */
 export default function HabitEntryDialog({
     open,
@@ -63,9 +62,7 @@ export default function HabitEntryDialog({
             setLocalDate(todayLocalDate);
             const initialEntry =
                 entries.find((entry) => entry.local_date === todayLocalDate) ?? null;
-            setDraftValue(
-                initialEntry ? String(toDisplayHabitValue(habit, initialEntry.value)) : '',
-            );
+            setDraftValue(initialEntry ? String(initialEntry.value) : '');
             setSubmitting(false);
             setValueError('');
         }
@@ -75,12 +72,13 @@ export default function HabitEntryDialog({
     const isBinary = habit.measure_kind === 'binary';
     const isQuit = habit.polarity === 'quit';
     const unitLabel = resolveUnitLabel(habit);
+    const loggedLocalDates = new Set(entries.map((entry) => entry.local_date));
 
     /** @param {string} nextLocalDate */
     function handleDateChange(nextLocalDate) {
         setLocalDate(nextLocalDate);
         const entryForDate = entries.find((entry) => entry.local_date === nextLocalDate) ?? null;
-        setDraftValue(entryForDate ? String(toDisplayHabitValue(habit, entryForDate.value)) : '');
+        setDraftValue(entryForDate ? String(entryForDate.value) : '');
         setValueError('');
     }
 
@@ -175,13 +173,14 @@ export default function HabitEntryDialog({
         >
             <div className="space-y-4 mt-2">
                 {allowDateNavigation && (
-                    <DateStepper
+                    <DatePillStrip
                         localDate={localDate}
                         minLocalDate={addDaysToLocalDate(
                             todayLocalDate,
                             -DEFAULT_BACKFILL_WINDOW_DAYS,
                         )}
                         maxLocalDate={todayLocalDate}
+                        loggedLocalDates={loggedLocalDates}
                         onChange={handleDateChange}
                     />
                 )}

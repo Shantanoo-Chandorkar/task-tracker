@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { Loader } from '@/components/custom/Loader';
 import { useHabitCheckIn } from '@/hooks/useHabitCheckIn';
-import { toDisplayHabitValue } from '@/modules/habits/domain/habit-display';
 import HabitEntryDialog from './HabitEntryDialog';
 
 /**
@@ -57,7 +56,7 @@ export default function HabitCheckInControl({ habit, todayEntry, todayLocalDate 
         );
     }
 
-    const displayValue = todayEntry ? toDisplayHabitValue(habit, todayEntry.value) : 0;
+    const todayValue = todayEntry ? todayEntry.value : 0;
 
     return (
         <>
@@ -66,7 +65,7 @@ export default function HabitCheckInControl({ habit, todayEntry, todayLocalDate 
                 onClick={() => setIsDialogOpen(true)}
                 className="hit-area press-feedback flex flex-shrink-0 items-center gap-1.5 rounded-full border border-field px-3 py-1.5 text-sm font-medium text-muted-foreground motion-safe:transition-colors hover:border-foreground hover:text-foreground"
             >
-                {displayValue} / {toDisplayHabitValue(habit, habit.target_value)}
+                {todayValue} / {habit.target_value}
             </button>
             <HabitEntryDialog
                 open={isDialogOpen}

@@ -171,7 +171,7 @@ describe('createHabit', () => {
         ).toMatchObject({ data: null, code: 'HABIT_POLARITY_MEASURE_MISMATCH' });
     });
 
-    it('stores a quantity target value canonically, converted from its display unit', async () => {
+    it('stores a quantity target value exactly as sent, with no unit conversion', async () => {
         const { createHabit } = await habitActions();
 
         const createResult = await createHabit({
@@ -181,7 +181,7 @@ describe('createHabit', () => {
             unit_code: 'km',
         });
 
-        expect(createResult.data).toMatchObject({ target_value: 5000, unit_code: 'km' });
+        expect(createResult.data).toMatchObject({ target_value: 5, unit_code: 'km' });
     });
 
     it('stores a custom-unit target value verbatim, with no conversion', async () => {
@@ -451,12 +451,12 @@ describe('updateHabit', () => {
         ).toMatchObject({ data: null, code: 'HABIT_POLARITY_MEASURE_MISMATCH' });
     });
 
-    it('converts a re-sent target value using the unit as of this same update', async () => {
+    it('stores a re-sent target value exactly as sent, even when the unit also changes', async () => {
         setUpWorld({
             habits: [
                 buildHabitRow('habit-1', {
                     measure_kind: 'quantity',
-                    target_value: 5000,
+                    target_value: 5,
                     unit_code: 'km',
                 }),
             ],
@@ -466,16 +466,15 @@ describe('updateHabit', () => {
         const updateResult = await updateHabit('habit-1', { target_value: 3, unit_code: 'mi' });
 
         expect(updateResult.error).toBeNull();
-        expect(updateResult.data.unit_code).toBe('mi');
-        expect(updateResult.data.target_value).toBeCloseTo(4828.032, 3);
+        expect(updateResult.data).toMatchObject({ unit_code: 'mi', target_value: 3 });
     });
 
-    it('leaves a stored canonical target value untouched when neither it nor the unit changes', async () => {
+    it('leaves the stored target value untouched when neither it nor the unit changes', async () => {
         setUpWorld({
             habits: [
                 buildHabitRow('habit-1', {
                     measure_kind: 'quantity',
-                    target_value: 5000,
+                    target_value: 5,
                     unit_code: 'km',
                 }),
             ],
@@ -484,7 +483,7 @@ describe('updateHabit', () => {
 
         await updateHabit('habit-1', { title: 'New title' });
 
-        expect(storedHabit('habit-1').target_value).toBe(5000);
+        expect(storedHabit('habit-1').target_value).toBe(5);
     });
 
     it('re-checks an unrelated field against the habit’s existing measure kind', async () => {

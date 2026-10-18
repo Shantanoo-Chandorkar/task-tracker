@@ -15,7 +15,6 @@ import {
     checkHabitRecurrence,
     checkHabitStartedOn,
 } from '@/modules/habits/domain/habit-input';
-import { toCanonicalHabitValue } from '@/modules/habits/domain/habit-display';
 import {
     DEFAULT_HABIT_COLOR,
     DEFAULT_HABIT_POLARITY,
@@ -102,11 +101,6 @@ function validateHabitCreateFields(fields, todayLocalDate) {
         return { failure: { error: unitCodeCheck.error, code: unitCodeCheck.code } };
     }
 
-    const targetValue = toCanonicalHabitValue(
-        { measure_kind: measureKind, unit_code: unitCodeCheck.unitCode },
-        targetValueCheck.targetValue,
-    );
-
     /** @type {Record<string, any>} */
     let recurrence = DEFAULT_HABIT_RECURRENCE;
     if (fields.recurrence !== undefined) {
@@ -129,7 +123,7 @@ function validateHabitCreateFields(fields, todayLocalDate) {
             color: fields.color ?? DEFAULT_HABIT_COLOR,
             polarity,
             measure_kind: measureKind,
-            target_value: targetValue,
+            target_value: targetValueCheck.targetValue,
             unit_code: unitCodeCheck.unitCode,
             recurrence,
             started_on: startedOnCheck.startedOn,
@@ -273,16 +267,6 @@ export const updateHabit = withAuthenticatedAction(
             const unitCodeCheck = checkHabitUnitCode(unitCodeToCheck, measureKind);
             if (unitCodeCheck.error) return { data: null, ...unitCodeCheck };
             updates.unit_code = unitCodeCheck.unitCode;
-        }
-
-        if (updates.target_value !== undefined) {
-            const finalUnitCode =
-                updates.unit_code !== undefined ? updates.unit_code : existingHabit.unit_code;
-            const pendingTargetValue = updates.target_value;
-            updates.target_value = toCanonicalHabitValue(
-                { measure_kind: measureKind, unit_code: finalUnitCode },
-                pendingTargetValue,
-            );
         }
 
         if (fields.recurrence !== undefined) {

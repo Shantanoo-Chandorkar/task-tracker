@@ -227,20 +227,20 @@ describe('HabitFormDialog measure-kind hint', () => {
     });
 });
 
-describe('HabitFormDialog canonical unit conversion', () => {
-    it('prefills the target value in the stored unit, converted back from canonical storage', () => {
+describe('HabitFormDialog does not convert the target value between units', () => {
+    it('prefills the stored target value exactly as-is for a built-in unit', () => {
         renderDialog({
             habit: buildCountHabit({
                 measure_kind: 'quantity',
                 unit_code: 'km',
-                target_value: 5000,
+                target_value: 5,
             }),
         });
 
         expect(screen.getByRole('spinbutton').value).toBe('5');
     });
 
-    it('leaves a custom (non-built-in) unit’s target value unconverted', () => {
+    it('prefills the stored target value exactly as-is for a custom unit', () => {
         renderDialog({
             habit: buildCountHabit({
                 measure_kind: 'quantity',
@@ -250,6 +250,24 @@ describe('HabitFormDialog canonical unit conversion', () => {
         });
 
         expect(screen.getByRole('spinbutton').value).toBe('8');
+    });
+
+    it('sends the typed target value unchanged, whatever unit is selected', async () => {
+        updateHabit.mockResolvedValue({ data: buildCountHabit(), error: null });
+        renderDialog({
+            habit: buildCountHabit({
+                measure_kind: 'quantity',
+                unit_code: 'km',
+                target_value: 5,
+            }),
+        });
+
+        await submitForm();
+
+        expect(updateHabit).toHaveBeenCalledWith(
+            'habit-1',
+            expect.objectContaining({ target_value: 5, unit_code: 'km' }),
+        );
     });
 });
 

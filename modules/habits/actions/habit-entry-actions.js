@@ -6,7 +6,6 @@ import {
     checkHabitEntryValue,
     checkHabitEntryLocalDate,
 } from '@/modules/habits/domain/habit-input';
-import { toCanonicalHabitValue } from '@/modules/habits/domain/habit-display';
 import { toHabitEntryRateLimitResult } from '@/modules/habits/domain/habit-entry-rate-limit';
 import {
     HABIT_ID_REQUIRED,
@@ -131,7 +130,7 @@ export const toggleHabitCheckIn = withAuthenticatedAction(
  *
  * @param {string} habitId - Habit to log a value for.
  * @param {string} localDate - 'YYYY-MM-DD' day the value belongs to.
- * @param {unknown} rawValue - Value entered by the user, in the habit's display unit, or empty to clear.
+ * @param {unknown} rawValue - Value entered by the user, stored exactly as sent, or empty to clear.
  * @returns {Promise<{ data: Record<string, any>|null, error: string|null, code?: string }>}
  */
 export const setHabitEntryValue = withAuthenticatedAction(
@@ -178,12 +177,11 @@ export const setHabitEntryValue = withAuthenticatedAction(
         if (valueCheck.error) {
             return { data: null, error: valueCheck.error, code: valueCheck.code };
         }
-        const canonicalValue = toCanonicalHabitValue(habit, valueCheck.value);
 
         if (existingEntry) {
             const { data: updatedEntry, error } = await supabase
                 .from('habit_entries')
-                .update({ value: canonicalValue })
+                .update({ value: valueCheck.value })
                 .eq('id', existingEntry.id)
                 .select()
                 .maybeSingle();
@@ -202,7 +200,7 @@ export const setHabitEntryValue = withAuthenticatedAction(
                 habit_id: habitId,
                 user_id: user.id,
                 local_date: resolvedLocalDate,
-                value: canonicalValue,
+                value: valueCheck.value,
             })
             .select()
             .single();

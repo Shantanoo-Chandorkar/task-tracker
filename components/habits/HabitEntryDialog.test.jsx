@@ -1,6 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import HabitEntryDialog from './HabitEntryDialog';
+
+// DatePillStrip scrolls the selected pill into view, which jsdom has no layout engine for.
+beforeAll(() => {
+    Element.prototype.scrollIntoView = () => {};
+});
 
 const toggle = vi.fn().mockResolvedValue(true);
 const setValue = vi.fn().mockResolvedValue(true);
@@ -259,7 +264,7 @@ describe('HabitEntryDialog quantity/duration body', () => {
 });
 
 describe('HabitEntryDialog back-fill navigation', () => {
-    it('shows a date stepper only when allowDateNavigation is true', () => {
+    it('shows a day-picker strip only when allowDateNavigation is true', () => {
         const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
         render(
             <HabitEntryDialog
@@ -270,7 +275,7 @@ describe('HabitEntryDialog back-fill navigation', () => {
                 todayLocalDate={TODAY}
             />,
         );
-        expect(screen.queryByLabelText('Previous day')).toBeNull();
+        expect(screen.queryByRole('group', { name: 'Pick a day' })).toBeNull();
 
         render(
             <HabitEntryDialog
@@ -282,7 +287,7 @@ describe('HabitEntryDialog back-fill navigation', () => {
                 allowDateNavigation
             />,
         );
-        expect(screen.getAllByLabelText('Previous day').length).toBeGreaterThan(0);
+        expect(screen.getAllByRole('group', { name: 'Pick a day' }).length).toBeGreaterThan(0);
     });
 
     it('re-prefills the amount from the newly selected day’s entry', () => {
@@ -303,8 +308,29 @@ describe('HabitEntryDialog back-fill navigation', () => {
         );
         expect(screen.getByLabelText('Value').value).toBe('5');
 
-        fireEvent.click(screen.getByLabelText('Previous day'));
+        fireEvent.click(screen.getByLabelText('Saturday, October 17, 2026'));
 
         expect(screen.getByLabelText('Value').value).toBe('9');
+    });
+
+    it('marks a day that already has an entry so it stands out in the strip', () => {
+        const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
+        const entries = [
+            { id: 'entry-yesterday', habit_id: 'habit-1', local_date: '2026-10-17', value: 9 },
+        ];
+        render(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={entries}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        expect(screen.getByLabelText('Saturday, October 17, 2026').className).toContain(
+            'bg-metric',
+        );
     });
 });
