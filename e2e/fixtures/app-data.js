@@ -305,22 +305,15 @@ export function sublistRow(page, sublistName) {
 }
 
 /**
- * Moves a sortable row one step down via dnd-kit's keyboard sensor, deterministically -
- * a raw mouse dragTo() is timing-sensitive against dnd-kit sortables.
+ * Moves a row one step down via its "..." menu's "Move down" item, the same path every
+ * space/list/sublist/task row shares.
  *
  * @param {import('@playwright/test').Locator} row - A space/list/sublist/task row locator.
  * @returns {Promise<void>}
  */
-export async function dragHandleDown(row) {
-    const handle = row.getByRole('button', { name: 'Drag to reorder' });
-    const page = row.page();
-    // Space/Arrow/Space back-to-back outruns React's own state update and drops on itself.
-    await handle.focus();
-    await handle.press('Space');
-    await page.waitForTimeout(150);
-    await handle.press('ArrowDown');
-    await page.waitForTimeout(150);
-    await handle.press('Space');
+export async function moveRowDown(row) {
+    await row.getByRole('button', { name: /actions for/i }).click();
+    await row.page().getByRole('menuitem', { name: 'Move down' }).click();
 }
 
 /**

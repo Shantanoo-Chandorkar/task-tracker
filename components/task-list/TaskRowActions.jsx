@@ -10,15 +10,20 @@ import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdow
 import RowActionsMenu, { MoveMenuItems } from '@/components/custom/RowActionsMenu';
 import ModalShell from '@/components/custom/ModalShell';
 import MountOnFirstOpen from '@/components/custom/MountOnFirstOpen';
-import { deleteTask, deleteTaskAndReparentChildren } from '@/actions/task-delete-actions';
+import {
+    deleteTask,
+    deleteTaskAndReparentChildren,
+} from '@/modules/tasks/actions/task-delete-actions';
 import { useDuplicateTask } from '@/hooks/useDuplicateTask';
-import { buildMoveGroups } from '@/lib/tasks/move-groups';
+import { buildMoveGroups } from '@/modules/tasks/domain/move-groups';
 import TaskFormDialog from '@/components/task-form/TaskFormDialog';
 import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
+import { createClientId } from '@/lib/client-id';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
+import { startTimeSession } from '@/modules/timer/actions/time-session-actions';
 
 /**
  * Where a task can be moved, worked out only while the menu item or the sheet that needs it is mounted.
@@ -238,6 +243,33 @@ export default function TaskRowActions({
         setPending(false);
     }
 
+    async function handleStartTimer() {
+        const releaseInFlight = claimInFlight(`timer-start:${task.id}`);
+        if (!releaseInFlight) return;
+        setPending(true);
+        const toastId = toast.loading('Starting timer...');
+        try {
+            let startResult;
+            try {
+                startResult = await startTimeSession({ taskId: task.id, id: createClientId() });
+            } catch {
+                toast.error('Could not reach the server. Check your connection and try again.', {
+                    id: toastId,
+                });
+                return;
+            }
+            if (startResult.error) {
+                toast.error(startResult.error, { id: toastId });
+                return;
+            }
+            queryClient.invalidateQueries({ queryKey: ['time-sessions'] });
+            toast.success('Timer started', { id: toastId });
+        } finally {
+            setPending(false);
+            releaseInFlight();
+        }
+    }
+
     return (
         <>
             {/* Edit/Delete live only in this menu - always visible since mobile has no hover. */}
@@ -283,6 +315,7 @@ export default function TaskRowActions({
                     >
                         Duplicate
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleStartTimer}>Start Timer</DropdownMenuItem>
                     <DropdownMenuSeparator />
 
                     {moveTargets && (

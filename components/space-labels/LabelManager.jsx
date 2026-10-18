@@ -1,14 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { DndContext, closestCenter } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Loader } from '@/components/custom/Loader';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { useDragSensors } from '@/hooks/useDragSensors';
 import { useLabelReorder } from '@/hooks/useLabelReorder';
-import { getMoveTargets } from '@/lib/tasks/move-neighbours';
-import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/ui/dnd-announcements';
+import { getMoveTargets } from '@/modules/tasks/domain/move-neighbours';
 import LabelRow from './LabelRow';
 import LabelFormDialog from './LabelFormDialog';
 import LabelDeleteDialog from './LabelDeleteDialog';
@@ -59,16 +55,12 @@ export default function LabelManager({
     const [deleteTarget, setDeleteTarget] = useState(null);
     const deleteConfirm = useConfirmAction(Boolean(deleteTarget));
 
-    const sensors = useDragSensors();
-    const { handleDragEnd, moveLabelNextTo } = useLabelReorder({
+    const { moveLabelNextTo } = useLabelReorder({
         resourceKey,
         spaceId,
         labels,
         saveOrder: actions.saveOrder,
     });
-    const announcements = buildAnnouncements(
-        (rowId) => labels.find((label) => label.id === rowId)?.name,
-    );
 
     function handleConfirmDelete() {
         if (!deleteTarget) return;
@@ -101,39 +93,23 @@ export default function LabelManager({
                     {emptyMessage}
                 </div>
             ) : (
-                <DndContext
-                    id={`${lowerNoun}-dnd`}
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                    accessibility={{
-                        announcements,
-                        screenReaderInstructions: SCREEN_READER_INSTRUCTIONS,
-                    }}
-                >
-                    <SortableContext
-                        items={labels.map((label) => label.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
-                        <div className="rounded-xl bg-card">
-                            {labels.map((label) => (
-                                <LabelRow
-                                    key={label.id}
-                                    label={label}
-                                    isReadOnly={isReadOnly}
-                                    badges={renderBadges?.(label)}
-                                    deleteBlockedReason={getDeleteBlockedReason(label, labels)}
-                                    moveTargets={getMoveTargets(labels, label.id)}
-                                    onEditRequest={(editedLabel) =>
-                                        setFormDialog({ open: true, label: editedLabel })
-                                    }
-                                    onDeleteRequest={setDeleteTarget}
-                                    onMove={moveLabelNextTo}
-                                />
-                            ))}
-                        </div>
-                    </SortableContext>
-                </DndContext>
+                <div className="rounded-xl bg-card">
+                    {labels.map((label) => (
+                        <LabelRow
+                            key={label.id}
+                            label={label}
+                            isReadOnly={isReadOnly}
+                            badges={renderBadges?.(label)}
+                            deleteBlockedReason={getDeleteBlockedReason(label, labels)}
+                            moveTargets={getMoveTargets(labels, label.id)}
+                            onEditRequest={(editedLabel) =>
+                                setFormDialog({ open: true, label: editedLabel })
+                            }
+                            onDeleteRequest={setDeleteTarget}
+                            onMove={moveLabelNextTo}
+                        />
+                    ))}
+                </div>
             )}
 
             {!isReadOnly && (

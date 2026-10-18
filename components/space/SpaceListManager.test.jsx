@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { REORDER_BUSY_MESSAGE } from '@/lib/in-flight-entities';
 import { PERMISSION_LEVEL_LABELS } from '@/lib/permissions/space-permissions';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
-import { fetchDeleteCounts } from '@/lib/fetch-delete-counts';
+import { fetchDeleteCounts } from '@/modules/tasks/domain/fetch-delete-counts';
 import SpaceListManager from './SpaceListManager';
 
 const USER_ID = 'user-1';
@@ -47,13 +47,13 @@ vi.mock('@/hooks/useListsQuery', () => ({ useListsQuery: () => ({ data: mocks.li
 vi.mock('@/hooks/useCurrentUserProfileQuery', () => ({
     useCurrentUserProfileQuery: () => ({ data: { is_guest: mocks.isGuest } }),
 }));
-vi.mock('@/actions/space-actions', () => ({
+vi.mock('@/modules/tasks/actions/space-actions', () => ({
     deleteSpace: (...args) => mocks.deleteSpace(...args),
 }));
-vi.mock('@/actions/list-actions', () => ({
+vi.mock('@/modules/tasks/actions/list-actions', () => ({
     deleteList: (...args) => mocks.deleteList(...args),
 }));
-vi.mock('@/actions/reorder-actions', () => ({
+vi.mock('@/modules/tasks/actions/reorder-actions', () => ({
     reorderSpaces: (...args) => mocks.reorderSpaces(...args),
     reorderLists: (...args) => mocks.reorderLists(...args),
 }));
@@ -70,7 +70,7 @@ vi.mock('sonner', () => ({
     },
 }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
-vi.mock('@/lib/fetch-delete-counts', () => ({ fetchDeleteCounts: vi.fn() }));
+vi.mock('@/modules/tasks/domain/fetch-delete-counts', () => ({ fetchDeleteCounts: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('./SpaceFormDialog', () => ({
     default: ({ open, space }) =>
@@ -156,11 +156,10 @@ function pendingPromise() {
 }
 
 describe('SpaceListManager row menus', () => {
-    it('names every drag handle and menu button after its space or list', () => {
+    it('names every menu button after its space or list', () => {
         renderManager();
 
         for (const rowName of ['Home', 'Work', 'Groceries', 'Chores']) {
-            expect(screen.getByRole('button', { name: `Drag to reorder ${rowName}` })).toBeTruthy();
             expect(
                 screen.getByRole('button', { name: `More actions for ${rowName}` }),
             ).toBeTruthy();
@@ -312,7 +311,6 @@ describe('SpaceListManager shared spaces', () => {
 
         expect(screen.getAllByText('Shared with you')).toHaveLength(2);
         expect(screen.getByText(`${PERMISSION_LEVEL_LABELS.full} access`)).toBeTruthy();
-        expect(screen.queryByRole('button', { name: 'Drag to reorder Team' })).toBeNull();
         expect(screen.queryByRole('button', { name: 'More actions for Team' })).toBeNull();
         expect(screen.getByRole('button', { name: 'Leave space' })).toBeTruthy();
     });

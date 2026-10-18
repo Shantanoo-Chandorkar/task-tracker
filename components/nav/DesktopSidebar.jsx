@@ -1,27 +1,41 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Search } from 'lucide-react';
 import SidebarNav from './SidebarNav';
+import HabitZoneNav from '@/components/habits/HabitZoneNav';
+import TimeTrackingNav from '@/components/timer/TimeTrackingNav';
 import { openSearch } from './GlobalSearch';
 
 /**
  * Persistent left sidebar shown at `lg` (1024px) and above - app name header,
- * search trigger, and the shared SidebarNav content.
+ * search trigger, and the zone-appropriate nav content.
  *
  * @param {object} props
  * @param {object[]} props.initialSpaces - SSR-fetched spaces, forwarded to SidebarNav
  * @param {object[]} props.initialLists - SSR-fetched lists, forwarded to SidebarNav
- * @param {object|null} props.initialProfile - SSR-fetched profile, forwarded to SidebarNav
+ * @param {object|null} props.initialProfile - SSR-fetched profile, forwarded to the nav content
  */
 export default function DesktopSidebar({ initialSpaces, initialLists, initialProfile }) {
+    const pathname = usePathname();
+    const isHabitZone = pathname.startsWith('/habits');
+    const isTimeTracking = pathname.startsWith('/timer');
+
+    const zoneHref = isHabitZone ? '/habits' : isTimeTracking ? '/timer' : '/';
+    const zoneLabel = isHabitZone
+        ? 'Habit Zone'
+        : isTimeTracking
+          ? 'Time Tracking'
+          : 'Task Tracker';
+
     return (
         <aside className="hidden lg:flex sticky top-0 h-screen w-[20%] flex-shrink-0 flex-col border-r border-border bg-sidebar p-3">
             <Link
-                href="/"
+                href={zoneHref}
                 className="mb-4 flex items-center gap-2 px-2 text-[0.9375rem] font-semibold text-foreground no-underline"
             >
-                Task Tracker
+                {zoneLabel}
             </Link>
             <button
                 onClick={openSearch}
@@ -33,11 +47,17 @@ export default function DesktopSidebar({ initialSpaces, initialLists, initialPro
                 </span>
                 <kbd className="rounded border border-border bg-muted px-1 text-xs">⌘K</kbd>
             </button>
-            <SidebarNav
-                initialSpaces={initialSpaces}
-                initialLists={initialLists}
-                initialProfile={initialProfile}
-            />
+            {isHabitZone ? (
+                <HabitZoneNav initialProfile={initialProfile} />
+            ) : isTimeTracking ? (
+                <TimeTrackingNav initialProfile={initialProfile} />
+            ) : (
+                <SidebarNav
+                    initialSpaces={initialSpaces}
+                    initialLists={initialLists}
+                    initialProfile={initialProfile}
+                />
+            )}
         </aside>
     );
 }

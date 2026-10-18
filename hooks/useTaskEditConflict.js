@@ -3,7 +3,10 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { withSavedRow, withStatusDisplay } from '@/lib/cache/query-cache';
-import { buildEditConflictMessage, describeTaskChanges } from '@/lib/tasks/task-edit-conflict';
+import {
+    buildEditConflictMessage,
+    describeTaskChanges,
+} from '@/modules/tasks/domain/task-edit-conflict';
 
 /**
  * Remembers which version of a task the edit dialog was opened on, and handles the save being refused because

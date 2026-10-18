@@ -4,7 +4,7 @@ import { useDeleteConfirm } from './useDeleteConfirm';
 
 const fetchDeleteCounts = vi.fn();
 
-vi.mock('@/lib/fetch-delete-counts', () => ({
+vi.mock('@/modules/tasks/domain/fetch-delete-counts', () => ({
     fetchDeleteCounts: (...args) => fetchDeleteCounts(...args),
 }));
 

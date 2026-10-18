@@ -3,7 +3,7 @@
 import { AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import ModalShell from '@/components/custom/ModalShell';
 import { Loader } from '@/components/custom/Loader';
-import { describeDeleteTarget } from '@/lib/spaces/delete-target-copy';
+import { describeDeleteTarget } from '@/modules/tasks/delete-target-copy';
 
 /**
  * Confirmation popup for deleting a space, deleting a list, or leaving a shared space.

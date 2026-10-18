@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { requireAuthResponse, withApiErrorHandling, queryFailedResponse } from '@/lib/api-response';
-import { SEARCH_FAILED } from '@/lib/error-codes';
+import { SEARCH_FAILED } from '@/modules/tasks/errors';
 
 const RESULTS_PER_CATEGORY = 8;
 

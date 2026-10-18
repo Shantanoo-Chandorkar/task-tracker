@@ -5,6 +5,8 @@ const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'tr
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     poweredByHeader: false,
+    // npm run typecheck (CI's real gate) checks tsconfig.typecheck.json; this file only feeds the bundler alias.
+    typescript: { ignoreBuildErrors: true },
     async headers() {
         return [
             {

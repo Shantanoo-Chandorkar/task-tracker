@@ -17,13 +17,15 @@ const reorderTags = vi.fn();
 
 vi.mock('@/hooks/useTagsQuery', () => ({ useTagsQuery: () => tagsQuery }));
 vi.mock('@/hooks/usePermissionForSpace', () => ({ usePermissionForSpace: () => permission.level }));
-vi.mock('@/actions/tag-actions', () => ({
+vi.mock('@/modules/tasks/actions/tag-actions', () => ({
     createTag: vi.fn(),
     updateTag: vi.fn(),
     deleteTag: (...args) => deleteTag(...args),
     deleteAllTagsInSpace: (...args) => deleteAllTagsInSpace(...args),
 }));
-vi.mock('@/actions/reorder-actions', () => ({ reorderTags: (...args) => reorderTags(...args) }));
+vi.mock('@/modules/tasks/actions/reorder-actions', () => ({
+    reorderTags: (...args) => reorderTags(...args),
+}));
 vi.mock('@/components/space-labels/LabelFormDialog', () => ({ default: () => null }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));

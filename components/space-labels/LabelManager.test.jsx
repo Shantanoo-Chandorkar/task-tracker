@@ -101,7 +101,6 @@ describe('LabelManager', () => {
 
         renderManager(buildProps({ labels: [] }));
         expect(screen.getByText('No tags in this space yet.')).toBeTruthy();
-        expect(screen.queryByRole('button', { name: /Drag to reorder/ })).toBeNull();
     });
 
     it('opens the form for a new label, and for an existing one from its menu', async () => {
@@ -121,7 +120,6 @@ describe('LabelManager', () => {
         expect(screen.getByText('Urgent')).toBeTruthy();
         expect(screen.queryByRole('button', { name: '+ Add tag' })).toBeNull();
         expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
-        expect(screen.queryByRole('button', { name: /Drag to reorder/ })).toBeNull();
         expect(screen.queryByText('Extra control')).toBeNull();
     });
 

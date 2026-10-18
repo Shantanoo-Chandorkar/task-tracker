@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/admin';
-import { computeNextOccurrence } from '@/lib/tasks/recurrence';
+import { computeNextOccurrence } from '@/modules/tasks/domain/recurrence';
 import { NextResponse } from 'next/server';
 import { apiErrorResponse, queryFailedResponse } from '@/lib/api-response';
-import { CRON_UNAUTHORIZED, RECURRENCE_LOAD_FAILED, INTERNAL_ERROR } from '@/lib/error-codes';
+import { CRON_UNAUTHORIZED, INTERNAL_ERROR } from '@/lib/error-codes';
+import { RECURRENCE_LOAD_FAILED } from '@/modules/tasks/errors';
 
 // A daily run that falls behind catches up on the next one, instead of running past the function time limit
 const MAX_TASKS_PER_RUN = 300;

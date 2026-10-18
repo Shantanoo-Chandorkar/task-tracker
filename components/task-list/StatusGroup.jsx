@@ -1,9 +1,8 @@
 'use client';
 
-import { Fragment, useId, useState } from 'react';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Fragment, useId } from 'react';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
-import { createStableIdsReader, isStartOfUnprioritisedTier } from '@/lib/tasks/task-tree';
+import { isStartOfUnprioritisedTier } from '@/modules/tasks/domain/task-tree';
 import TaskRow, { PriorityTierDivider } from './TaskRow';
 
 /**
@@ -43,9 +42,6 @@ export default function StatusGroup({
     isInSublist = false,
 }) {
     const headingId = useId();
-    // Same array while the ids are unchanged, or SortableContext re-renders every row on each list render
-    const [readStableIds] = useState(createStableIdsReader);
-    const taskIds = readStableIds(tasks);
     if (tasks.length === 0) return null;
     const Heading = isInSublist ? 'h3' : 'h2';
 
@@ -88,27 +84,25 @@ export default function StatusGroup({
 
             {!isCollapsed && (
                 <>
-                    <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-                        {tasks.map((task, taskIndex) => (
-                            <Fragment key={task.id}>
-                                {isStartOfUnprioritisedTier(tasks, taskIndex) && (
-                                    <PriorityTierDivider />
-                                )}
-                                <div onClick={() => onFocusTask(task.id)}>
-                                    <TaskRow
-                                        task={task}
-                                        depth={0}
-                                        listId={listId}
-                                        currentUserId={currentUserId}
-                                        myPermission={myPermission}
-                                        maxSubtasksPerParent={maxSubtasksPerParent}
-                                        siblingTasks={tasks}
-                                        onMoveTask={onMoveTask}
-                                    />
-                                </div>
-                            </Fragment>
-                        ))}
-                    </SortableContext>
+                    {tasks.map((task, taskIndex) => (
+                        <Fragment key={task.id}>
+                            {isStartOfUnprioritisedTier(tasks, taskIndex) && (
+                                <PriorityTierDivider />
+                            )}
+                            <div onClick={() => onFocusTask(task.id)}>
+                                <TaskRow
+                                    task={task}
+                                    depth={0}
+                                    listId={listId}
+                                    currentUserId={currentUserId}
+                                    myPermission={myPermission}
+                                    maxSubtasksPerParent={maxSubtasksPerParent}
+                                    siblingTasks={tasks}
+                                    onMoveTask={onMoveTask}
+                                />
+                            </div>
+                        </Fragment>
+                    ))}
 
                     {canWrite && (
                         <button

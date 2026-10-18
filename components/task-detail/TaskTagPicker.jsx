@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { runExclusively } from '@/lib/in-flight-entities';
 import { useTagsQuery } from '@/hooks/useTagsQuery';
-import { assignTagsToTask, removeTagFromTask } from '@/actions/tag-actions';
+import { assignTagsToTask, removeTagFromTask } from '@/modules/tasks/actions/tag-actions';
 import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import TagComboboxField from '@/components/tag/TagComboboxField';

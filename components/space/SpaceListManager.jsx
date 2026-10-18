@@ -1,17 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { DndContext, closestCenter } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
-import { useDragSensors } from '@/hooks/useDragSensors';
 import { useSpaceListReorder } from '@/hooks/useSpaceListReorder';
 import { useSpaceListDeletion } from '@/hooks/useSpaceListDeletion';
 import { useJoinSpaceDialog } from '@/hooks/useJoinSpaceDialog';
-import { getMoveTargets } from '@/lib/tasks/move-neighbours';
-import { buildAnnouncements, SCREEN_READER_INSTRUCTIONS } from '@/lib/ui/dnd-announcements';
+import { getMoveTargets } from '@/modules/tasks/domain/move-neighbours';
 import SpaceFormDialog from './SpaceFormDialog';
 import ListFormDialog from './ListFormDialog';
 import JoinSpaceDialog from './JoinSpaceDialog';
@@ -23,7 +19,7 @@ const DASHED_BUTTON_CLASS =
 
 /**
  * Full Space/List management UI - create, rename, recolor, reorder, and delete both.
- * Owned spaces are drag-reorderable; spaces shared with the current user render in a
+ * Owned spaces are reorderable via Move up/down; spaces shared with the current user render in a
  * separate, non-reorderable section (reordering a space you don't own would just fail RLS).
  *
  * @param {object} props
@@ -50,16 +46,7 @@ export default function SpaceListManager({
     const sharedSpaces = spaces.filter((space) => space.owner_id !== currentUserId);
 
     const deletion = useSpaceListDeletion(lists);
-    const { handleDragEnd, moveSpaceNextTo, moveListNextTo } = useSpaceListReorder(
-        ownedSpaces,
-        lists,
-    );
-    const sensors = useDragSensors();
-    const announcements = buildAnnouncements(
-        (rowId) =>
-            spaces.find((space) => space.id === rowId)?.name ??
-            lists.find((list) => list.id === rowId)?.name,
-    );
+    const { moveSpaceNextTo, moveListNextTo } = useSpaceListReorder(ownedSpaces, lists);
 
     const sectionActions = {
         onEditSpace: (space) => setSpaceDialog({ open: true, space }),
@@ -77,60 +64,39 @@ export default function SpaceListManager({
             <div>
                 <h2 className="text-base font-semibold mb-1">Your spaces</h2>
                 <p className="text-sm text-muted-foreground">
-                    Spaces group your lists. Each list holds its own tasks. Drag to reorder.
+                    Spaces group your lists. Each list holds its own tasks. Use the menu to reorder.
                 </p>
             </div>
 
-            <DndContext
-                id="space-list-dnd"
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-                accessibility={{
-                    announcements,
-                    screenReaderInstructions: SCREEN_READER_INSTRUCTIONS,
-                }}
-            >
-                <SortableContext
-                    items={ownedSpaces.map((space) => space.id)}
-                    strategy={verticalListSortingStrategy}
-                >
-                    <div className="space-y-3">
-                        {ownedSpaces.map((space) => (
-                            <SpaceSection
-                                key={space.id}
-                                space={space}
-                                isOwner
-                                initialProfile={initialProfile}
-                                lists={lists.filter((list) => list.space_id === space.id)}
-                                moveTargets={getMoveTargets(ownedSpaces, space.id)}
-                                actions={sectionActions}
-                            />
-                        ))}
-                    </div>
-                </SortableContext>
+            <div className="space-y-3">
+                {ownedSpaces.map((space) => (
+                    <SpaceSection
+                        key={space.id}
+                        space={space}
+                        isOwner
+                        initialProfile={initialProfile}
+                        lists={lists.filter((list) => list.space_id === space.id)}
+                        moveTargets={getMoveTargets(ownedSpaces, space.id)}
+                        actions={sectionActions}
+                    />
+                ))}
+            </div>
 
-                {sharedSpaces.length > 0 && (
-                    <div className="space-y-3 mt-6">
-                        <p className="text-xs font-medium text-muted-foreground">Shared with you</p>
-                        <SortableContext
-                            items={sharedSpaces.map((space) => space.id)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            {sharedSpaces.map((space) => (
-                                <SpaceSection
-                                    key={space.id}
-                                    space={space}
-                                    isOwner={false}
-                                    initialProfile={initialProfile}
-                                    lists={lists.filter((list) => list.space_id === space.id)}
-                                    actions={sectionActions}
-                                />
-                            ))}
-                        </SortableContext>
-                    </div>
-                )}
-            </DndContext>
+            {sharedSpaces.length > 0 && (
+                <div className="space-y-3 mt-6">
+                    <p className="text-xs font-medium text-muted-foreground">Shared with you</p>
+                    {sharedSpaces.map((space) => (
+                        <SpaceSection
+                            key={space.id}
+                            space={space}
+                            isOwner={false}
+                            initialProfile={initialProfile}
+                            lists={lists.filter((list) => list.space_id === space.id)}
+                            actions={sectionActions}
+                        />
+                    ))}
+                </div>
+            )}
 
             <div className="flex gap-2">
                 <button

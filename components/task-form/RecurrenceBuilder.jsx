@@ -9,7 +9,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { humanReadableLabel } from '@/lib/tasks/recurrence';
+import { humanReadableLabel } from '@/modules/tasks/domain/recurrence';
 
 const FREQUENCIES = [
     { value: 'DAILY', label: 'Daily' },

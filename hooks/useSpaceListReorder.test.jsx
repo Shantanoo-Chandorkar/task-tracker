@@ -7,7 +7,7 @@ import { useSpaceListReorder } from './useSpaceListReorder';
 
 const mocks = vi.hoisted(() => ({ reorderSpaces: vi.fn(), reorderLists: vi.fn() }));
 
-vi.mock('@/actions/reorder-actions', () => ({
+vi.mock('@/modules/tasks/actions/reorder-actions', () => ({
     reorderSpaces: (...args) => mocks.reorderSpaces(...args),
     reorderLists: (...args) => mocks.reorderLists(...args),
 }));
@@ -40,13 +40,6 @@ function renderSpaceListReorder() {
     return { hookResult, cancelQueries, invalidateQueries };
 }
 
-function drag(type, activeId, overId, extraData = {}) {
-    return {
-        active: { id: activeId, data: { current: { type, ...extraData } } },
-        over: { id: overId },
-    };
-}
-
 describe('useSpaceListReorder', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -54,10 +47,10 @@ describe('useSpaceListReorder', () => {
         mocks.reorderLists.mockResolvedValue({ error: null });
     });
 
-    it('a space drag saves spaces and never touches the lists cache or list saves', async () => {
+    it('moving a space saves spaces and never touches the lists cache or list saves', async () => {
         const { hookResult, cancelQueries, invalidateQueries } = renderSpaceListReorder();
 
-        await act(() => hookResult.current.handleDragEnd(drag('space', 'sp1', 'sp2')));
+        await act(() => hookResult.current.moveSpaceNextTo('sp1', 'sp2'));
 
         expect(mocks.reorderSpaces).toHaveBeenCalledTimes(1);
         expect(mocks.reorderLists).not.toHaveBeenCalled();
@@ -66,12 +59,10 @@ describe('useSpaceListReorder', () => {
         expect(invalidateQueries).not.toHaveBeenCalledWith({ queryKey: ['lists'] });
     });
 
-    it('a list drag saves only the lists of that space and never touches the spaces cache', async () => {
+    it('moving a list saves only the lists of that space and never touches the spaces cache', async () => {
         const { hookResult, cancelQueries, invalidateQueries } = renderSpaceListReorder();
 
-        await act(() =>
-            hookResult.current.handleDragEnd(drag('list', 'l3', 'l4', { spaceId: 'sp2' })),
-        );
+        await act(() => hookResult.current.moveListNextTo(LISTS[2], 'l4'));
 
         expect(mocks.reorderLists).toHaveBeenCalledTimes(1);
         expect(mocks.reorderLists).toHaveBeenCalledWith('sp2', ['l4', 'l3']);
@@ -81,7 +72,7 @@ describe('useSpaceListReorder', () => {
         expect(invalidateQueries).not.toHaveBeenCalledWith({ queryKey: ['spaces'] });
     });
 
-    it('Move up and Move down use the same save path as a drag', async () => {
+    it('Move up and Move down share the same save path for spaces and for lists', async () => {
         const { hookResult } = renderSpaceListReorder();
 
         await act(() => hookResult.current.moveListNextTo(LISTS[1], 'l1'));
@@ -89,19 +80,6 @@ describe('useSpaceListReorder', () => {
 
         expect(mocks.reorderLists).toHaveBeenCalledWith('sp1', ['l2', 'l1']);
         expect(mocks.reorderSpaces).toHaveBeenCalledWith(['sp2', 'sp1']);
-    });
-
-    it('ignores a drop onto nothing, onto itself, or of an unknown kind', async () => {
-        const { hookResult, cancelQueries } = renderSpaceListReorder();
-
-        await act(() =>
-            hookResult.current.handleDragEnd({ ...drag('space', 'sp1', 'sp2'), over: null }),
-        );
-        await act(() => hookResult.current.handleDragEnd(drag('space', 'sp1', 'sp1')));
-        await act(() => hookResult.current.handleDragEnd(drag('task', 'x', 'y')));
-
-        expect(cancelQueries).not.toHaveBeenCalled();
-        expect(mocks.reorderSpaces).not.toHaveBeenCalled();
     });
 
     it('lets a space save and a list save of another space run at once, but turns a repeat away', async () => {

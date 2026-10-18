@@ -6,7 +6,7 @@ import {
     apiErrorResponse,
     queryFailedResponse,
 } from '@/lib/api-response';
-import { TAG_SPACE_ID_REQUIRED, TAGS_LOAD_FAILED } from '@/lib/error-codes';
+import { TAG_SPACE_ID_REQUIRED, TAGS_LOAD_FAILED } from '@/modules/tasks/errors';
 
 /**
  * GET /api/tags?space_id=<id>

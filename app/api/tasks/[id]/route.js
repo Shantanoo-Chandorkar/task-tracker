@@ -1,7 +1,7 @@
-import { deleteTask } from '@/actions/task-delete-actions';
-import { updateTask } from '@/actions/task-update-actions';
+import { deleteTask } from '@/modules/tasks/actions/task-delete-actions';
+import { updateTask } from '@/modules/tasks/actions/task-update-actions';
 import { withApiErrorHandling, actionResponse, apiErrorResponse } from '@/lib/api-response';
-import { TASK_UPDATE_EMPTY } from '@/lib/error-codes';
+import { TASK_UPDATE_EMPTY } from '@/modules/tasks/errors';
 
 /**
  * PATCH /api/tasks/[id]

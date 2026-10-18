@@ -22,6 +22,7 @@ vi.mock('@/hooks/useCurrentUserProfileQuery', () => ({
     useCurrentUserProfileQuery: () => ({ data: null }),
 }));
 vi.mock('./QuickCreateFab', () => ({ default: () => null }));
+vi.mock('@/components/habits/HabitQuickCreateFab', () => ({ default: () => null }));
 vi.mock('@/components/ThemeToggle', () => ({ default: () => null }));
 vi.mock('@/components/nav/LogoutButton', () => ({ default: () => null }));
 
@@ -52,6 +53,30 @@ describe('BottomNav', () => {
         const links = currentLinks('Primary');
         expect(links).toHaveLength(1);
         expect(links[0].textContent).toBe(linkName);
+    });
+});
+
+describe('BottomNav - Habit Zone', () => {
+    it.each([
+        ['/habits', 'Habits'],
+        ['/habits/categories', 'Categories'],
+        ['/habits/analytics', 'Analytics'],
+        ['/settings', 'Settings'],
+    ])('marks only the %s link as the current page', (path, linkName) => {
+        currentPath.value = path;
+        render(<BottomNav initialSpaces={[]} initialLists={[]} />);
+
+        const links = currentLinks('Primary');
+        expect(links).toHaveLength(1);
+        expect(links[0].textContent).toBe(linkName);
+    });
+
+    it('no longer offers a Switch to Tasks tab - that moved to the hamburger drawer', () => {
+        currentPath.value = '/habits';
+        render(<BottomNav initialSpaces={[]} initialLists={[]} />);
+
+        expect(screen.queryByText('Switch to Tasks')).toBeNull();
+        expect(screen.getByText('Analytics')).toBeTruthy();
     });
 });
 

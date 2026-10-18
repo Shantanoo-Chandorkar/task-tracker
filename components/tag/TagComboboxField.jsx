@@ -13,8 +13,8 @@ import {
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/custom/Loader';
-import { LABEL_NAME_MAX } from '@/lib/space-labels/label-limits';
-import { MAX_TAGS_PER_TASK } from '@/lib/tags/tag-limits';
+import { LABEL_NAME_MAX } from '@/modules/tasks/label-limits';
+import { MAX_TAGS_PER_TASK } from '@/modules/tasks/tag-limits';
 import TagColorDot from './TagColorDot';
 
 /**

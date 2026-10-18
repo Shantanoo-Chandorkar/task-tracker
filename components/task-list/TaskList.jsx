@@ -1,12 +1,10 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { DndContext } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus } from 'lucide-react';
-import { buildTaskBuckets, countTasksByStatusId } from '@/lib/tasks/task-buckets';
-import { createStableTreeBuilder } from '@/lib/tasks/task-tree';
-import { getStatusGroupFlagKey } from '@/lib/tasks/status-group-collapse';
+import { buildTaskBuckets, countTasksByStatusId } from '@/modules/tasks/domain/task-buckets';
+import { createStableTreeBuilder } from '@/modules/tasks/domain/task-tree';
+import { getStatusGroupFlagKey } from '@/modules/tasks/domain/status-group-collapse';
 import { toggleFlag as toggleGroup, useUIFlags } from '@/providers/UIStateProvider';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
@@ -15,7 +13,7 @@ import { useSublistsQuery } from '@/hooks/useSublistsQuery';
 import { usePermissionForSpace } from '@/hooks/usePermissionForSpace';
 import { useSpaceById } from '@/hooks/useSpaceById';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
-import { useListDragAndDrop } from '@/hooks/useListDragAndDrop';
+import { useListRowMoves } from '@/hooks/useListRowMoves';
 import { useDuplicateShortcut } from '@/hooks/useDuplicateShortcut';
 import { useSublistDeletion } from '@/hooks/useSublistDeletion';
 import TaskFormDialog, { scheduleEditorPrefetch } from '@/components/task-form/TaskFormDialog';
@@ -30,7 +28,7 @@ import DeleteSublistDialog from './DeleteSublistDialog';
 
 /**
  * Root task list - groups root tasks by sublist, then by status, all collapsible.
- * Handles DnD reordering (tasks and sublists) and the Ctrl+D duplicate shortcut.
+ * Handles Move up / Move down reordering (tasks and sublists) and the Ctrl+D duplicate shortcut.
  *
  * @param {object} props
  * @param {string} props.listId - The list this task tree belongs to
@@ -112,11 +110,7 @@ export default function TaskList({
     );
     const groupFlags = useUIFlags(groupFlagKeys);
 
-    const { dndContextProps, onMoveTask, onMoveSublist } = useListDragAndDrop(
-        listId,
-        flatList,
-        sublists,
-    );
+    const { onMoveTask, onMoveSublist } = useListRowMoves(listId, flatList, sublists);
     const onFocusTask = useDuplicateShortcut(listId);
     const sublistDeletion = useSublistDeletion(listId, flatList);
 
@@ -132,7 +126,7 @@ export default function TaskList({
     }
 
     return (
-        <DndContext {...dndContextProps}>
+        <>
             <div className="space-y-6">
                 <ListHeader
                     listId={listId}
@@ -161,34 +155,29 @@ export default function TaskList({
                     countsByStatusId={countsByStatusId}
                 />
 
-                <SortableContext
-                    items={sublists.map((sublist) => sublist.id)}
-                    strategy={verticalListSortingStrategy}
-                >
-                    {buckets.map((bucket) => (
-                        <TaskBucket
-                            key={bucket.key}
-                            bucket={bucket}
-                            statuses={statuses}
-                            sublists={sublists}
-                            groupFlags={groupFlags}
-                            listId={listId}
-                            canWrite={canWrite}
-                            currentUserId={currentUserId}
-                            myPermission={myPermission}
-                            maxSubtasksPerParent={maxSubtasksPerParent}
-                            onToggleGroup={toggleGroup}
-                            onFocusTask={onFocusTask}
-                            onMoveTask={onMoveTask}
-                            onMoveSublist={onMoveSublist}
-                            onEditSublist={(sublist) => setSublistDialog({ open: true, sublist })}
-                            onDeleteSublist={sublistDeletion.requestDelete}
-                            onAddTask={({ sublistId, statusId }) =>
-                                setCreateDialog({ open: true, parentId: null, sublistId, statusId })
-                            }
-                        />
-                    ))}
-                </SortableContext>
+                {buckets.map((bucket) => (
+                    <TaskBucket
+                        key={bucket.key}
+                        bucket={bucket}
+                        statuses={statuses}
+                        sublists={sublists}
+                        groupFlags={groupFlags}
+                        listId={listId}
+                        canWrite={canWrite}
+                        currentUserId={currentUserId}
+                        myPermission={myPermission}
+                        maxSubtasksPerParent={maxSubtasksPerParent}
+                        onToggleGroup={toggleGroup}
+                        onFocusTask={onFocusTask}
+                        onMoveTask={onMoveTask}
+                        onMoveSublist={onMoveSublist}
+                        onEditSublist={(sublist) => setSublistDialog({ open: true, sublist })}
+                        onDeleteSublist={sublistDeletion.requestDelete}
+                        onAddTask={({ sublistId, statusId }) =>
+                            setCreateDialog({ open: true, parentId: null, sublistId, statusId })
+                        }
+                    />
+                ))}
 
                 {canWrite && (
                     <button
@@ -221,6 +210,6 @@ export default function TaskList({
             />
 
             <DeleteSublistDialog deletion={sublistDeletion} />
-        </DndContext>
+        </>
     );
 }

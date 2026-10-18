@@ -6,7 +6,7 @@ import {
     apiErrorResponse,
     queryFailedResponse,
 } from '@/lib/api-response';
-import { SUBLISTS_LIST_ID_REQUIRED, SUBLISTS_LOAD_FAILED } from '@/lib/error-codes';
+import { SUBLISTS_LIST_ID_REQUIRED, SUBLISTS_LOAD_FAILED } from '@/modules/tasks/errors';
 
 /**
  * GET /api/sublists?list_id=<id>
