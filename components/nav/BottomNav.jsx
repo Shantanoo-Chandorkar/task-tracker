@@ -4,7 +4,15 @@ import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
-import { Home, ListChecks, LayoutGrid, Settings, ArrowLeftRight, Timer } from 'lucide-react';
+import {
+    Home,
+    ListChecks,
+    LayoutGrid,
+    BarChart3,
+    Settings,
+    ArrowLeftRight,
+    Timer,
+} from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
 import HabitQuickCreateFab from '@/components/habits/HabitQuickCreateFab';
 
@@ -12,12 +20,14 @@ const tabClassName = (isActive) =>
     `press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isActive ? 'text-primary' : 'text-muted-foreground'}`;
 
 /**
- * Habit Zone's 4 tabs: Habits / Categories / [FAB] / Switch to Task Tracker / Settings.
+ * Habit Zone's 4 tabs: Habits / Categories / [FAB] / Analytics / Settings. Switching zones
+ * stays reachable via the hamburger drawer's HabitZoneNav, which already lists both switches.
  */
 function HabitZoneTabs() {
     const pathname = usePathname();
     const isHabits = pathname === '/habits';
     const isCategories = pathname.startsWith('/habits/categories');
+    const isAnalytics = pathname.startsWith('/habits/analytics');
     const isSettings = pathname.startsWith('/settings');
 
     return (
@@ -44,9 +54,13 @@ function HabitZoneTabs() {
             <div className="w-12 flex-shrink-0" aria-hidden="true" />
 
             <div className="flex-1 flex">
-                <Link href="/" className={tabClassName(false)}>
-                    <ArrowLeftRight aria-hidden="true" className="h-5 w-5" />
-                    Tasks
+                <Link
+                    href="/habits/analytics"
+                    aria-current={isAnalytics ? 'page' : undefined}
+                    className={tabClassName(isAnalytics)}
+                >
+                    <BarChart3 aria-hidden="true" className="h-5 w-5" />
+                    Analytics
                 </Link>
                 <Link
                     href="/settings"
