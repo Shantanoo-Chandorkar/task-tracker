@@ -9,6 +9,7 @@ import {
     resumeTimeSession,
     completeTimeSession,
     discardTimeSession,
+    advanceSessionBlock,
 } from '@/modules/timer/actions/time-session-actions';
 import { createClientId } from '@/lib/client-id';
 import { claimInFlight } from '@/lib/in-flight-entities';
@@ -61,6 +62,7 @@ async function runTimeSessionAction(entityKey, loadingMessage, action) {
  *   resume: (id: string) => Promise<boolean>,
  *   complete: (id: string) => Promise<boolean>,
  *   discard: (id: string) => Promise<boolean>,
+ *   advanceBlock: (id: string) => Promise<boolean>,
  * }}
  */
 export function useTimeSessionActions() {
@@ -139,5 +141,19 @@ export function useTimeSessionActions() {
         [invalidate],
     );
 
-    return { start, pause, resume, complete, discard };
+    const advanceBlock = useCallback(
+        async (id) => {
+            const advanceResult = await runTimeSessionAction(
+                `time-session:${id}`,
+                'Moving to the next block...',
+                () => advanceSessionBlock(id),
+            );
+            if (!advanceResult) return false;
+            invalidate();
+            return true;
+        },
+        [invalidate],
+    );
+
+    return { start, pause, resume, complete, discard, advanceBlock };
 }

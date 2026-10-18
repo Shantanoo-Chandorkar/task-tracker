@@ -9,6 +9,7 @@ const pauseTimeSession = vi.fn();
 const resumeTimeSession = vi.fn();
 const completeTimeSession = vi.fn();
 const discardTimeSession = vi.fn();
+const advanceSessionBlock = vi.fn();
 
 vi.mock('@/modules/timer/actions/time-session-actions', () => ({
     startTimeSession: (...args) => startTimeSession(...args),
@@ -16,6 +17,7 @@ vi.mock('@/modules/timer/actions/time-session-actions', () => ({
     resumeTimeSession: (...args) => resumeTimeSession(...args),
     completeTimeSession: (...args) => completeTimeSession(...args),
     discardTimeSession: (...args) => discardTimeSession(...args),
+    advanceSessionBlock: (...args) => advanceSessionBlock(...args),
 }));
 vi.mock('@/lib/client-id', () => ({ createClientId: () => 'client-id-1' }));
 vi.mock('sonner', () => ({
@@ -100,6 +102,22 @@ describe('useTimeSessionActions', () => {
 
         expect(discardResult).toBe(true);
         expect(discardTimeSession).toHaveBeenCalledWith('session-1');
+        expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+            queryKey: ['time-sessions'],
+        });
+    });
+
+    it('advances a session to its next block and invalidates on success', async () => {
+        advanceSessionBlock.mockResolvedValue({
+            data: { id: 'session-1', block_index: 1 },
+            error: null,
+        });
+        const { result, queryClient } = renderActionsHook();
+
+        const advanceResult = await result.current.advanceBlock('session-1');
+
+        expect(advanceResult).toBe(true);
+        expect(advanceSessionBlock).toHaveBeenCalledWith('session-1');
         expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
             queryKey: ['time-sessions'],
         });
