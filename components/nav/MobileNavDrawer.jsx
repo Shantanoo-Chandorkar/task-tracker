@@ -1,21 +1,24 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import ModalShell from '@/components/custom/ModalShell';
 import SidebarNav from './SidebarNav';
+import HabitZoneNav from '@/components/habits/HabitZoneNav';
 
 /**
- * Hamburger button + slide-in Sheet wrapping the shared SidebarNav content -
+ * Hamburger button + slide-in Sheet wrapping the shared nav content -
  * the mobile/tablet equivalent of DesktopSidebar, shown below `lg` (1024px).
  *
  * @param {object} props
  * @param {object[]} [props.initialSpaces] - SSR-fetched spaces, forwarded to SidebarNav
  * @param {object[]} [props.initialLists] - SSR-fetched lists, forwarded to SidebarNav
- * @param {object|null} [props.initialProfile] - SSR-fetched profile, forwarded to SidebarNav
+ * @param {object|null} [props.initialProfile] - SSR-fetched profile, forwarded to the nav content
  */
 export default function MobileNavDrawer({ initialSpaces, initialLists, initialProfile }) {
     const [isOpen, setIsOpen] = useState(false);
+    const isHabitZone = usePathname().startsWith('/habits');
 
     return (
         <>
@@ -31,12 +34,24 @@ export default function MobileNavDrawer({ initialSpaces, initialLists, initialPr
                 onClose={() => setIsOpen(false)}
                 variant="sheet"
                 side="left"
-                title="Task Tracker"
+                title={isHabitZone ? 'Habit Zone' : 'Task Tracker'}
                 contentClassName="flex w-[80%] flex-col bg-sidebar p-3"
                 headerClassName="p-0 pb-4"
                 titleClassName="text-[0.9375rem] font-semibold"
             >
-                <SidebarNav onNavigate={() => setIsOpen(false)} />
+                {isHabitZone ? (
+                    <HabitZoneNav
+                        onNavigate={() => setIsOpen(false)}
+                        initialProfile={initialProfile}
+                    />
+                ) : (
+                    <SidebarNav
+                        onNavigate={() => setIsOpen(false)}
+                        initialSpaces={initialSpaces}
+                        initialLists={initialLists}
+                        initialProfile={initialProfile}
+                    />
+                )}
             </ModalShell>
         </>
     );

@@ -5,7 +5,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
-import { Home, LayoutGrid, Settings } from 'lucide-react';
+import { Home, LayoutGrid, Settings, ArrowLeftRight } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/nav/LogoutButton';
 
@@ -122,6 +122,14 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
             </div>
 
             <div className="mt-3 flex flex-col pt-3 border-t border-sidebar-border">
+                <Link
+                    href="/habits"
+                    onClick={onNavigate}
+                    className="flex items-center gap-2 rounded-md px-2 py-2 text-sm mb-2 no-underline text-sidebar-foreground hover:bg-sidebar-accent/60"
+                >
+                    <ArrowLeftRight aria-hidden="true" className="h-4 w-4" />
+                    Switch to Habit Zone
+                </Link>
                 <Link
                     href="/settings"
                     aria-current={isSettingsActive ? 'page' : undefined}

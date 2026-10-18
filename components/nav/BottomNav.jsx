@@ -4,8 +4,64 @@ import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
-import { Home, ListChecks, LayoutGrid, Settings } from 'lucide-react';
+import { Home, ListChecks, LayoutGrid, Settings, ArrowLeftRight } from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
+import HabitQuickCreateFab from '@/components/habits/HabitQuickCreateFab';
+
+const tabClassName = (isActive) =>
+    `press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isActive ? 'text-primary' : 'text-muted-foreground'}`;
+
+/**
+ * Habit Zone's 4 tabs: Habits / Categories / [FAB] / Switch to Task Tracker / Settings.
+ */
+function HabitZoneTabs() {
+    const pathname = usePathname();
+    const isHabits = pathname === '/habits';
+    const isCategories = pathname.startsWith('/habits/categories');
+    const isSettings = pathname.startsWith('/settings');
+
+    return (
+        <div className="relative flex items-center">
+            <div className="flex-1 flex">
+                <Link
+                    href="/habits"
+                    aria-current={isHabits ? 'page' : undefined}
+                    className={tabClassName(isHabits)}
+                >
+                    <ListChecks aria-hidden="true" className="h-5 w-5" />
+                    Habits
+                </Link>
+                <Link
+                    href="/habits/categories"
+                    aria-current={isCategories ? 'page' : undefined}
+                    className={tabClassName(isCategories)}
+                >
+                    <LayoutGrid aria-hidden="true" className="h-5 w-5" />
+                    Categories
+                </Link>
+            </div>
+
+            <div className="w-12 flex-shrink-0" aria-hidden="true" />
+
+            <div className="flex-1 flex">
+                <Link href="/" className={tabClassName(false)}>
+                    <ArrowLeftRight aria-hidden="true" className="h-5 w-5" />
+                    Tasks
+                </Link>
+                <Link
+                    href="/settings"
+                    aria-current={isSettings ? 'page' : undefined}
+                    className={tabClassName(isSettings)}
+                >
+                    <Settings aria-hidden="true" className="h-5 w-5" />
+                    Settings
+                </Link>
+            </div>
+
+            <HabitQuickCreateFab className="press-feedback absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center" />
+        </div>
+    );
+}
 
 /**
  * Mobile bottom navigation - Home / Tasks / Spaces / Settings, with a center-FAB quick-create.
@@ -18,9 +74,10 @@ export default function BottomNav({ initialSpaces, initialLists }) {
     const pathname = usePathname();
     const params = useParams();
     const listId = params?.listId;
+    const isHabitZone = pathname.startsWith('/habits');
 
-    const { data: spaces } = useSpacesQuery({ initialData: initialSpaces });
-    const { data: lists } = useListsQuery({ initialData: initialLists });
+    const { data: spaces } = useSpacesQuery({ initialData: initialSpaces, enabled: !isHabitZone });
+    const { data: lists } = useListsQuery({ initialData: initialLists, enabled: !isHabitZone });
 
     const firstSpaceWithList = (spaces || []).find((space) =>
         (lists || []).some((list) => list.space_id === space.id),
@@ -35,6 +92,17 @@ export default function BottomNav({ initialSpaces, initialLists }) {
     const isTasks = pathname.startsWith('/lists');
     const isSpaces = pathname.startsWith('/spaces');
     const isSettings = pathname.startsWith('/settings');
+
+    if (isHabitZone) {
+        return (
+            <nav
+                aria-label="Primary"
+                className="lg:hidden translucent-bar fixed bottom-0 inset-x-0 z-20 border-t pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+            >
+                <HabitZoneTabs />
+            </nav>
+        );
+    }
 
     return (
         // Spacer matches the FAB's width so it centers at true 50%, not an uneven flex gap.
