@@ -8,6 +8,8 @@ import {
     startOfLocalWeek,
     isLocalDateBefore,
     isLocalDateAfter,
+    localDateRange,
+    formatLocalDateForPill,
 } from './local-date';
 
 describe('isValidLocalDateString', () => {
@@ -115,5 +117,47 @@ describe('isLocalDateBefore / isLocalDateAfter', () => {
     it('is false for either comparison on equal dates', () => {
         expect(isLocalDateBefore('2026-10-18', '2026-10-18')).toBe(false);
         expect(isLocalDateAfter('2026-10-18', '2026-10-18')).toBe(false);
+    });
+});
+
+describe('localDateRange', () => {
+    it('lists every date between start and end, inclusive of both ends', () => {
+        expect(localDateRange('2026-10-16', '2026-10-18')).toEqual([
+            '2026-10-16',
+            '2026-10-17',
+            '2026-10-18',
+        ]);
+    });
+
+    it('spans a month boundary', () => {
+        expect(localDateRange('2026-01-30', '2026-02-01')).toEqual([
+            '2026-01-30',
+            '2026-01-31',
+            '2026-02-01',
+        ]);
+    });
+
+    it('returns a single date when start and end are the same', () => {
+        expect(localDateRange('2026-10-18', '2026-10-18')).toEqual(['2026-10-18']);
+    });
+});
+
+describe('formatLocalDateForPill', () => {
+    it('formats a known Sunday', () => {
+        expect(formatLocalDateForPill('2026-10-18')).toEqual({
+            weekday: 'Sun',
+            day: '18',
+            month: 'Oct',
+            full: 'Sunday, October 18, 2026',
+        });
+    });
+
+    it('formats a single-digit day without padding', () => {
+        expect(formatLocalDateForPill('2026-10-01')).toMatchObject({ day: '1', month: 'Oct' });
+    });
+
+    it('gives a different month label across a month boundary', () => {
+        expect(formatLocalDateForPill('2026-10-31')).toMatchObject({ month: 'Oct' });
+        expect(formatLocalDateForPill('2026-11-01')).toMatchObject({ month: 'Nov' });
     });
 });

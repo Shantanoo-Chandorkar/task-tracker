@@ -118,3 +118,35 @@ export function isLocalDateBefore(earlierCandidate, laterCandidate) {
 export function isLocalDateAfter(laterCandidate, earlierCandidate) {
     return isAfter(parseISO(laterCandidate), parseISO(earlierCandidate));
 }
+
+/**
+ * Lists every local date from start to end, inclusive - for rendering a bounded day picker.
+ *
+ * @param {string} startLocalDate - 'YYYY-MM-DD', earliest date.
+ * @param {string} endLocalDate - 'YYYY-MM-DD', latest date.
+ * @returns {string[]} Dates in ascending order.
+ */
+export function localDateRange(startLocalDate, endLocalDate) {
+    const dayCount = localDateDiffInDays(endLocalDate, startLocalDate) + 1;
+    return Array.from({ length: dayCount }, (_, offset) =>
+        addDaysToLocalDate(startLocalDate, offset),
+    );
+}
+
+/**
+ * Formats a local date for a compact day-picker pill: short labels plus a full one for a11y.
+ * Includes the month, since a bare day number is ambiguous once a picker spans more than one.
+ *
+ * @param {string} localDate - 'YYYY-MM-DD'.
+ * @returns {{ weekday: string, day: string, month: string, full: string }} e.g. 'Mon', '17', 'Oct',
+ *   'Monday, October 17, 2026'.
+ */
+export function formatLocalDateForPill(localDate) {
+    const date = parseISO(localDate);
+    return {
+        weekday: format(date, 'EEE'),
+        day: format(date, 'd'),
+        month: format(date, 'MMM'),
+        full: format(date, 'EEEE, MMMM d, yyyy'),
+    };
+}
