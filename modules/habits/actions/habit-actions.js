@@ -9,11 +9,13 @@ import {
     checkHabitColor,
     checkHabitPolarity,
     checkHabitMeasureKind,
+    checkHabitPolarityMeasureCombination,
     checkHabitTargetValue,
     checkHabitUnitCode,
     checkHabitRecurrence,
     checkHabitStartedOn,
 } from '@/modules/habits/domain/habit-input';
+import { toCanonicalHabitValue } from '@/modules/habits/domain/habit-display';
 import {
     DEFAULT_HABIT_COLOR,
     DEFAULT_HABIT_POLARITY,
@@ -87,6 +89,9 @@ function validateHabitCreateFields(fields, todayLocalDate) {
         measureKind = measureKindCheck.measureKind ?? measureKind;
     }
 
+    const polarityMeasureFailure = checkHabitPolarityMeasureCombination(polarity, measureKind);
+    if (polarityMeasureFailure) return { failure: polarityMeasureFailure };
+
     const targetValueCheck = checkHabitTargetValue(fields.target_value, measureKind);
     if (targetValueCheck.error) {
         return { failure: { error: targetValueCheck.error, code: targetValueCheck.code } };
@@ -96,6 +101,11 @@ function validateHabitCreateFields(fields, todayLocalDate) {
     if (unitCodeCheck.error) {
         return { failure: { error: unitCodeCheck.error, code: unitCodeCheck.code } };
     }
+
+    const targetValue = toCanonicalHabitValue(
+        { measure_kind: measureKind, unit_code: unitCodeCheck.unitCode },
+        targetValueCheck.targetValue,
+    );
 
     /** @type {Record<string, any>} */
     let recurrence = DEFAULT_HABIT_RECURRENCE;
@@ -119,7 +129,7 @@ function validateHabitCreateFields(fields, todayLocalDate) {
             color: fields.color ?? DEFAULT_HABIT_COLOR,
             polarity,
             measure_kind: measureKind,
-            target_value: targetValueCheck.targetValue,
+            target_value: targetValue,
             unit_code: unitCodeCheck.unitCode,
             recurrence,
             started_on: startedOnCheck.startedOn,
@@ -193,6 +203,7 @@ export const updateHabit = withAuthenticatedAction(
         );
         if (loadFailure) return { data: null, ...loadFailure };
 
+        /** @type {Record<string, any>} */
         const updates = {};
 
         if (fields.title !== undefined) {
@@ -214,10 +225,12 @@ export const updateHabit = withAuthenticatedAction(
             updates.color = fields.color;
         }
 
+        let polarity = existingHabit.polarity;
         if (fields.polarity !== undefined) {
             const polarityCheck = checkHabitPolarity(fields.polarity);
             if (polarityCheck.error) return { data: null, ...polarityCheck };
-            updates.polarity = polarityCheck.polarity;
+            polarity = polarityCheck.polarity;
+            updates.polarity = polarity;
         }
 
         let measureKind = existingHabit.measure_kind;
@@ -229,6 +242,14 @@ export const updateHabit = withAuthenticatedAction(
         }
         // A changed measure kind invalidates the old target/unit - re-check only, never reuse them.
         const isMeasureKindUnchanged = measureKind === existingHabit.measure_kind;
+
+        if (fields.polarity !== undefined || fields.measure_kind !== undefined) {
+            const polarityMeasureFailure = checkHabitPolarityMeasureCombination(
+                polarity,
+                measureKind,
+            );
+            if (polarityMeasureFailure) return { data: null, ...polarityMeasureFailure };
+        }
 
         if (fields.target_value !== undefined || fields.measure_kind !== undefined) {
             const targetValueToCheck =
@@ -252,6 +273,16 @@ export const updateHabit = withAuthenticatedAction(
             const unitCodeCheck = checkHabitUnitCode(unitCodeToCheck, measureKind);
             if (unitCodeCheck.error) return { data: null, ...unitCodeCheck };
             updates.unit_code = unitCodeCheck.unitCode;
+        }
+
+        if (updates.target_value !== undefined) {
+            const finalUnitCode =
+                updates.unit_code !== undefined ? updates.unit_code : existingHabit.unit_code;
+            const pendingTargetValue = updates.target_value;
+            updates.target_value = toCanonicalHabitValue(
+                { measure_kind: measureKind, unit_code: finalUnitCode },
+                pendingTargetValue,
+            );
         }
 
         if (fields.recurrence !== undefined) {

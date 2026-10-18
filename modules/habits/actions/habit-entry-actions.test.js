@@ -103,21 +103,42 @@ describe('toggleHabitCheckIn', () => {
         });
     });
 
-    it('logs the habit’s target value for a count habit, since there is no stepper input yet', async () => {
+    it('refuses to toggle a non-binary habit - it needs an amount, via setHabitEntryValue', async () => {
         setUpWorld({
-            habits: [
-                buildHabitRow('habit-1', {
-                    measure_kind: 'count',
-                    target_value: 20,
-                    unit_code: null,
-                }),
-            ],
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20 })],
         });
         const { toggleHabitCheckIn } = await habitEntryActions();
 
-        const toggleResult = await toggleHabitCheckIn('habit-1');
+        expect(await toggleHabitCheckIn('habit-1')).toMatchObject({
+            data: null,
+            code: 'HABIT_ENTRY_ACTION_MEASURE_MISMATCH',
+        });
+    });
 
-        expect(toggleResult.data).toMatchObject({ value: 20 });
+    it('logs today by default, and a given past date within the back-fill window', async () => {
+        const { toggleHabitCheckIn } = await habitEntryActions();
+
+        const toggleResult = await toggleHabitCheckIn('habit-1', '2026-10-15');
+
+        expect(toggleResult.data).toMatchObject({ local_date: '2026-10-15' });
+    });
+
+    it('rejects a date older than the 30-day back-fill window', async () => {
+        const { toggleHabitCheckIn } = await habitEntryActions();
+
+        expect(await toggleHabitCheckIn('habit-1', '2026-09-17')).toMatchObject({
+            data: null,
+            code: 'HABIT_ENTRY_DATE_TOO_OLD',
+        });
+    });
+
+    it('rejects a future date', async () => {
+        const { toggleHabitCheckIn } = await habitEntryActions();
+
+        expect(await toggleHabitCheckIn('habit-1', '2026-10-19')).toMatchObject({
+            data: null,
+            code: 'HABIT_ENTRY_DATE_IN_FUTURE',
+        });
     });
 
     it('undoes today’s check-in on a second toggle', async () => {
@@ -219,6 +240,181 @@ describe('toggleHabitCheckIn', () => {
         expect(await toggleHabitCheckIn('habit-1')).toEqual({
             data: null,
             error: 'Failed to undo check-in',
+        });
+    });
+});
+
+describe('setHabitEntryValue', () => {
+    function setUpCountHabit(overrides = {}) {
+        setUpWorld({
+            habits: [
+                buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20, ...overrides }),
+            ],
+        });
+    }
+
+    it('needs a habit id', async () => {
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        expect(await setHabitEntryValue('', TODAY, 5)).toEqual({
+            data: null,
+            error: 'Habit ID is required',
+            code: 'HABIT_ID_REQUIRED',
+        });
+    });
+
+    it('refuses a binary habit - it toggles, via toggleHabitCheckIn', async () => {
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        expect(await setHabitEntryValue('habit-1', TODAY, 1)).toMatchObject({
+            data: null,
+            code: 'HABIT_ENTRY_ACTION_MEASURE_MISMATCH',
+        });
+    });
+
+    it('logs a count value for today', async () => {
+        setUpCountHabit();
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        const result = await setHabitEntryValue('habit-1', TODAY, 15);
+
+        expect(result.error).toBeNull();
+        expect(result.data).toMatchObject({ local_date: TODAY, value: 15 });
+    });
+
+    it('converts a quantity value from its display unit to canonical storage', async () => {
+        setUpWorld({
+            habits: [
+                buildHabitRow('habit-1', {
+                    measure_kind: 'quantity',
+                    target_value: 5000,
+                    unit_code: 'km',
+                }),
+            ],
+        });
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        const result = await setHabitEntryValue('habit-1', TODAY, 2.5);
+
+        expect(result.data.value).toBe(2500);
+    });
+
+    it('updates (not duplicates) an existing entry for the same day', async () => {
+        setUpWorld({
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20 })],
+            entries: [
+                {
+                    id: 'entry-1',
+                    habit_id: 'habit-1',
+                    user_id: OWNER_ID,
+                    local_date: TODAY,
+                    value: 5,
+                },
+            ],
+        });
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        const result = await setHabitEntryValue('habit-1', TODAY, 12);
+
+        expect(result.data).toMatchObject({ id: 'entry-1', value: 12 });
+        expect(tables.habit_entries).toHaveLength(1);
+    });
+
+    it('clears an existing entry when the value is empty', async () => {
+        setUpWorld({
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20 })],
+            entries: [
+                {
+                    id: 'entry-1',
+                    habit_id: 'habit-1',
+                    user_id: OWNER_ID,
+                    local_date: TODAY,
+                    value: 5,
+                },
+            ],
+        });
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        const result = await setHabitEntryValue('habit-1', TODAY, '');
+
+        expect(result).toEqual({ data: null, error: null });
+        expect(tables.habit_entries).toHaveLength(0);
+    });
+
+    it('is a no-op clearing a day with no existing entry', async () => {
+        setUpCountHabit();
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        expect(await setHabitEntryValue('habit-1', TODAY, null)).toEqual({
+            data: null,
+            error: null,
+        });
+    });
+
+    it('rejects a negative value', async () => {
+        setUpCountHabit();
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        expect(await setHabitEntryValue('habit-1', TODAY, -1)).toMatchObject({
+            data: null,
+            code: 'HABIT_ENTRY_VALUE_INVALID',
+        });
+    });
+
+    it('rejects a date older than the 30-day back-fill window', async () => {
+        setUpCountHabit();
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        expect(await setHabitEntryValue('habit-1', '2026-09-17', 5)).toMatchObject({
+            data: null,
+            code: 'HABIT_ENTRY_DATE_TOO_OLD',
+        });
+    });
+
+    it('accepts a date exactly 30 days back', async () => {
+        setUpCountHabit();
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        const result = await setHabitEntryValue('habit-1', '2026-09-18', 5);
+
+        expect(result.error).toBeNull();
+    });
+
+    it('rejects a future date', async () => {
+        setUpCountHabit();
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        expect(await setHabitEntryValue('habit-1', '2026-10-19', 5)).toMatchObject({
+            data: null,
+            code: 'HABIT_ENTRY_DATE_IN_FUTURE',
+        });
+    });
+
+    it('maps a guest-limit error on insert to the friendly result', async () => {
+        setUpWorld({
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20 })],
+            fakeOptions: {
+                insertError: { code: 'P0001', message: 'GUEST_LIMIT_REACHED:habit_entries' },
+            },
+        });
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        const result = await setHabitEntryValue('habit-1', TODAY, 5);
+
+        expect(result.data).toBeNull();
+        expect(result.error).toContain('Guest mode is limited');
+    });
+
+    it('hides a generic insert failure behind a fixed message', async () => {
+        setUpWorld({
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20 })],
+            fakeOptions: { insertError: { code: 'XX000', message: 'boom' } },
+        });
+        const { setHabitEntryValue } = await habitEntryActions();
+
+        expect(await setHabitEntryValue('habit-1', TODAY, 5)).toEqual({
+            data: null,
+            error: 'Failed to log check-in',
         });
     });
 });

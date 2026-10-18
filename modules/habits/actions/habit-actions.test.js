@@ -158,6 +158,45 @@ describe('createHabit', () => {
         ).toMatchObject({ data: null, code: 'HABIT_TARGET_VALUE_NOT_ALLOWED' });
     });
 
+    it('refuses a quit habit paired with a non-binary measure (decision B4)', async () => {
+        const { createHabit } = await habitActions();
+
+        expect(
+            await createHabit({
+                title: 'Smoke less',
+                polarity: 'quit',
+                measure_kind: 'count',
+                target_value: 5,
+            }),
+        ).toMatchObject({ data: null, code: 'HABIT_POLARITY_MEASURE_MISMATCH' });
+    });
+
+    it('stores a quantity target value canonically, converted from its display unit', async () => {
+        const { createHabit } = await habitActions();
+
+        const createResult = await createHabit({
+            title: 'Walk',
+            measure_kind: 'quantity',
+            target_value: 5,
+            unit_code: 'km',
+        });
+
+        expect(createResult.data).toMatchObject({ target_value: 5000, unit_code: 'km' });
+    });
+
+    it('stores a custom-unit target value verbatim, with no conversion', async () => {
+        const { createHabit } = await habitActions();
+
+        const createResult = await createHabit({
+            title: 'Drink water',
+            measure_kind: 'quantity',
+            target_value: 8,
+            unit_code: 'cups',
+        });
+
+        expect(createResult.data).toMatchObject({ target_value: 8, unit_code: 'cups' });
+    });
+
     it('validates a recurrence rule against its own kind', async () => {
         const { createHabit } = await habitActions();
 
@@ -389,6 +428,63 @@ describe('updateHabit', () => {
 
         expect(updateResult.error).toBeNull();
         expect(updateResult.data).toMatchObject({ measure_kind: 'count', unit_code: null });
+    });
+
+    it('refuses switching to quit while a non-binary measure is kept', async () => {
+        setUpWorld({
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 5 })],
+        });
+        const { updateHabit } = await habitActions();
+
+        expect(await updateHabit('habit-1', { polarity: 'quit' })).toMatchObject({
+            data: null,
+            code: 'HABIT_POLARITY_MEASURE_MISMATCH',
+        });
+    });
+
+    it('refuses switching to a non-binary measure while quit is kept', async () => {
+        setUpWorld({ habits: [buildHabitRow('habit-1', { polarity: 'quit' })] });
+        const { updateHabit } = await habitActions();
+
+        expect(
+            await updateHabit('habit-1', { measure_kind: 'count', target_value: 5 }),
+        ).toMatchObject({ data: null, code: 'HABIT_POLARITY_MEASURE_MISMATCH' });
+    });
+
+    it('converts a re-sent target value using the unit as of this same update', async () => {
+        setUpWorld({
+            habits: [
+                buildHabitRow('habit-1', {
+                    measure_kind: 'quantity',
+                    target_value: 5000,
+                    unit_code: 'km',
+                }),
+            ],
+        });
+        const { updateHabit } = await habitActions();
+
+        const updateResult = await updateHabit('habit-1', { target_value: 3, unit_code: 'mi' });
+
+        expect(updateResult.error).toBeNull();
+        expect(updateResult.data.unit_code).toBe('mi');
+        expect(updateResult.data.target_value).toBeCloseTo(4828.032, 3);
+    });
+
+    it('leaves a stored canonical target value untouched when neither it nor the unit changes', async () => {
+        setUpWorld({
+            habits: [
+                buildHabitRow('habit-1', {
+                    measure_kind: 'quantity',
+                    target_value: 5000,
+                    unit_code: 'km',
+                }),
+            ],
+        });
+        const { updateHabit } = await habitActions();
+
+        await updateHabit('habit-1', { title: 'New title' });
+
+        expect(storedHabit('habit-1').target_value).toBe(5000);
     });
 
     it('re-checks an unrelated field against the habit’s existing measure kind', async () => {
