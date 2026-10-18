@@ -5,12 +5,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { useSpaceIdForList } from '@/hooks/useSpaceIdForList';
-import { findCompletedDescendants, findIncompleteDescendants } from '@/lib/tasks/task-completion';
+import {
+    findCompletedDescendants,
+    findIncompleteDescendants,
+} from '@/modules/tasks/data/task-completion';
 import {
     completeTaskAndDescendants,
     uncompleteTaskAndDescendants,
-} from '@/actions/task-completion-actions';
-import { updateTask } from '@/actions/task-update-actions';
+} from '@/modules/tasks/actions/task-completion-actions';
+import { updateTask } from '@/modules/tasks/actions/task-update-actions';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
 import { withSavedRow, withStatusDisplay } from '@/lib/cache/query-cache';

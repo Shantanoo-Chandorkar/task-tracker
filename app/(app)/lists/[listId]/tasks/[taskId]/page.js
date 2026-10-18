@@ -3,8 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { isUuid } from '@/lib/validation';
 import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 import TaskDetail from '@/components/task-detail/TaskDetail';
-import { loadListName } from '@/lib/page-titles';
-import { LIST_TASK_COLUMNS } from '@/lib/tasks/list-tasks';
+import { loadListName } from '@/modules/tasks/domain/page-titles';
+import { LIST_TASK_COLUMNS } from '@/modules/tasks/data/list-tasks';
 
 /**
  * Tab title: "Task in <list name>"; the task's own title would need an extra query, so it is not used.

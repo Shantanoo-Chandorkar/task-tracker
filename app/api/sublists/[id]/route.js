@@ -1,14 +1,14 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { updateSublist, deleteSublist } from '@/actions/sublist-actions';
+import { updateSublist, deleteSublist } from '@/modules/tasks/actions/sublist-actions';
 import {
     withApiErrorHandling,
     actionResponse,
     requireAuthResponse,
     apiErrorResponse,
 } from '@/lib/api-response';
-import { SUBLIST_NOT_FOUND } from '@/lib/error-codes';
-import { countSublistTasks } from '@/lib/tasks/task-relations';
+import { SUBLIST_NOT_FOUND } from '@/modules/tasks/errors';
+import { countSublistTasks } from '@/modules/tasks/domain/task-relations';
 
 /**
  * GET /api/sublists/[id]

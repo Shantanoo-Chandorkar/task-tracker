@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
     sublists: [],
     permission: 'owner',
     filters: { activeCount: 0, matchingTaskIds: [] },
-    dndProps: null,
+    rowMoves: null,
     duplicateTaskById: null,
     taskFormProps: null,
     sublistFormProps: null,
@@ -29,9 +29,11 @@ vi.mock('sonner', () => ({
     },
 }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
-vi.mock('@/actions/sublist-actions', () => ({ deleteSublist: vi.fn() }));
-vi.mock('@/actions/reorder-actions', () => ({ reorderSublists: vi.fn() }));
-vi.mock('@/lib/fetch-delete-counts', () => ({ fetchDeleteCounts: async () => null }));
+vi.mock('@/modules/tasks/actions/sublist-actions', () => ({ deleteSublist: vi.fn() }));
+vi.mock('@/modules/tasks/actions/reorder-actions', () => ({ reorderSublists: vi.fn() }));
+vi.mock('@/modules/tasks/domain/fetch-delete-counts', () => ({
+    fetchDeleteCounts: async () => null,
+}));
 
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('@/hooks/useTasksQuery', () => ({ useTasksQuery: () => ({ data: state.tasks }) }));
@@ -48,19 +50,19 @@ vi.mock('@/hooks/useDuplicateTask', () => ({
 vi.mock('@/hooks/useTaskFilters', () => ({
     useTaskFilters: () => ({ filters: {}, activeCount: state.filters.activeCount }),
 }));
-vi.mock('@/lib/tasks/task-filters', async (importOriginal) => ({
+vi.mock('@/modules/tasks/domain/task-filters', async (importOriginal) => ({
     ...(await importOriginal()),
     taskMatchesFilters: (task) => state.filters.matchingTaskIds.includes(task.id),
 }));
 
-// A real DndContext, wrapped only so the test can call the drag handler the way dnd-kit would
-vi.mock('@dnd-kit/core', async () => {
-    const actualModule = await vi.importActual('@dnd-kit/core');
+// The real hook, wrapped only so the test can call onMoveTask/onMoveSublist the way a row's menu would
+vi.mock('@/hooks/useListRowMoves', async () => {
+    const actualModule = await vi.importActual('@/hooks/useListRowMoves');
     return {
-        ...actualModule,
-        DndContext: function CapturedDndContext(props) {
-            state.dndProps = props;
-            return <actualModule.DndContext {...props} />;
+        useListRowMoves: (...args) => {
+            const result = actualModule.useListRowMoves(...args);
+            state.rowMoves = result;
+            return result;
         },
     };
 });
@@ -124,8 +126,8 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
 
 const { toast } = await import('sonner');
 const { bustPageCache } = await import('@/lib/cache/service-worker-cache');
-const { deleteSublist } = await import('@/actions/sublist-actions');
-const { reorderSublists } = await import('@/actions/reorder-actions');
+const { deleteSublist } = await import('@/modules/tasks/actions/sublist-actions');
+const { reorderSublists } = await import('@/modules/tasks/actions/reorder-actions');
 
 const STATUSES = [
     { id: 'st-todo', name: 'To do', color: '#111111', code: 'todo', is_default: true },
@@ -180,21 +182,15 @@ function renderTaskList() {
     );
 }
 
-function dragTask(activeId, overId) {
+function moveTask(taskId, neighbourId) {
     return act(async () => {
-        await state.dndProps.onDragEnd({
-            active: { id: activeId, data: { current: {} } },
-            over: { id: overId },
-        });
+        await state.rowMoves.onMoveTask(taskId, neighbourId);
     });
 }
 
-function dragSublist(activeId, overId) {
+function moveSublist(sublistId, neighbourId) {
     return act(async () => {
-        await state.dndProps.onDragEnd({
-            active: { id: activeId, data: { current: { type: 'sublist' } } },
-            over: { id: overId },
-        });
+        await state.rowMoves.onMoveSublist(sublistId, neighbourId);
     });
 }
 
@@ -465,10 +461,10 @@ describe('TaskList permissions and dialogs', () => {
 });
 
 describe('TaskList task reorder', () => {
-    it('drops a task onto the first slot: updates the order at once, then saves it', async () => {
+    it('moves a task onto the first slot: updates the order at once, then saves it', async () => {
         renderTaskList();
 
-        await dragTask('b', 'a');
+        await moveTask('b', 'a');
 
         expect(cachedTaskIds().slice(0, 3)).toEqual(['b', 'a', 'c']);
         const [moveUrl, moveRequest] = globalThis.fetch.mock.calls[0];
@@ -483,10 +479,10 @@ describe('TaskList task reorder', () => {
         });
     });
 
-    it('drops a task downward: inserts after the target', async () => {
+    it('moves a task downward: inserts after the target', async () => {
         renderTaskList();
 
-        await dragTask('a', 'c');
+        await moveTask('a', 'c');
 
         expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body)).toMatchObject({
             afterSiblingId: 'c',
@@ -495,10 +491,10 @@ describe('TaskList task reorder', () => {
         expect(cachedTaskIds().slice(0, 3)).toEqual(['b', 'c', 'a']);
     });
 
-    it('drops a task upward into the middle: inserts after the sibling before the target', async () => {
+    it('moves a task upward into the middle: inserts after the sibling before the target', async () => {
         renderTaskList();
 
-        await dragTask('c', 'b');
+        await moveTask('c', 'b');
 
         expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body)).toMatchObject({
             afterSiblingId: 'a',
@@ -506,11 +502,11 @@ describe('TaskList task reorder', () => {
         });
     });
 
-    it('sends a subtask drop with its parent and no sublist', async () => {
+    it('sends a subtask move with its parent and no sublist', async () => {
         state.tasks.push(buildTask('a2', { parent_id: 'a', depth: 1, position: 2 }));
 
         renderTaskList();
-        await dragTask('a2', 'a1');
+        await moveTask('a2', 'a1');
 
         expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body)).toMatchObject({
             newParentId: 'a',
@@ -523,7 +519,7 @@ describe('TaskList task reorder', () => {
         state.tasks.push(buildTask('e2', { sublist_id: 's1', position: 2 }));
 
         renderTaskList();
-        await dragTask('e2', 'e');
+        await moveTask('e2', 'e');
 
         expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body)).toMatchObject({
             sublistId: 's1',
@@ -534,7 +530,7 @@ describe('TaskList task reorder', () => {
     it('shows progress, refreshes the list, clears the page cache and confirms on success', async () => {
         renderTaskList();
 
-        await dragTask('b', 'a');
+        await moveTask('b', 'a');
 
         expect(toast.loading).toHaveBeenCalledWith('Saving order...');
         expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
@@ -548,7 +544,7 @@ describe('TaskList task reorder', () => {
         globalThis.fetch = vi.fn(async () => ({ ok: false }));
         renderTaskList();
 
-        await dragTask('b', 'a');
+        await moveTask('b', 'a');
 
         expect(toast.error).toHaveBeenCalledWith('Failed to reorder task', { id: 'toast-id' });
         expect(toast.success).not.toHaveBeenCalled();
@@ -564,7 +560,7 @@ describe('TaskList task reorder', () => {
         });
         renderTaskList();
 
-        await dragTask('b', 'a');
+        await moveTask('b', 'a');
 
         expect(toast.error).toHaveBeenCalledWith('Failed to reorder task', { id: 'toast-id' });
         expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
@@ -572,39 +568,25 @@ describe('TaskList task reorder', () => {
         });
     });
 
-    it('ignores a drop onto a task of the other priority tier', async () => {
+    it('ignores a move onto a task of the other priority tier', async () => {
         state.tasks[1] = buildTask('b', { position: 2, is_prioritised: true });
 
         renderTaskList();
-        await dragTask('a', 'b');
+        await moveTask('a', 'b');
 
         expect(globalThis.fetch).not.toHaveBeenCalled();
         expect(toast.loading).not.toHaveBeenCalled();
     });
 
-    it('ignores a drop onto itself and a drop outside any target', async () => {
+    it('ignores a move onto a task that is not a sibling', async () => {
         renderTaskList();
 
-        await dragTask('a', 'a');
-        await act(async () => {
-            await state.dndProps.onDragEnd({
-                active: { id: 'a', data: { current: {} } },
-                over: null,
-            });
-        });
+        await moveTask('a', 'e');
 
         expect(globalThis.fetch).not.toHaveBeenCalled();
     });
 
-    it('ignores a drop onto a task that is not a sibling', async () => {
-        renderTaskList();
-
-        await dragTask('a', 'e');
-
-        expect(globalThis.fetch).not.toHaveBeenCalled();
-    });
-
-    it('refuses a second drop while the first is still saving, with the busy message', async () => {
+    it('refuses a second move while the first is still saving, with the busy message', async () => {
         let finishFirstSave;
         globalThis.fetch = vi.fn(
             () =>
@@ -614,25 +596,22 @@ describe('TaskList task reorder', () => {
         );
         renderTaskList();
 
-        let firstDrop;
+        let firstMove;
         act(() => {
-            firstDrop = state.dndProps.onDragEnd({
-                active: { id: 'b', data: { current: {} } },
-                over: { id: 'a' },
-            });
+            firstMove = state.rowMoves.onMoveTask('b', 'a');
         });
         await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
-        await dragTask('c', 'a');
+        await moveTask('c', 'a');
 
         expect(toast.info).toHaveBeenCalledWith(REORDER_BUSY_MESSAGE);
         expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
         await act(async () => {
             finishFirstSave();
-            await firstDrop;
+            await firstMove;
         });
         globalThis.fetch.mockImplementation(async () => ({ ok: true }));
-        await dragTask('c', 'a');
+        await moveTask('c', 'a');
         expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
 
@@ -654,7 +633,7 @@ describe('TaskList sublist reorder', () => {
         reorderSublists.mockResolvedValue({ error: null });
         renderTaskList();
 
-        await dragSublist('s2', 's1');
+        await moveSublist('s2', 's1');
 
         expect(
             queryClient
@@ -670,7 +649,7 @@ describe('TaskList sublist reorder', () => {
         reorderSublists.mockResolvedValue({ error: 'Not allowed' });
         renderTaskList();
 
-        await dragSublist('s2', 's1');
+        await moveSublist('s2', 's1');
 
         expect(toast.error).toHaveBeenCalledWith('Not allowed', { id: 'toast-id' });
         expect(toast.success).not.toHaveBeenCalled();
@@ -683,7 +662,7 @@ describe('TaskList sublist reorder', () => {
         reorderSublists.mockRejectedValue(new Error('offline'));
         renderTaskList();
 
-        await dragSublist('s2', 's1');
+        await moveSublist('s2', 's1');
 
         expect(toast.error).toHaveBeenCalledWith('Failed to reorder sublist', { id: 'toast-id' });
     });

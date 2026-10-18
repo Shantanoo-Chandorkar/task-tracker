@@ -35,15 +35,13 @@ describe('useTaskReorder', () => {
     });
     afterEach(() => vi.restoreAllMocks());
 
-    it('saves a drop through the move route and puts the optimistic order in the cache', async () => {
+    it('saves a move through the move route and puts the optimistic order in the cache', async () => {
         const { result, queryClient } = renderTaskReorder(
             [task('a'), task('b'), task('c')],
             'list-save',
         );
 
-        await act(() =>
-            result.current.handleTaskDragEnd({ active: { id: 'c' }, over: { id: 'a' } }),
-        );
+        await act(() => result.current.onMoveTask('c', 'a'));
 
         expect(movedTaskIds()).toEqual(['/api/tasks/c/move']);
         expect(
@@ -51,12 +49,10 @@ describe('useTaskReorder', () => {
         ).toEqual(['c', 'a', 'b']);
     });
 
-    it('does nothing for a drop the plan rejects', async () => {
+    it('does nothing for a move the plan rejects', async () => {
         const { result } = renderTaskReorder([task('a'), task('b')], 'list-ignore');
 
-        await act(() =>
-            result.current.handleTaskDragEnd({ active: { id: 'a' }, over: { id: 'missing' } }),
-        );
+        await act(() => result.current.onMoveTask('a', 'missing'));
 
         expect(globalThis.fetch).not.toHaveBeenCalled();
     });

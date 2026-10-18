@@ -12,10 +12,10 @@ const clientIds = vi.hoisted(() => ({ counter: 0, unavailable: false }));
 vi.mock('@/lib/client-id', () => ({
     createClientId: () => (clientIds.unavailable ? undefined : `client-id-${++clientIds.counter}`),
 }));
-vi.mock('@/actions/task-create-actions', () => ({
+vi.mock('@/modules/tasks/actions/task-create-actions', () => ({
     createTaskWithTags: (...args) => createTaskWithTags(...args),
 }));
-vi.mock('@/actions/task-update-actions', () => ({
+vi.mock('@/modules/tasks/actions/task-update-actions', () => ({
     updateTask: (...args) => updateTask(...args),
 }));
 const editorLoadTracker = vi.hoisted(() => ({ loadCount: 0 }));

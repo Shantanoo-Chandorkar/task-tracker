@@ -1,9 +1,9 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { deleteSublist } from '@/actions/sublist-actions';
+import { deleteSublist } from '@/modules/tasks/actions/sublist-actions';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
-import { countSublistTasks } from '@/lib/tasks/task-relations';
+import { countSublistTasks } from '@/modules/tasks/domain/task-relations';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm';
 

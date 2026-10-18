@@ -7,7 +7,7 @@ const duplicateTask = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
-vi.mock('@/actions/task-duplicate-action', () => ({
+vi.mock('@/modules/tasks/actions/task-duplicate-action', () => ({
     duplicateTask: (...args) => duplicateTask(...args),
 }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));

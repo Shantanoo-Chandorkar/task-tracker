@@ -5,7 +5,9 @@ import SpacePreferencesSection from './SpacePreferencesSection';
 
 const updateSpace = vi.fn();
 
-vi.mock('@/actions/space-actions', () => ({ updateSpace: (...args) => updateSpace(...args) }));
+vi.mock('@/modules/tasks/actions/space-actions', () => ({
+    updateSpace: (...args) => updateSpace(...args),
+}));
 vi.mock('@/hooks/useSpaceById', () => ({
     useSpaceById: () => ({ id: 'space-1', require_due_date: false, max_subtasks_per_parent: 5 }),
 }));

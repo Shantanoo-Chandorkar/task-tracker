@@ -7,7 +7,7 @@ import { getCurrentUserProfile } from '@/lib/profile';
 import SpaceListManager from '@/components/space/SpaceListManager';
 import HomeView from '@/components/home/HomeView';
 import HomeSkeleton from '@/components/home/HomeSkeleton';
-import { loadHomeSummary } from '@/lib/home/build-home-summary';
+import { loadHomeSummary } from '@/modules/tasks/data/build-home-summary';
 
 export const metadata = { title: 'Home' };
 

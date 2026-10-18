@@ -12,8 +12,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), dismiss: vi.fn() },
 }));
-vi.mock('@/actions/sublist-actions', () => ({ deleteSublist: mocks.deleteSublist }));
-vi.mock('@/lib/fetch-delete-counts', () => ({ fetchDeleteCounts: mocks.fetchDeleteCounts }));
+vi.mock('@/modules/tasks/actions/sublist-actions', () => ({ deleteSublist: mocks.deleteSublist }));
+vi.mock('@/modules/tasks/domain/fetch-delete-counts', () => ({
+    fetchDeleteCounts: mocks.fetchDeleteCounts,
+}));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: mocks.bustPageCache }));
 
 const sublist = { id: 'sublist-1', name: 'Sprint' };

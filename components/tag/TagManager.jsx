@@ -8,8 +8,13 @@ import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { removeRowFromCache } from '@/lib/cache/query-cache';
 import { pluralize } from '@/lib/ui/pluralize';
-import { createTag, updateTag, deleteTag, deleteAllTagsInSpace } from '@/actions/tag-actions';
-import { reorderTags } from '@/actions/reorder-actions';
+import {
+    createTag,
+    updateTag,
+    deleteTag,
+    deleteAllTagsInSpace,
+} from '@/modules/tasks/actions/tag-actions';
+import { reorderTags } from '@/modules/tasks/actions/reorder-actions';
 import LabelManager from '@/components/space-labels/LabelManager';
 import LabelDeleteDialog from '@/components/space-labels/LabelDeleteDialog';
 

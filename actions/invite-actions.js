@@ -10,7 +10,6 @@ import { maskEmail } from '@/lib/mask-email';
 import { takeInviteSendSlot } from '@/lib/invites/invite-rate-limit';
 import { sendSpaceInviteEmail } from '@/lib/email/notifications/send-space-invite-email';
 import {
-    SPACE_NOT_FOUND,
     ALREADY_MEMBER,
     REQUEST_NOT_FOUND,
     INVITE_INVALID,
@@ -18,6 +17,7 @@ import {
     INVITE_EMAIL_MISMATCH,
     INVITE_RATE_LIMITED,
 } from '@/lib/error-codes';
+import { SPACE_NOT_FOUND } from '@/modules/tasks/errors';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DAY_MS = 24 * 60 * 60 * 1000;

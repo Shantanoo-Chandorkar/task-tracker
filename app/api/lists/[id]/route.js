@@ -1,13 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { updateList, deleteList } from '@/actions/list-actions';
+import { updateList, deleteList } from '@/modules/tasks/actions/list-actions';
 import {
     withApiErrorHandling,
     actionResponse,
     requireAuthResponse,
     apiErrorResponse,
 } from '@/lib/api-response';
-import { LIST_NOT_FOUND } from '@/lib/error-codes';
+import { LIST_NOT_FOUND } from '@/modules/tasks/errors';
 
 /**
  * GET /api/lists/[id]

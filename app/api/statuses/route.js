@@ -6,7 +6,7 @@ import {
     apiErrorResponse,
     queryFailedResponse,
 } from '@/lib/api-response';
-import { STATUSES_SPACE_ID_REQUIRED, STATUSES_LOAD_FAILED } from '@/lib/error-codes';
+import { STATUSES_SPACE_ID_REQUIRED, STATUSES_LOAD_FAILED } from '@/modules/tasks/errors';
 
 /**
  * GET /api/statuses?space_id=<id>

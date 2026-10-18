@@ -6,7 +6,7 @@ import ModalShell from '@/components/custom/ModalShell';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/custom/Loader';
 import ColorNameField from '@/components/custom/ColorNameField';
-import { LABEL_NAME_MAX } from '@/lib/space-labels/label-limits';
+import { LABEL_NAME_MAX } from '@/modules/tasks/label-limits';
 
 /**
  * Modal for creating or editing a space label (a status or a tag), rendered through the shared ModalShell.

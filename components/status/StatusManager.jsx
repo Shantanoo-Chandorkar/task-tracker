@@ -3,8 +3,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useStatusesQuery } from '@/hooks/useStatusesQuery';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
-import { createStatus, updateStatus, deleteStatus } from '@/actions/status-actions';
-import { reorderStatuses } from '@/actions/reorder-actions';
+import { createStatus, updateStatus, deleteStatus } from '@/modules/tasks/actions/status-actions';
+import { reorderStatuses } from '@/modules/tasks/actions/reorder-actions';
 import LabelManager from '@/components/space-labels/LabelManager';
 
 const STATUS_ACTIONS = {
@@ -74,7 +74,7 @@ export default function StatusManager({ spaceId, initialStatuses }) {
             noun="Status"
             resourceKey="statuses"
             heading="Statuses"
-            description="Manage the statuses used to organize your tasks. Drag to reorder."
+            description="Manage the statuses used to organize your tasks. Use the menu to reorder."
             deleteDescription="Tasks using this status will lose it. This cannot be undone."
             emptyMessage="No statuses in this space yet."
             labels={statuses}

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSpaceById } from '@/hooks/useSpaceById';
-import { updateSpace } from '@/actions/space-actions';
+import { updateSpace } from '@/modules/tasks/actions/space-actions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Loader } from '@/components/custom/Loader';

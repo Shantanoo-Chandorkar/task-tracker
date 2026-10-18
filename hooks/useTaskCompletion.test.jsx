@@ -7,10 +7,10 @@ import { useTaskCompletion } from './useTaskCompletion';
 const updateTask = vi.fn();
 const completeTaskAndDescendants = vi.fn();
 
-vi.mock('@/actions/task-update-actions', () => ({
+vi.mock('@/modules/tasks/actions/task-update-actions', () => ({
     updateTask: (...args) => updateTask(...args),
 }));
-vi.mock('@/actions/task-completion-actions', () => ({
+vi.mock('@/modules/tasks/actions/task-completion-actions', () => ({
     completeTaskAndDescendants: (...args) => completeTaskAndDescendants(...args),
     uncompleteTaskAndDescendants: vi.fn(),
 }));

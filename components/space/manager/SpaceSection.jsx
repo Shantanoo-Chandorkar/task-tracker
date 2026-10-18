@@ -1,10 +1,8 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
-import { getMoveTargets } from '@/lib/tasks/move-neighbours';
+import { getMoveTargets } from '@/modules/tasks/domain/move-neighbours';
 import SpaceSharingSection from '../SpaceSharingSection';
 import SpaceSettingsSheet from '../SpaceSettingsSheet';
 import ListRow from './ListRow';
@@ -12,7 +10,7 @@ import SpaceHeader from './SpaceHeader';
 import SpaceFooterActions from './SpaceFooterActions';
 
 /**
- * One drag-reorderable space card: header, its lists, an add-list button and the footer actions.
+ * One space card: header, its lists, an add-list button and the footer actions.
  * Rename, delete and the sharing panel are owner-only; a collaborator gets a Shared badge and Leave instead.
  *
  * @param {object} props
@@ -38,24 +36,12 @@ export default function SpaceSection({
     const { data: profile } = useCurrentUserProfileQuery({ initialData: initialProfile });
     // Guests cannot share; the button stays hidden until the profile confirms a registered user
     const canShareSpace = isOwner && profile?.is_guest === false;
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-        id: space.id,
-        data: { type: 'space' },
-        disabled: !isOwner,
-    });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
 
     return (
-        <div ref={setNodeRef} style={style} className="rounded-xl bg-card">
+        <div className="rounded-xl bg-card">
             <SpaceHeader
                 space={space}
                 isOwner={isOwner}
-                dragHandleProps={{ ...listeners, ...attributes }}
                 moveTargets={moveTargets}
                 onEditSpace={actions.onEditSpace}
                 onDeleteSpace={actions.onDeleteSpace}
@@ -63,21 +49,16 @@ export default function SpaceSection({
             />
 
             <div>
-                <SortableContext
-                    items={lists.map((list) => list.id)}
-                    strategy={verticalListSortingStrategy}
-                >
-                    {lists.map((list) => (
-                        <ListRow
-                            key={list.id}
-                            list={list}
-                            onEditRequest={actions.onEditList}
-                            onDeleteRequest={actions.onDeleteList}
-                            moveTargets={getMoveTargets(lists, list.id)}
-                            onMoveList={actions.onMoveList}
-                        />
-                    ))}
-                </SortableContext>
+                {lists.map((list) => (
+                    <ListRow
+                        key={list.id}
+                        list={list}
+                        onEditRequest={actions.onEditList}
+                        onDeleteRequest={actions.onDeleteList}
+                        moveTargets={getMoveTargets(lists, list.id)}
+                        onMoveList={actions.onMoveList}
+                    />
+                ))}
 
                 <button
                     type="button"

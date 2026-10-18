@@ -1,4 +1,4 @@
-import { updateStatus, deleteStatus } from '@/actions/status-actions';
+import { updateStatus, deleteStatus } from '@/modules/tasks/actions/status-actions';
 import { withApiErrorHandling, actionResponse } from '@/lib/api-response';
 
 /**

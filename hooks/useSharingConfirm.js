@@ -6,7 +6,7 @@ import { rejectJoinRequest, removeCollaborator } from '@/actions/collaboration-a
 import { revokeSpaceInvite } from '@/actions/invite-actions';
 import { removeRowFromCache } from '@/lib/cache/query-cache';
 import { refetchSpaceSharing } from '@/lib/cache/refetch-space-sharing';
-import { getSharingToasts } from '@/lib/spaces/sharing-confirm-copy';
+import { getSharingToasts } from '@/modules/tasks/sharing-confirm-copy';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 /**

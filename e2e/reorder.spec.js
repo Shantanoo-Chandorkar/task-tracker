@@ -8,7 +8,7 @@ import {
     listRow,
     sublistRow,
     taskRow,
-    dragHandleDown,
+    moveRowDown,
 } from './fixtures/app-data.js';
 
 /**
@@ -28,7 +28,7 @@ async function expectRowBelow(lowerRow, upperRow) {
     }).toPass();
 }
 
-test.describe('drag-and-drop reorder', () => {
+test.describe('Move up/down reorder', () => {
     test.beforeEach(async ({ page, testUser }) => {
         await loginAs(page, testUser);
     });
@@ -38,7 +38,7 @@ test.describe('drag-and-drop reorder', () => {
         const firstSpaceName = await createSpace(page);
         const secondSpaceName = await createSpace(page);
 
-        await dragHandleDown(spaceSection(page, firstSpaceName));
+        await moveRowDown(spaceSection(page, firstSpaceName));
         await expectRowBelow(
             spaceSection(page, firstSpaceName),
             spaceSection(page, secondSpaceName),
@@ -59,7 +59,7 @@ test.describe('drag-and-drop reorder', () => {
         const firstListName = await createList(page, spaceName);
         const secondListName = await createList(page, spaceName);
 
-        await dragHandleDown(listRow(page, spaceName, firstListName));
+        await moveRowDown(listRow(page, spaceName, firstListName));
         await expectRowBelow(
             listRow(page, spaceName, firstListName),
             listRow(page, spaceName, secondListName),
@@ -83,7 +83,7 @@ test.describe('drag-and-drop reorder', () => {
         const firstSublistName = await createSublist(page, spaceName, listName);
         const secondSublistName = await createSublist(page, spaceName, listName);
 
-        await dragHandleDown(sublistRow(page, firstSublistName));
+        await moveRowDown(sublistRow(page, firstSublistName));
         await expectRowBelow(
             sublistRow(page, firstSublistName),
             sublistRow(page, secondSublistName),
@@ -107,7 +107,7 @@ test.describe('drag-and-drop reorder', () => {
         const firstTaskTitle = await createTask(page);
         const secondTaskTitle = await createTask(page);
 
-        await dragHandleDown(taskRow(page, firstTaskTitle));
+        await moveRowDown(taskRow(page, firstTaskTitle));
         await expectRowBelow(taskRow(page, firstTaskTitle), taskRow(page, secondTaskTitle));
         await expect(page.getByText('Order updated')).toBeVisible();
 

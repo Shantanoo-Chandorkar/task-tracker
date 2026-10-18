@@ -3,10 +3,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SortableContext } from '@dnd-kit/sortable';
 import TaskRow from './TaskRow';
 import { useTasksQuery } from '@/hooks/useTasksQuery';
-import { createStableIdsReader, createStableTreeBuilder } from '@/lib/tasks/task-tree';
+import { createStableTreeBuilder } from '@/modules/tasks/domain/task-tree';
 
 const LIST_ID = 'list-1';
 const SPACE_ID = 'space-1';
@@ -25,26 +24,25 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
-vi.mock('@/actions/task-delete-actions', () => ({
+vi.mock('@/modules/tasks/actions/task-delete-actions', () => ({
     deleteTask: vi.fn(),
     deleteTaskAndReparentChildren: vi.fn(),
 }));
-vi.mock('@/actions/task-update-actions', () => ({ updateTask: vi.fn() }));
-vi.mock('@/actions/task-completion-actions', () => ({
+vi.mock('@/modules/tasks/actions/task-update-actions', () => ({ updateTask: vi.fn() }));
+vi.mock('@/modules/tasks/actions/task-completion-actions', () => ({
     completeTaskAndDescendants: vi.fn(),
     uncompleteTaskAndDescendants: vi.fn(),
 }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
-// A row calls useSortable on every render, so counting its calls counts the row's real renders
-vi.mock('@dnd-kit/sortable', async () => {
-    const actualModule = await vi.importActual('@dnd-kit/sortable');
+// A row calls getMoveTargets on every render (it has an onMoveTask), so counting its calls counts real renders
+vi.mock('@/modules/tasks/domain/move-neighbours', async () => {
+    const actualModule = await vi.importActual('@/modules/tasks/domain/move-neighbours');
     return {
         ...actualModule,
-        useSortable: (sortableOptions) => {
-            renderCountsByRowId[sortableOptions.id] =
-                (renderCountsByRowId[sortableOptions.id] ?? 0) + 1;
-            return actualModule.useSortable(sortableOptions);
+        getMoveTargets: (siblingRows, rowId, ...rest) => {
+            renderCountsByRowId[rowId] = (renderCountsByRowId[rowId] ?? 0) + 1;
+            return actualModule.getMoveTargets(siblingRows, rowId, ...rest);
         },
     };
 });
@@ -137,12 +135,10 @@ function RowListHarness() {
     const { data: flatList = [] } = useTasksQuery(LIST_ID);
     const [buildStableTree] = useState(createStableTreeBuilder);
     const rootTasks = useMemo(() => buildStableTree(flatList), [buildStableTree, flatList]);
-    const [readStableIds] = useState(createStableIdsReader);
-    const rootTaskIds = readStableIds(rootTasks);
     const onMoveTask = useCallback(() => {}, []);
 
     return (
-        <SortableContext items={rootTaskIds}>
+        <>
             {rootTasks.map((rootTask) => (
                 <TaskRow
                     key={rootTask.id}
@@ -156,7 +152,7 @@ function RowListHarness() {
                     onMoveTask={onMoveTask}
                 />
             ))}
-        </SortableContext>
+        </>
     );
 }
 
