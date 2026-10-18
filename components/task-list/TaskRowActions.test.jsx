@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import TaskRowActions from './TaskRowActions';
 
 const LIST_ID = 'list-1';
@@ -15,6 +16,11 @@ vi.mock('@/modules/tasks/actions/task-delete-actions', () => ({
 vi.mock('@/modules/tasks/actions/task-update-actions', () => ({ updateTask: vi.fn() }));
 vi.mock('@/lib/cache/service-worker-cache', () => ({ bustPageCache: vi.fn() }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
+const startTimeSession = vi.fn();
+vi.mock('@/modules/timer/actions/time-session-actions', () => ({
+    startTimeSession: (...args) => startTimeSession(...args),
+}));
+vi.mock('@/lib/client-id', () => ({ createClientId: () => 'client-id-1' }));
 
 // Radix positions menus with a ResizeObserver, which jsdom does not provide
 beforeAll(() => {
@@ -106,5 +112,54 @@ describe('TaskRowActions Move to', () => {
         fireEvent.click(await screen.findByRole('menuitem', { name: 'Move to...' }));
 
         expect(await screen.findByText('Other root')).toBeTruthy();
+    });
+});
+
+describe('TaskRowActions Start Timer', () => {
+    afterEach(() => startTimeSession.mockReset());
+
+    it('starts a timer for this task with a client-made id', async () => {
+        startTimeSession.mockResolvedValue({ data: { id: 'session-1' }, error: null });
+        renderActions(otherRoot, [otherRoot]);
+        openMenu(otherRoot);
+
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Start Timer' }));
+
+        await waitFor(() =>
+            expect(startTimeSession).toHaveBeenCalledWith({
+                taskId: 'other',
+                id: 'client-id-1',
+            }),
+        );
+        expect(toast.success).toHaveBeenCalledWith('Timer started', { id: 'toast-id' });
+    });
+
+    it('shows the server error without starting a second request', async () => {
+        startTimeSession.mockResolvedValue({ data: null, error: 'Already timing this task' });
+        renderActions(otherRoot, [otherRoot]);
+        openMenu(otherRoot);
+
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Start Timer' }));
+
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith('Already timing this task', {
+                id: 'toast-id',
+            }),
+        );
+    });
+
+    it('ignores a repeat click while the first request is still in flight', async () => {
+        let finishStart;
+        startTimeSession.mockReturnValueOnce(new Promise((resolve) => (finishStart = resolve)));
+        renderActions(otherRoot, [otherRoot]);
+
+        openMenu(otherRoot);
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Start Timer' }));
+        // The menu closes on selection; reopening it and clicking again is the real double-tap case
+        openMenu(otherRoot);
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Start Timer' }));
+
+        expect(startTimeSession).toHaveBeenCalledTimes(1);
+        finishStart({ data: { id: 'session-1' }, error: null });
     });
 });
