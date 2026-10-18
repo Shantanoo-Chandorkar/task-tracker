@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeElapsedSeconds, isSessionStale } from './session-clock';
+import { computeElapsedSeconds, isSessionStale, formatElapsedDuration } from './session-clock';
 
 describe('computeElapsedSeconds', () => {
     it('adds the current running segment to the sealed accumulated seconds', () => {
@@ -87,5 +87,23 @@ describe('isSessionStale', () => {
     it('is false for a running session with no last_resumed_at', () => {
         const session = { status: 'running', last_resumed_at: null };
         expect(isSessionStale(session, new Date('2026-10-18T10:00:00.000Z'))).toBe(false);
+    });
+});
+
+describe('formatElapsedDuration', () => {
+    it('formats under a minute as mm:ss', () => {
+        expect(formatElapsedDuration(5)).toBe('0:05');
+    });
+
+    it('formats under an hour as mm:ss', () => {
+        expect(formatElapsedDuration(125)).toBe('2:05');
+    });
+
+    it('formats an hour or more as h:mm:ss', () => {
+        expect(formatElapsedDuration(3725)).toBe('1:02:05');
+    });
+
+    it('pads minutes and seconds inside an hour value, but not the hour itself', () => {
+        expect(formatElapsedDuration(36000)).toBe('10:00:00');
     });
 });

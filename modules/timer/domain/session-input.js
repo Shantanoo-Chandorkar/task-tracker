@@ -64,7 +64,7 @@ export function checkSessionLabel(rawLabel) {
 /**
  * Whether a session has no subject - just a label, never a fake task row (decision 13).
  *
- * @param {{ habit_id: string|null, task_id: string|null }} session - The session row.
+ * @param {Record<string, any>} session - The session row; needs habit_id, task_id.
  * @returns {boolean} True when the session is standalone.
  */
 function isStandaloneSession(session) {
@@ -76,8 +76,8 @@ function isStandaloneSession(session) {
  * A standalone session is deleted - no feature reads one and none is planned.
  * A habit/task-linked session is kept instead, for Analytics' total-tracked-time KPI.
  *
- * @param {{ habit_id: string|null, task_id: string|null, status: string, accumulated_seconds: number,
- *   last_resumed_at: string|null }} session - The session row.
+ * @param {Record<string, any>} session - The session row; needs habit_id, task_id, status,
+ *   accumulated_seconds, last_resumed_at.
  * @param {Date} now - The instant the session is being completed at.
  * @returns {{ action: 'delete' } | { action: 'update', updates: Record<string, any> }} What the
  *   caller should do to the row.
@@ -103,7 +103,7 @@ const ALREADY_COMPLETED_FAILURE = {
 /**
  * Checks a session can be paused - only a running session can be, and never once completed.
  *
- * @param {{ status: string }} session - The session row.
+ * @param {Record<string, any>} session - The session row; needs status.
  * @returns {{ error: string, code: string }|null} The refusal, or null when pausing is allowed.
  */
 export function checkCanPause(session) {
@@ -117,7 +117,7 @@ export function checkCanPause(session) {
 /**
  * Checks a session can be resumed - only a paused session can be, and never once completed.
  *
- * @param {{ status: string }} session - The session row.
+ * @param {Record<string, any>} session - The session row; needs status.
  * @returns {{ error: string, code: string }|null} The refusal, or null when resuming is allowed.
  */
 export function checkCanResume(session) {
@@ -131,7 +131,7 @@ export function checkCanResume(session) {
 /**
  * Checks a session can be completed - refused only once it already has been.
  *
- * @param {{ status: string }} session - The session row.
+ * @param {Record<string, any>} session - The session row; needs status.
  * @returns {{ error: string, code: string }|null} The refusal, or null when completing is allowed.
  */
 export function checkCanComplete(session) {
