@@ -9,8 +9,11 @@ beforeAll(() => {
 
 const toggle = vi.fn().mockResolvedValue(true);
 const setValue = vi.fn().mockResolvedValue(true);
+const setValues = vi.fn().mockResolvedValue(true);
 vi.mock('@/hooks/useHabitCheckIn', () => ({ useHabitCheckIn: () => ({ toggle }) }));
-vi.mock('@/hooks/useHabitEntryValue', () => ({ useHabitEntryValue: () => ({ setValue }) }));
+vi.mock('@/hooks/useHabitEntryValue', () => ({
+    useHabitEntryValue: () => ({ setValue, setValues }),
+}));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
 const TODAY = '2026-10-18';
@@ -30,6 +33,7 @@ function buildHabit(overrides = {}) {
 beforeEach(() => {
     toggle.mockClear();
     setValue.mockClear();
+    setValues.mockClear();
 });
 
 describe('HabitEntryDialog binary body', () => {
@@ -332,5 +336,187 @@ describe('HabitEntryDialog back-fill navigation', () => {
         expect(screen.getByLabelText('Saturday, October 17, 2026').className).toContain(
             'bg-metric',
         );
+    });
+});
+
+describe('HabitEntryDialog multi-day batch save', () => {
+    it('keeps a day’s typed value after switching away, and saves every drafted day in one call', async () => {
+        const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
+        render(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={[]}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText('Value'), { target: { value: '7' } });
+        fireEvent.click(screen.getByLabelText('Friday, October 16, 2026'));
+        expect(screen.getByLabelText('Value').value).toBe('');
+        fireEvent.change(screen.getByLabelText('Value'), { target: { value: '4' } });
+
+        fireEvent.click(screen.getByText('Save'));
+
+        await waitFor(() => expect(setValues).toHaveBeenCalledTimes(1));
+        expect(setValues).toHaveBeenCalledWith(habit, [
+            { localDate: TODAY, rawValue: '7' },
+            { localDate: '2026-10-16', rawValue: '4' },
+        ]);
+    });
+
+    it('disables Save until at least one day has a pending edit', () => {
+        const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
+        render(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={[]}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        expect(screen.getByText('Save').closest('button').disabled).toBe(true);
+
+        fireEvent.change(screen.getByLabelText('Value'), { target: { value: '3' } });
+
+        expect(screen.getByText('Save').closest('button').disabled).toBe(false);
+    });
+
+    it('defers Clear to the batch save instead of calling setValue immediately', async () => {
+        const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
+        const entries = [{ id: 'entry-1', habit_id: 'habit-1', local_date: TODAY, value: 5 }];
+        render(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={entries}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        fireEvent.click(screen.getByText('Clear'));
+        expect(setValue).not.toHaveBeenCalled();
+        expect(screen.getByLabelText('Value').value).toBe('');
+
+        fireEvent.click(screen.getByText('Save'));
+
+        await waitFor(() => expect(setValues).toHaveBeenCalledTimes(1));
+        expect(setValues).toHaveBeenCalledWith(habit, [{ localDate: TODAY, rawValue: null }]);
+    });
+
+    it('jumps to the invalid day and shows the error there when saving a bad value elsewhere', async () => {
+        const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
+        render(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={[]}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText('Value'), { target: { value: '7' } });
+        fireEvent.click(screen.getByLabelText('Friday, October 16, 2026'));
+        fireEvent.change(screen.getByLabelText('Value'), { target: { value: '3' } });
+        fireEvent.change(screen.getByLabelText('Value'), { target: { value: '' } });
+
+        fireEvent.click(screen.getByText('Save'));
+
+        await waitFor(() => expect(screen.getByText('Value cannot be empty')).toBeTruthy());
+        expect(setValues).not.toHaveBeenCalled();
+        expect(
+            screen
+                .getByLabelText('Friday, October 16, 2026 (unsaved)')
+                .getAttribute('aria-pressed'),
+        ).toBe('true');
+    });
+
+    it('toggling a binary day in back-fill mode does not close the dialog or call toggle directly', () => {
+        const onClose = vi.fn();
+        const habit = buildHabit();
+        render(
+            <HabitEntryDialog
+                open
+                onClose={onClose}
+                habit={habit}
+                entries={[]}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        fireEvent.click(screen.getByText('Not done yet'));
+
+        expect(toggle).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+        expect(screen.getByText('Done')).toBeTruthy();
+    });
+
+    it('saves a drafted binary toggle via setValues on Save', async () => {
+        const habit = buildHabit();
+        render(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={[]}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        fireEvent.click(screen.getByText('Not done yet'));
+        fireEvent.click(screen.getByText('Save'));
+
+        await waitFor(() => expect(setValues).toHaveBeenCalledTimes(1));
+        expect(setValues).toHaveBeenCalledWith(habit, [{ localDate: TODAY, rawValue: true }]);
+    });
+
+    it('discards drafts when the dialog is reopened for the same habit', () => {
+        const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
+        const { rerender } = render(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={[]}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+        fireEvent.change(screen.getByLabelText('Value'), { target: { value: '7' } });
+
+        rerender(
+            <HabitEntryDialog
+                open={false}
+                onClose={vi.fn()}
+                habit={habit}
+                entries={[]}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+        rerender(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={[]}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        expect(screen.getByLabelText('Value').value).toBe('');
+        expect(screen.getByText('Save').closest('button').disabled).toBe(true);
     });
 });

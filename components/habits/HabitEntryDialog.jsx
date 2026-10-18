@@ -31,13 +31,16 @@ function resolveUnitLabel(habit) {
  * Shared by the row's check-in control (today only, non-binary) and the "Log a different day"
  * back-fill flow (any measure kind) - the body swaps by `habit.measure_kind`.
  *
+ * In back-fill mode, every edit is kept as a local draft keyed by date and committed all at once
+ * via Save; today-only mode is untouched and still saves immediately.
+ *
  * @param {object} props
  * @param {boolean} props.open - Whether the dialog is open.
  * @param {() => void} props.onClose - Called when the dialog should close.
  * @param {object} props.habit - The habit being logged.
  * @param {object[]} props.entries - This habit's own entries (any order), to find a day's existing one.
  * @param {string} props.todayLocalDate - 'YYYY-MM-DD', the caller's current local date.
- * @param {boolean} [props.allowDateNavigation] - Shows a day-picker strip bounded to the back-fill window.
+ * @param {boolean} [props.allowDateNavigation] - Shows a day-picker strip and enables multi-day drafts.
  */
 export default function HabitEntryDialog({
     open,
@@ -48,9 +51,10 @@ export default function HabitEntryDialog({
     allowDateNavigation = false,
 }) {
     const { toggle } = useHabitCheckIn();
-    const { setValue } = useHabitEntryValue();
+    const { setValue, setValues } = useHabitEntryValue();
     const [localDate, setLocalDate] = useState(todayLocalDate);
     const [draftValue, setDraftValue] = useState('');
+    const [draftsByLocalDate, setDraftsByLocalDate] = useState({});
     const [submitting, setSubmitting] = useState(false);
     const [valueError, setValueError] = useState('');
 
@@ -63,6 +67,7 @@ export default function HabitEntryDialog({
             const initialEntry =
                 entries.find((entry) => entry.local_date === todayLocalDate) ?? null;
             setDraftValue(initialEntry ? String(initialEntry.value) : '');
+            setDraftsByLocalDate({});
             setSubmitting(false);
             setValueError('');
         }
@@ -73,27 +78,54 @@ export default function HabitEntryDialog({
     const isQuit = habit.polarity === 'quit';
     const unitLabel = resolveUnitLabel(habit);
     const loggedLocalDates = new Set(entries.map((entry) => entry.local_date));
+    const draftLocalDates = new Set(Object.keys(draftsByLocalDate));
+    const hasPendingDrafts = draftLocalDates.size > 0;
+    const hasDraftForCurrentDate = allowDateNavigation && localDate in draftsByLocalDate;
 
+    const isLoggedForDisplay = hasDraftForCurrentDate
+        ? Boolean(draftsByLocalDate[localDate])
+        : Boolean(existingEntry);
+    const displayedValue = allowDateNavigation
+        ? hasDraftForCurrentDate
+            ? (draftsByLocalDate[localDate] ?? '')
+            : existingEntry
+              ? String(existingEntry.value)
+              : ''
+        : draftValue;
+    const canClearCurrentDay = hasDraftForCurrentDate
+        ? draftsByLocalDate[localDate] !== null
+        : Boolean(existingEntry);
+
+    // Wired only to DatePillStrip's onChange (back-fill mode) - every edit already lives in `draftsByLocalDate`.
     /** @param {string} nextLocalDate */
     function handleDateChange(nextLocalDate) {
         setLocalDate(nextLocalDate);
-        const entryForDate = entries.find((entry) => entry.local_date === nextLocalDate) ?? null;
-        setDraftValue(entryForDate ? String(entryForDate.value) : '');
         setValueError('');
     }
 
     /** @param {string} value */
     function handleDraftValueChange(value) {
-        setDraftValue(value);
+        if (allowDateNavigation) {
+            setDraftsByLocalDate((previousDrafts) => ({ ...previousDrafts, [localDate]: value }));
+        } else {
+            setDraftValue(value);
+        }
         setValueError('');
     }
 
     /** @param {number} delta */
     function adjustCount(delta) {
-        handleDraftValueChange(String(Math.max(0, Number(draftValue || 0) + delta)));
+        handleDraftValueChange(String(Math.max(0, Number(displayedValue || 0) + delta)));
     }
 
     async function handleToggle() {
+        if (allowDateNavigation) {
+            setDraftsByLocalDate((previousDrafts) => ({
+                ...previousDrafts,
+                [localDate]: !isLoggedForDisplay,
+            }));
+            return;
+        }
         setSubmitting(true);
         try {
             const didToggle = await toggle(habit, existingEntry, localDate);
@@ -103,7 +135,41 @@ export default function HabitEntryDialog({
         }
     }
 
+    async function handleSaveAll() {
+        const draftDates = Object.keys(draftsByLocalDate);
+        if (!isBinary) {
+            for (const draftLocalDate of draftDates) {
+                const value = draftsByLocalDate[draftLocalDate];
+                if (value === null) continue;
+                if (value === '' || Number.isNaN(Number(value))) {
+                    setLocalDate(draftLocalDate);
+                    setValueError('Value cannot be empty');
+                    return;
+                }
+            }
+        }
+
+        setSubmitting(true);
+        try {
+            const rawEntries = draftDates.map((draftLocalDate) => ({
+                localDate: draftLocalDate,
+                rawValue: draftsByLocalDate[draftLocalDate],
+            }));
+            const didSave = await setValues(habit, rawEntries);
+            if (didSave) {
+                setDraftsByLocalDate({});
+                onClose();
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
     async function handleSave() {
+        if (allowDateNavigation) {
+            await handleSaveAll();
+            return;
+        }
         if (draftValue === '' || Number.isNaN(Number(draftValue))) {
             setValueError('Value cannot be empty');
             return;
@@ -118,6 +184,11 @@ export default function HabitEntryDialog({
     }
 
     async function handleClear() {
+        if (allowDateNavigation) {
+            setDraftsByLocalDate((previousDrafts) => ({ ...previousDrafts, [localDate]: null }));
+            setValueError('');
+            return;
+        }
         setSubmitting(true);
         try {
             const didClear = await setValue(habit, existingEntry, localDate, null);
@@ -127,6 +198,8 @@ export default function HabitEntryDialog({
         }
     }
 
+    const showBinaryOnlyFooter = isBinary && !allowDateNavigation;
+
     return (
         <ModalShell
             open={open}
@@ -134,13 +207,13 @@ export default function HabitEntryDialog({
             isBusy={submitting}
             title={habit.title}
             footer={
-                isBinary ? (
+                showBinaryOnlyFooter ? (
                     <Button type="button" variant="outline" onClick={onClose}>
                         Close
                     </Button>
                 ) : (
                     <>
-                        {existingEntry && (
+                        {!isBinary && canClearCurrentDay && (
                             <Button
                                 type="button"
                                 variant="outline"
@@ -161,7 +234,7 @@ export default function HabitEntryDialog({
                         <Button
                             type="button"
                             onClick={handleSave}
-                            disabled={submitting}
+                            disabled={submitting || (allowDateNavigation && !hasPendingDrafts)}
                             className="gap-1.5"
                         >
                             {submitting && <Loader size="xs" />}
@@ -181,6 +254,7 @@ export default function HabitEntryDialog({
                         )}
                         maxLocalDate={todayLocalDate}
                         loggedLocalDates={loggedLocalDates}
+                        draftLocalDates={draftLocalDates}
                         onChange={handleDateChange}
                     />
                 )}
@@ -191,9 +265,9 @@ export default function HabitEntryDialog({
                             type="button"
                             onClick={handleToggle}
                             disabled={submitting}
-                            aria-pressed={Boolean(existingEntry)}
+                            aria-pressed={isLoggedForDisplay}
                             className={`hit-area press-feedback flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-medium motion-safe:transition-colors disabled:opacity-60 ${
-                                existingEntry
+                                isLoggedForDisplay
                                     ? isQuit
                                         ? 'border-destructive bg-destructive text-destructive-foreground'
                                         : 'border-metric bg-metric text-background'
@@ -201,7 +275,7 @@ export default function HabitEntryDialog({
                             }`}
                         >
                             {submitting && <Loader size="sm" />}
-                            {existingEntry
+                            {isLoggedForDisplay
                                 ? isQuit
                                     ? 'Slipped'
                                     : 'Done'
@@ -227,7 +301,7 @@ export default function HabitEntryDialog({
                                 type="number"
                                 min={0}
                                 step="any"
-                                value={draftValue}
+                                value={displayedValue}
                                 disabled={submitting}
                                 onChange={(event) => handleDraftValueChange(event.target.value)}
                                 className="w-24 text-center"
@@ -255,7 +329,7 @@ export default function HabitEntryDialog({
                                 type="number"
                                 min={0}
                                 step="any"
-                                value={draftValue}
+                                value={displayedValue}
                                 disabled={submitting}
                                 onChange={(event) => handleDraftValueChange(event.target.value)}
                                 className="w-28"

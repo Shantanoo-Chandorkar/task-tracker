@@ -5,6 +5,7 @@ import { toGuestLimitResult } from '@/lib/guest/guest-database-errors';
 import {
     checkHabitEntryValue,
     checkHabitEntryLocalDate,
+    checkHabitEntryBatch,
 } from '@/modules/habits/domain/habit-input';
 import { toHabitEntryRateLimitResult } from '@/modules/habits/domain/habit-entry-rate-limit';
 import {
@@ -209,5 +210,83 @@ export const setHabitEntryValue = withAuthenticatedAction(
         }
 
         return { data: createdEntry, error: null };
+    },
+);
+
+/**
+ * Logs, updates and clears several days of a habit's check-ins in one batch - at most one
+ * upsert statement and one delete statement total, never one write per day (decision: the
+ * back-fill dialog's multi-day save).
+ *
+ * @param {string} habitId - Habit the batch belongs to.
+ * @param {Array<{ localDate: string, rawValue: unknown }>} rawEntries - Each day's edit;
+ *   `rawValue` of null/undefined/'' clears that day instead of validating it as a number.
+ * @returns {Promise<{ data: { upsertedEntries: Record<string, any>[], clearedLocalDates:
+ *   string[] }|null, error: string|null, code?: string }>}
+ */
+export const setHabitEntryValues = withAuthenticatedAction(
+    '[habits] set entry values',
+    'Unexpected error saving check-ins',
+    async (user, supabase, habitId, rawEntries) => {
+        if (!habitId) return { data: null, ...ID_REQUIRED_FAILURE };
+
+        const { habit, failure: loadFailure } = await loadHabitForWrite(
+            supabase,
+            habitId,
+            NOT_FOUND_FAILURE,
+        );
+        if (loadFailure) return { data: null, ...loadFailure };
+
+        const todayLocalDate = await resolveUserTodayLocalDate(supabase, user.id);
+        const batchCheck = checkHabitEntryBatch(rawEntries, habit.measure_kind, todayLocalDate);
+        if (batchCheck.error || !batchCheck.entries) {
+            return { data: null, error: batchCheck.error, code: batchCheck.code };
+        }
+        const validEntries = batchCheck.entries;
+
+        const entriesToUpsert = validEntries.filter((entry) => entry.value !== null);
+        const localDatesToClear = validEntries
+            .filter((entry) => entry.value === null)
+            .map((entry) => entry.localDate);
+
+        let upsertedEntries = [];
+        if (entriesToUpsert.length > 0) {
+            const { data, error } = await supabase
+                .from('habit_entries')
+                .upsert(
+                    entriesToUpsert.map((entry) => ({
+                        habit_id: habitId,
+                        user_id: user.id,
+                        local_date: entry.localDate,
+                        value: entry.value,
+                    })),
+                    { onConflict: 'habit_id,local_date' },
+                )
+                .select();
+            if (error) {
+                return {
+                    data: null,
+                    ...toHabitEntryWriteFailure(error, 'Failed to save check-ins'),
+                };
+            }
+            upsertedEntries = data ?? [];
+        }
+
+        if (localDatesToClear.length > 0) {
+            const { error } = await supabase
+                .from('habit_entries')
+                .delete()
+                .eq('habit_id', habitId)
+                .in('local_date', localDatesToClear)
+                .select();
+            if (error) {
+                return {
+                    data: null,
+                    ...toHabitEntryWriteFailure(error, 'Failed to clear check-ins'),
+                };
+            }
+        }
+
+        return { data: { upsertedEntries, clearedLocalDates: localDatesToClear }, error: null };
     },
 );

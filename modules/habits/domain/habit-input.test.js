@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { addDaysToLocalDate } from './local-date';
 import {
     checkHabitTitle,
     checkHabitDescription,
@@ -15,6 +16,7 @@ import {
     pickHabitCategoryUpdates,
     checkHabitEntryLocalDate,
     checkHabitEntryValue,
+    checkHabitEntryBatch,
     checkHabitEntryNote,
 } from './habit-input';
 
@@ -392,6 +394,73 @@ describe('checkHabitEntryValue', () => {
 
     it('rejects an unrecognised measure kind instead of throwing', () => {
         expect(checkHabitEntryValue(1, 'bogus').code).toBe('HABIT_INVALID_MEASURE_KIND');
+    });
+});
+
+describe('checkHabitEntryBatch', () => {
+    const today = '2026-10-18';
+
+    it('validates a mixed batch of set and clear entries', () => {
+        expect(
+            checkHabitEntryBatch(
+                [
+                    { localDate: '2026-10-17', rawValue: '5' },
+                    { localDate: '2026-10-16', rawValue: '' },
+                ],
+                'count',
+                today,
+            ),
+        ).toEqual({
+            entries: [
+                { localDate: '2026-10-17', value: 5 },
+                { localDate: '2026-10-16', value: null },
+            ],
+        });
+    });
+
+    it('rejects a non-array or empty batch', () => {
+        expect(checkHabitEntryBatch([], 'count', today).code).toBe('HABIT_ENTRY_BATCH_EMPTY');
+        expect(checkHabitEntryBatch(null, 'count', today).code).toBe('HABIT_ENTRY_BATCH_EMPTY');
+    });
+
+    it('rejects a batch larger than the back-fill window plus today', () => {
+        const rawEntries = Array.from({ length: 32 }, (_, index) => ({
+            localDate: addDaysToLocalDate(today, -index),
+            rawValue: '1',
+        }));
+        expect(checkHabitEntryBatch(rawEntries, 'count', today).code).toBe(
+            'HABIT_ENTRY_BATCH_TOO_LARGE',
+        );
+    });
+
+    it('rejects a batch with the same date sent twice', () => {
+        const rawEntries = [
+            { localDate: '2026-10-17', rawValue: '5' },
+            { localDate: '2026-10-17', rawValue: '6' },
+        ];
+        expect(checkHabitEntryBatch(rawEntries, 'count', today).code).toBe(
+            'HABIT_ENTRY_BATCH_DUPLICATE_DATE',
+        );
+    });
+
+    it('rejects the whole batch when one entry has an invalid date', () => {
+        const rawEntries = [
+            { localDate: '2026-10-17', rawValue: '5' },
+            { localDate: '2026-10-20', rawValue: '5' },
+        ];
+        expect(checkHabitEntryBatch(rawEntries, 'count', today).code).toBe(
+            'HABIT_ENTRY_DATE_IN_FUTURE',
+        );
+    });
+
+    it('rejects the whole batch when one entry has an invalid value', () => {
+        const rawEntries = [
+            { localDate: '2026-10-17', rawValue: '5' },
+            { localDate: '2026-10-16', rawValue: '-1' },
+        ];
+        expect(checkHabitEntryBatch(rawEntries, 'quantity', today).code).toBe(
+            'HABIT_ENTRY_VALUE_INVALID',
+        );
     });
 });
 

@@ -19,6 +19,9 @@ import {
     HABIT_ENTRY_DATE_TOO_OLD,
     HABIT_ENTRY_VALUE_INVALID,
     HABIT_ENTRY_NOTE_TOO_LONG,
+    HABIT_ENTRY_BATCH_EMPTY,
+    HABIT_ENTRY_BATCH_TOO_LARGE,
+    HABIT_ENTRY_BATCH_DUPLICATE_DATE,
     HABIT_CATEGORY_NAME_REQUIRED,
     HABIT_CATEGORY_NAME_TOO_LONG,
     HABIT_POLARITY_MEASURE_MISMATCH,
@@ -38,6 +41,8 @@ const DESCRIPTION_MAX_LENGTH = 10000;
 const CATEGORY_NAME_MAX_LENGTH = 200;
 const NOTE_MAX_LENGTH = 2000;
 export const DEFAULT_BACKFILL_WINDOW_DAYS = 30;
+// The back-fill window plus today - the real maximum number of distinct days a batch can ever cover.
+const MAX_BATCH_ENTRIES = DEFAULT_BACKFILL_WINDOW_DAYS + 1;
 
 // What an <input type="color"> sends; anything else would reach a style attribute unchecked
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -418,6 +423,64 @@ export function checkHabitEntryValue(rawValue, measureKind) {
         return { error: 'Value is invalid for this habit', code: HABIT_ENTRY_VALUE_INVALID };
     }
     return { value };
+}
+
+/**
+ * Validates a whole batch of check-in edits atomically - one bad entry rejects everything, so a
+ * caller never partially writes a multi-day save.
+ *
+ * @param {unknown} rawEntries - Array of `{ localDate, rawValue }` sent by the client.
+ * @param {string} measureKind - The habit's measure kind, applied to every non-clearing entry.
+ * @param {string} todayLocalDate - 'YYYY-MM-DD', the caller's current local date.
+ * @returns {{ entries: Array<{ localDate: string, value: number|null }>, error?: undefined,
+ *   code?: undefined } | { entries?: undefined, error: string, code?: string }} The validated
+ *   batch (`value: null` means "clear this day"), or why it was rejected.
+ */
+export function checkHabitEntryBatch(rawEntries, measureKind, todayLocalDate) {
+    if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
+        return { error: 'At least one day is required', code: HABIT_ENTRY_BATCH_EMPTY };
+    }
+    if (rawEntries.length > MAX_BATCH_ENTRIES) {
+        return {
+            error: `Cannot save more than ${MAX_BATCH_ENTRIES} days at once`,
+            code: HABIT_ENTRY_BATCH_TOO_LARGE,
+        };
+    }
+
+    const seenLocalDates = new Set();
+    /** @type {Array<{ localDate: string, value: number|null }>} */
+    const entries = [];
+    for (const rawEntry of rawEntries) {
+        const rawLocalDate = rawEntry?.localDate;
+        const dateCheck = checkHabitEntryLocalDate(rawLocalDate, todayLocalDate);
+        if (dateCheck.error || !dateCheck.localDate) {
+            return { error: `Day ${rawLocalDate}: ${dateCheck.error}`, code: dateCheck.code };
+        }
+        const validLocalDate = dateCheck.localDate;
+        if (seenLocalDates.has(validLocalDate)) {
+            return {
+                error: `Day ${validLocalDate} was sent more than once`,
+                code: HABIT_ENTRY_BATCH_DUPLICATE_DATE,
+            };
+        }
+        seenLocalDates.add(validLocalDate);
+
+        const { rawValue } = rawEntry;
+        const isClearing = rawValue === undefined || rawValue === null || rawValue === '';
+        if (isClearing) {
+            entries.push({ localDate: validLocalDate, value: null });
+            continue;
+        }
+        const valueCheck = checkHabitEntryValue(rawValue, measureKind);
+        if (valueCheck.error || valueCheck.value === undefined) {
+            return {
+                error: `Day ${validLocalDate}: ${valueCheck.error}`,
+                code: valueCheck.code,
+            };
+        }
+        entries.push({ localDate: validLocalDate, value: valueCheck.value });
+    }
+    return { entries };
 }
 
 /**

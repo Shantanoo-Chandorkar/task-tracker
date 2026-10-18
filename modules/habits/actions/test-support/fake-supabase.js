@@ -43,6 +43,7 @@ export function createFakeSupabase({
         let isAscending = true;
         let pendingUpdate = null;
         let pendingInsert = null;
+        let pendingUpsert = null;
         let isDeleting = false;
 
         function addFilter(operator, column, value) {
@@ -55,6 +56,7 @@ export function createFakeSupabase({
                 filters.every(({ operator, column, value }) => {
                     if (operator === 'eq') return row[column] === value;
                     if (operator === 'is') return (row[column] ?? null) === value;
+                    if (operator === 'in') return value.includes(row[column]);
                     return true;
                 }),
             );
@@ -77,6 +79,7 @@ export function createFakeSupabase({
             },
             eq: (column, value) => addFilter('eq', column, value),
             is: (column, value) => addFilter('is', column, value),
+            in: (column, values) => addFilter('in', column, values),
             order(column, { ascending = true } = {}) {
                 orderColumn = column;
                 isAscending = ascending;
@@ -91,6 +94,14 @@ export function createFakeSupabase({
             update(values) {
                 pendingUpdate = values;
                 updates.push({ tableName, values });
+                return builder;
+            },
+            upsert(values, { onConflict } = {}) {
+                pendingUpsert = {
+                    rows: Array.isArray(values) ? values : [values],
+                    conflictColumns: onConflict ? onConflict.split(',') : ['id'],
+                };
+                inserts.push({ tableName, values, isUpsert: true });
                 return builder;
             },
             delete() {
@@ -123,6 +134,33 @@ export function createFakeSupabase({
                 return { data: row, error: null };
             },
             then(resolve) {
+                if (pendingUpsert) {
+                    if (insertError) return resolve({ data: null, error: insertError });
+                    const { rows, conflictColumns } = pendingUpsert;
+                    const storedRows = (tables[tableName] ??= []);
+                    const resultRows = rows.map((row) => {
+                        const existingRow = storedRows.find((stored) =>
+                            conflictColumns.every((column) => stored[column] === row[column]),
+                        );
+                        if (existingRow) {
+                            Object.assign(existingRow, row);
+                            return existingRow;
+                        }
+                        insertedRowCount += 1;
+                        const insertedRow = { id: `${tableName}-new-${insertedRowCount}`, ...row };
+                        storedRows.push(insertedRow);
+                        return insertedRow;
+                    });
+                    return resolve({ data: resultRows, error: null });
+                }
+                if (isDeleting) {
+                    if (deleteError) return resolve({ data: null, error: deleteError });
+                    const removedRows = matchingRows();
+                    tables[tableName] = tables[tableName].filter(
+                        (row) => !removedRows.includes(row),
+                    );
+                    return resolve({ data: removedRows, error: null });
+                }
                 const rows = matchingRows();
                 return resolve({ data: rows, error: null });
             },

@@ -418,3 +418,158 @@ describe('setHabitEntryValue', () => {
         });
     });
 });
+
+describe('setHabitEntryValues', () => {
+    function setUpCountHabit(overrides = {}) {
+        setUpWorld({
+            habits: [
+                buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20, ...overrides }),
+            ],
+        });
+    }
+
+    it('needs a habit id', async () => {
+        const { setHabitEntryValues } = await habitEntryActions();
+
+        expect(await setHabitEntryValues('', [{ localDate: TODAY, rawValue: 5 }])).toEqual({
+            data: null,
+            error: 'Habit ID is required',
+            code: 'HABIT_ID_REQUIRED',
+        });
+    });
+
+    it('refuses a signed-out caller with the stable auth code', async () => {
+        currentUserId = null;
+        const { setHabitEntryValues } = await habitEntryActions();
+
+        expect(
+            await setHabitEntryValues('habit-1', [{ localDate: TODAY, rawValue: 5 }]),
+        ).toMatchObject({ data: null, code: 'NOT_AUTHENTICATED' });
+    });
+
+    it('treats another user’s habit as not found, same as a missing one', async () => {
+        currentUserId = STRANGER_ID;
+        const { setHabitEntryValues } = await habitEntryActions();
+
+        expect(await setHabitEntryValues('habit-1', [{ localDate: TODAY, rawValue: 5 }])).toEqual({
+            data: null,
+            error: 'Habit not found',
+            code: 'HABIT_NOT_FOUND',
+        });
+    });
+
+    it('saves a mixed batch of new, updated and cleared days in exactly one upsert and one delete', async () => {
+        setUpWorld({
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20 })],
+            entries: [
+                {
+                    id: 'entry-1',
+                    habit_id: 'habit-1',
+                    user_id: OWNER_ID,
+                    local_date: '2026-10-16',
+                    value: 5,
+                },
+            ],
+        });
+        const { setHabitEntryValues } = await habitEntryActions();
+
+        const batchResult = await setHabitEntryValues('habit-1', [
+            { localDate: TODAY, rawValue: 3 }, // new day
+            { localDate: '2026-10-16', rawValue: 9 }, // updates the existing entry
+            { localDate: '2026-10-15', rawValue: null }, // clears a day with nothing to clear (no-op)
+        ]);
+
+        expect(batchResult.error).toBeNull();
+        expect(batchResult.data.upsertedEntries).toHaveLength(2);
+        expect(batchResult.data.clearedLocalDates).toEqual(['2026-10-15']);
+        expect(tables.habit_entries.find((row) => row.local_date === TODAY)).toMatchObject({
+            value: 3,
+        });
+        expect(tables.habit_entries.find((row) => row.local_date === '2026-10-16')).toMatchObject({
+            id: 'entry-1',
+            value: 9,
+        });
+        expect(fake.inserts.filter((call) => call.isUpsert)).toHaveLength(1);
+        expect(fake.deletes).toHaveLength(1);
+    });
+
+    it('writes nothing at all when one entry in the batch is invalid', async () => {
+        setUpCountHabit();
+        const { setHabitEntryValues } = await habitEntryActions();
+
+        const batchResult = await setHabitEntryValues('habit-1', [
+            { localDate: TODAY, rawValue: 3 },
+            { localDate: '2026-10-17', rawValue: -1 },
+        ]);
+
+        expect(batchResult.data).toBeNull();
+        expect(batchResult.code).toBe('HABIT_ENTRY_VALUE_INVALID');
+        expect(tables.habit_entries).toHaveLength(0);
+        expect(fake.inserts).toHaveLength(0);
+        expect(fake.deletes).toHaveLength(0);
+    });
+
+    it('rejects an empty batch', async () => {
+        setUpCountHabit();
+        const { setHabitEntryValues } = await habitEntryActions();
+
+        expect(await setHabitEntryValues('habit-1', [])).toMatchObject({
+            data: null,
+            code: 'HABIT_ENTRY_BATCH_EMPTY',
+        });
+    });
+
+    it('allows a binary habit through, unlike the single-day action', async () => {
+        const batchResult = await (
+            await habitEntryActions()
+        ).setHabitEntryValues('habit-1', [{ localDate: TODAY, rawValue: true }]);
+
+        expect(batchResult.error).toBeNull();
+        expect(batchResult.data.upsertedEntries).toEqual([
+            expect.objectContaining({ local_date: TODAY, value: 1 }),
+        ]);
+    });
+
+    it('maps a guest-limit error on the upsert to the friendly result', async () => {
+        setUpWorld({
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20 })],
+            fakeOptions: {
+                insertError: { code: 'P0001', message: 'GUEST_LIMIT_REACHED:habit_entries' },
+            },
+        });
+        const { setHabitEntryValues } = await habitEntryActions();
+
+        const batchResult = await setHabitEntryValues('habit-1', [
+            { localDate: TODAY, rawValue: 5 },
+        ]);
+
+        expect(batchResult.data).toBeNull();
+        expect(batchResult.error).toContain('Guest mode is limited');
+    });
+
+    it('maps a rate-limit error on the delete to the friendly result', async () => {
+        setUpWorld({
+            habits: [buildHabitRow('habit-1', { measure_kind: 'count', target_value: 20 })],
+            entries: [
+                {
+                    id: 'entry-1',
+                    habit_id: 'habit-1',
+                    user_id: OWNER_ID,
+                    local_date: TODAY,
+                    value: 5,
+                },
+            ],
+            fakeOptions: {
+                deleteError: { code: 'P0001', message: 'HABIT_ENTRY_WRITE_RATE_LIMITED:minute' },
+            },
+        });
+        const { setHabitEntryValues } = await habitEntryActions();
+
+        const batchResult = await setHabitEntryValues('habit-1', [
+            { localDate: TODAY, rawValue: null },
+        ]);
+
+        expect(batchResult.data).toBeNull();
+        expect(batchResult.code).toBe('HABIT_ENTRY_RATE_LIMITED');
+    });
+});

@@ -86,6 +86,25 @@ describe('DatePillStrip', () => {
         expect(screen.getByText('Nov 1')).toBeTruthy();
     });
 
+    it('visually distinguishes a date with an unsaved draft from a logged or untouched one', () => {
+        render(
+            <DatePillStrip
+                localDate="2026-10-18"
+                minLocalDate="2026-10-16"
+                maxLocalDate="2026-10-18"
+                loggedLocalDates={new Set(['2026-10-16'])}
+                draftLocalDates={new Set(['2026-10-17'])}
+                onChange={vi.fn()}
+            />,
+        );
+
+        const loggedPill = screen.getByLabelText('Friday, October 16, 2026');
+        const draftPill = screen.getByLabelText('Saturday, October 17, 2026 (unsaved)');
+        expect(loggedPill.className).toContain('bg-metric');
+        expect(draftPill.className).not.toContain('bg-metric');
+        expect(draftPill.className).toContain('border-primary');
+    });
+
     it('calls onChange with the tapped date, without toggling or saving anything itself', () => {
         const onChange = vi.fn();
         render(
