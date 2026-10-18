@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Search } from 'lucide-react';
 import SidebarNav from './SidebarNav';
 import HabitZoneNav from '@/components/habits/HabitZoneNav';
+import TimeTrackingNav from '@/components/timer/TimeTrackingNav';
 import { openSearch } from './GlobalSearch';
 
 /**
@@ -17,15 +18,24 @@ import { openSearch } from './GlobalSearch';
  * @param {object|null} props.initialProfile - SSR-fetched profile, forwarded to the nav content
  */
 export default function DesktopSidebar({ initialSpaces, initialLists, initialProfile }) {
-    const isHabitZone = usePathname().startsWith('/habits');
+    const pathname = usePathname();
+    const isHabitZone = pathname.startsWith('/habits');
+    const isTimeTracking = pathname.startsWith('/timer');
+
+    const zoneHref = isHabitZone ? '/habits' : isTimeTracking ? '/timer' : '/';
+    const zoneLabel = isHabitZone
+        ? 'Habit Zone'
+        : isTimeTracking
+          ? 'Time Tracking'
+          : 'Task Tracker';
 
     return (
         <aside className="hidden lg:flex sticky top-0 h-screen w-[20%] flex-shrink-0 flex-col border-r border-border bg-sidebar p-3">
             <Link
-                href={isHabitZone ? '/habits' : '/'}
+                href={zoneHref}
                 className="mb-4 flex items-center gap-2 px-2 text-[0.9375rem] font-semibold text-foreground no-underline"
             >
-                {isHabitZone ? 'Habit Zone' : 'Task Tracker'}
+                {zoneLabel}
             </Link>
             <button
                 onClick={openSearch}
@@ -39,6 +49,8 @@ export default function DesktopSidebar({ initialSpaces, initialLists, initialPro
             </button>
             {isHabitZone ? (
                 <HabitZoneNav initialProfile={initialProfile} />
+            ) : isTimeTracking ? (
+                <TimeTrackingNav initialProfile={initialProfile} />
             ) : (
                 <SidebarNav
                     initialSpaces={initialSpaces}

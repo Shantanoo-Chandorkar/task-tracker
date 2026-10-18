@@ -49,7 +49,9 @@ export default function MobileTopBar({ initialSpaces, initialLists, initialProfi
                     ? 'Categories'
                     : pathname.startsWith('/habits')
                       ? 'Habit Zone'
-                      : 'Task Tracker';
+                      : pathname.startsWith('/timer')
+                        ? 'Timer'
+                        : 'Task Tracker';
 
     return (
         <div className="lg:hidden translucent-bar sticky top-[var(--guest-banner-height,0px)] z-20 flex items-center justify-between gap-2 border-b px-3 py-3">

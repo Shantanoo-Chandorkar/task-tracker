@@ -5,7 +5,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
-import { Home, LayoutGrid, Settings, ArrowLeftRight } from 'lucide-react';
+import { Home, LayoutGrid, Settings, ArrowLeftRight, Timer } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/nav/LogoutButton';
 
@@ -129,6 +129,14 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
                 >
                     <ArrowLeftRight aria-hidden="true" className="h-4 w-4" />
                     Switch to Habit Zone
+                </Link>
+                <Link
+                    href="/timer"
+                    onClick={onNavigate}
+                    className="flex items-center gap-2 rounded-md px-2 py-2 text-sm mb-2 no-underline text-sidebar-foreground hover:bg-sidebar-accent/60"
+                >
+                    <Timer aria-hidden="true" className="h-4 w-4" />
+                    Switch to Time Tracking
                 </Link>
                 <Link
                     href="/settings"

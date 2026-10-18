@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCurrentUserProfileQuery } from '@/hooks/useCurrentUserProfileQuery';
-import { ListChecks, LayoutGrid, ArrowLeftRight } from 'lucide-react';
+import { ListChecks, LayoutGrid, ArrowLeftRight, Timer } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/nav/LogoutButton';
 
@@ -72,6 +72,14 @@ export default function HabitZoneNav({ onNavigate, initialProfile }) {
                 >
                     <ArrowLeftRight aria-hidden="true" className="h-4 w-4" />
                     Switch to Task Tracker
+                </Link>
+                <Link
+                    href="/timer"
+                    onClick={onNavigate}
+                    className="flex items-center gap-2 rounded-md px-2 py-2 text-sm mb-2 no-underline text-sidebar-foreground hover:bg-sidebar-accent/60"
+                >
+                    <Timer aria-hidden="true" className="h-4 w-4" />
+                    Switch to Time Tracking
                 </Link>
                 <div className="h-px w-full bg-sidebar-border mb-2" />
                 <div className="flex items-center gap-2 px-2 py-1">

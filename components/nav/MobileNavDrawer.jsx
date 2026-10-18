@@ -6,6 +6,7 @@ import { Menu } from 'lucide-react';
 import ModalShell from '@/components/custom/ModalShell';
 import SidebarNav from './SidebarNav';
 import HabitZoneNav from '@/components/habits/HabitZoneNav';
+import TimeTrackingNav from '@/components/timer/TimeTrackingNav';
 
 /**
  * Hamburger button + slide-in Sheet wrapping the shared nav content -
@@ -18,7 +19,14 @@ import HabitZoneNav from '@/components/habits/HabitZoneNav';
  */
 export default function MobileNavDrawer({ initialSpaces, initialLists, initialProfile }) {
     const [isOpen, setIsOpen] = useState(false);
-    const isHabitZone = usePathname().startsWith('/habits');
+    const pathname = usePathname();
+    const isHabitZone = pathname.startsWith('/habits');
+    const isTimeTracking = pathname.startsWith('/timer');
+    const zoneLabel = isHabitZone
+        ? 'Habit Zone'
+        : isTimeTracking
+          ? 'Time Tracking'
+          : 'Task Tracker';
 
     return (
         <>
@@ -34,13 +42,18 @@ export default function MobileNavDrawer({ initialSpaces, initialLists, initialPr
                 onClose={() => setIsOpen(false)}
                 variant="sheet"
                 side="left"
-                title={isHabitZone ? 'Habit Zone' : 'Task Tracker'}
+                title={zoneLabel}
                 contentClassName="flex w-[80%] flex-col bg-sidebar p-3"
                 headerClassName="p-0 pb-4"
                 titleClassName="text-[0.9375rem] font-semibold"
             >
                 {isHabitZone ? (
                     <HabitZoneNav
+                        onNavigate={() => setIsOpen(false)}
+                        initialProfile={initialProfile}
+                    />
+                ) : isTimeTracking ? (
+                    <TimeTrackingNav
                         onNavigate={() => setIsOpen(false)}
                         initialProfile={initialProfile}
                     />

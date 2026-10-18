@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
-import { Home, ListChecks, LayoutGrid, Settings, ArrowLeftRight } from 'lucide-react';
+import { Home, ListChecks, LayoutGrid, Settings, ArrowLeftRight, Timer } from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
 import HabitQuickCreateFab from '@/components/habits/HabitQuickCreateFab';
 
@@ -64,7 +64,52 @@ function HabitZoneTabs() {
 }
 
 /**
+ * Time Tracking's tabs: Timer / Switch to Habit Zone / [gap, no FAB] / Switch to Task Tracker / Settings.
+ * Deliberately links to both other zones, unlike Habit Zone's single switch tab (see BottomNav's docblock).
+ */
+function TimeTrackingTabs() {
+    const pathname = usePathname();
+    const isTimer = pathname.startsWith('/timer');
+    const isSettings = pathname.startsWith('/settings');
+
+    return (
+        <div className="flex items-center">
+            <div className="flex-1 flex">
+                <Link
+                    href="/timer"
+                    aria-current={isTimer ? 'page' : undefined}
+                    className={tabClassName(isTimer)}
+                >
+                    <Timer aria-hidden="true" className="h-5 w-5" />
+                    Timer
+                </Link>
+                <Link href="/habits" className={tabClassName(false)}>
+                    <ListChecks aria-hidden="true" className="h-5 w-5" />
+                    Habits
+                </Link>
+            </div>
+            <div className="flex-1 flex">
+                <Link href="/" className={tabClassName(false)}>
+                    <ArrowLeftRight aria-hidden="true" className="h-5 w-5" />
+                    Tasks
+                </Link>
+                <Link
+                    href="/settings"
+                    aria-current={isSettings ? 'page' : undefined}
+                    className={tabClassName(isSettings)}
+                >
+                    <Settings aria-hidden="true" className="h-5 w-5" />
+                    Settings
+                </Link>
+            </div>
+        </div>
+    );
+}
+
+/**
  * Mobile bottom navigation - Home / Tasks / Spaces / Settings, with a center-FAB quick-create.
+ * The three zones' tab sets are deliberately asymmetric, not retrofitted to match each other -
+ * see `HabitZoneTabs`/`TimeTrackingTabs` below for which zone-switch tabs each one carries.
  *
  * @param {object} props
  * @param {object[]} [props.initialSpaces] - SSR-fetched spaces, so the Tasks link's href never hydration-mismatches
@@ -75,9 +120,16 @@ export default function BottomNav({ initialSpaces, initialLists }) {
     const params = useParams();
     const listId = params?.listId;
     const isHabitZone = pathname.startsWith('/habits');
+    const isTimeTracking = pathname.startsWith('/timer');
 
-    const { data: spaces } = useSpacesQuery({ initialData: initialSpaces, enabled: !isHabitZone });
-    const { data: lists } = useListsQuery({ initialData: initialLists, enabled: !isHabitZone });
+    const { data: spaces } = useSpacesQuery({
+        initialData: initialSpaces,
+        enabled: !isHabitZone && !isTimeTracking,
+    });
+    const { data: lists } = useListsQuery({
+        initialData: initialLists,
+        enabled: !isHabitZone && !isTimeTracking,
+    });
 
     const firstSpaceWithList = (spaces || []).find((space) =>
         (lists || []).some((list) => list.space_id === space.id),
@@ -100,6 +152,17 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                 className="lg:hidden translucent-bar fixed bottom-0 inset-x-0 z-20 border-t pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
             >
                 <HabitZoneTabs />
+            </nav>
+        );
+    }
+
+    if (isTimeTracking) {
+        return (
+            <nav
+                aria-label="Primary"
+                className="lg:hidden translucent-bar fixed bottom-0 inset-x-0 z-20 border-t pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+            >
+                <TimeTrackingTabs />
             </nav>
         );
     }
