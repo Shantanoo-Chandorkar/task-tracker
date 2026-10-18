@@ -1,13 +1,30 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import StandaloneSessionForm from './StandaloneSessionForm';
 
+// Radix Select positions its listbox with ResizeObserver and scrollIntoView, which jsdom lacks
+beforeAll(() => {
+    globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    };
+    Element.prototype.scrollIntoView = () => {};
+});
+
 const start = vi.fn();
+const templatesState = vi.hoisted(() => ({ templates: [] }));
 vi.mock('@/hooks/useTimeSessionActions', () => ({
     useTimeSessionActions: () => ({ start }),
 }));
+vi.mock('@/hooks/useTimerTemplatesQuery', () => ({
+    useTimerTemplatesQuery: () => ({ data: templatesState.templates }),
+}));
 
-beforeEach(() => start.mockReset());
+beforeEach(() => {
+    start.mockReset();
+    templatesState.templates = [];
+});
 
 describe('StandaloneSessionForm', () => {
     it('starts a session with the typed label', () => {
@@ -56,5 +73,22 @@ describe('StandaloneSessionForm', () => {
         expect(screen.getByText('Start').closest('button').disabled).toBe(true);
 
         finishStart(true);
+    });
+
+    it('hides the template picker when there are no templates', () => {
+        render(<StandaloneSessionForm />);
+        expect(screen.queryByRole('combobox', { name: 'Template' })).toBeNull();
+    });
+
+    it('shows and passes through the chosen template', () => {
+        templatesState.templates = [{ id: 'template-1', name: 'Pomodoro' }];
+        start.mockResolvedValue(true);
+        render(<StandaloneSessionForm />);
+
+        fireEvent.click(screen.getByRole('combobox', { name: 'Template' }));
+        fireEvent.click(screen.getByText('Pomodoro'));
+        fireEvent.click(screen.getByText('Start'));
+
+        expect(start).toHaveBeenCalledWith({ label: '', templateId: 'template-1' });
     });
 });

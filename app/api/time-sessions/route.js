@@ -7,9 +7,9 @@ const LOOKBACK_DAYS = 30;
 
 /**
  * GET /api/time-sessions
- * Returns the caller's own sessions (live and completed) from a fixed lookback window onward -
- * bounds the row count, same purpose as `/api/habit-entries`'s `since`, with no client-supplied
- * range yet since nothing in Bucket C2 needs one.
+ * Returns the caller's own sessions (live and completed) from a fixed lookback window onward,
+ * each with its template, task and habit title embedded - bounds the row count, same purpose as
+ * `/api/habit-entries`'s `since`, with no client-supplied range since nothing needs one yet.
  */
 export const GET = withApiErrorHandling(async function GET() {
     const unauthorized = await requireAuthResponse();
@@ -20,7 +20,7 @@ export const GET = withApiErrorHandling(async function GET() {
 
     const { data: sessions, error } = await supabase
         .from('time_sessions')
-        .select('*')
+        .select('*, timer_templates(name, blocks), tasks(title), habits(title)')
         .gte('started_at', since)
         .order('started_at', { ascending: false });
 

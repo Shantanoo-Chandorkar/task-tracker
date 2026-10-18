@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TimerPageContent from './TimerPageContent';
 
 let sessions;
@@ -13,11 +14,37 @@ vi.mock('@/hooks/useTimeSessionActions', () => ({
         resume: vi.fn(),
         complete: vi.fn(),
         discard: vi.fn(),
+        advanceBlock: vi.fn(),
     }),
 }));
+vi.mock('@/hooks/useTimerTemplatesQuery', () => ({
+    useTimerTemplatesQuery: () => ({ data: [], isLoading: false }),
+}));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
+vi.mock('sonner', () => ({
+    toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), dismiss: vi.fn() },
+}));
+
+// Radix Select (StandaloneSessionForm) and dialogs (TimerTemplateManager) need these, even closed
+beforeAll(() => {
+    globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    };
+    Element.prototype.scrollIntoView = () => {};
+});
 
 const NOW = '2026-10-18T12:00:00.000Z';
+
+function renderPage() {
+    const queryClient = new QueryClient();
+    return render(
+        <QueryClientProvider client={queryClient}>
+            <TimerPageContent />
+        </QueryClientProvider>,
+    );
+}
 
 beforeEach(() => {
     vi.useFakeTimers();
@@ -27,6 +54,15 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('TimerPageContent', () => {
+    it('switches to the template manager on the Templates tab', () => {
+        renderPage();
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Templates' }));
+
+        expect(screen.getByText('No templates yet.')).toBeTruthy();
+        expect(screen.queryByLabelText('Session label')).toBeNull();
+    });
+
     it('shows a panel for every live session and hides completed ones', () => {
         sessions = [
             {
@@ -48,7 +84,7 @@ describe('TimerPageContent', () => {
                 last_resumed_at: null,
             },
         ];
-        render(<TimerPageContent />);
+        renderPage();
 
         expect(screen.getByText('Task work')).toBeTruthy();
         expect(screen.queryByText('Old one')).toBeNull();
@@ -66,7 +102,7 @@ describe('TimerPageContent', () => {
                 last_resumed_at: NOW,
             },
         ];
-        render(<TimerPageContent />);
+        renderPage();
 
         expect(screen.getByLabelText('Session label')).toBeTruthy();
     });
@@ -83,7 +119,7 @@ describe('TimerPageContent', () => {
                 last_resumed_at: NOW,
             },
         ];
-        render(<TimerPageContent />);
+        renderPage();
 
         expect(screen.queryByLabelText('Session label')).toBeNull();
     });
@@ -100,7 +136,7 @@ describe('TimerPageContent', () => {
                 last_resumed_at: '2026-10-17T10:00:00.000Z',
             },
         ];
-        render(<TimerPageContent />);
+        renderPage();
 
         expect(screen.getByText('You left this running')).toBeTruthy();
     });
@@ -117,7 +153,7 @@ describe('TimerPageContent', () => {
                 last_resumed_at: '2026-10-18T11:00:00.000Z',
             },
         ];
-        render(<TimerPageContent />);
+        renderPage();
 
         expect(screen.queryByText('You left this running')).toBeNull();
     });

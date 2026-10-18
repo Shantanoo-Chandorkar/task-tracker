@@ -5,8 +5,9 @@ import TimerControls from './TimerControls';
 const pause = vi.fn().mockResolvedValue(true);
 const resume = vi.fn().mockResolvedValue(true);
 const complete = vi.fn().mockResolvedValue(true);
+const advanceBlock = vi.fn().mockResolvedValue(true);
 vi.mock('@/hooks/useTimeSessionActions', () => ({
-    useTimeSessionActions: () => ({ pause, resume, complete }),
+    useTimeSessionActions: () => ({ pause, resume, complete, advanceBlock }),
 }));
 
 describe('TimerControls', () => {
@@ -64,5 +65,38 @@ describe('TimerControls', () => {
         expect(within(completeButton).queryByRole('status', { name: 'Loading' })).toBeNull();
 
         finishPause(true);
+    });
+
+    it('shows "Next block" only when the session is templated and not on its last block', () => {
+        const { rerender } = render(
+            <TimerControls
+                session={{ id: 'session-1', status: 'running' }}
+                blockDisplay={{ isLastBlock: false }}
+            />,
+        );
+        expect(screen.getByText('Next block')).toBeTruthy();
+
+        rerender(
+            <TimerControls
+                session={{ id: 'session-1', status: 'running' }}
+                blockDisplay={{ isLastBlock: true }}
+            />,
+        );
+        expect(screen.queryByText('Next block')).toBeNull();
+
+        rerender(<TimerControls session={{ id: 'session-1', status: 'running' }} />);
+        expect(screen.queryByText('Next block')).toBeNull();
+    });
+
+    it('advances to the next block on click', () => {
+        render(
+            <TimerControls
+                session={{ id: 'session-1', status: 'running' }}
+                blockDisplay={{ isLastBlock: false }}
+            />,
+        );
+
+        fireEvent.click(screen.getByText('Next block'));
+        expect(advanceBlock).toHaveBeenCalledWith('session-1');
     });
 });
