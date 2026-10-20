@@ -18,7 +18,8 @@ async function triggerRefreshWithResponse(response) {
     render(<AuthKeepAlive />);
     await vi.advanceTimersByTimeAsync(61 * 1000);
     window.dispatchEvent(new Event('online'));
-    await vi.advanceTimersByTimeAsync(0);
+    // Resume refreshes are jittered by up to 2s; advance past the whole window to let it fire.
+    await vi.advanceTimersByTimeAsync(2000);
 }
 
 describe('AuthKeepAlive', () => {
@@ -35,6 +36,10 @@ describe('AuthKeepAlive', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.unstubAllGlobals();
+        Object.defineProperty(document, 'visibilityState', {
+            value: 'visible',
+            configurable: true,
+        });
     });
 
     it('clears cached data before sending a signed-out user to /login', async () => {
@@ -70,5 +75,29 @@ describe('AuthKeepAlive', () => {
 
         expect(clearAllCaches).not.toHaveBeenCalled();
         expect(assignLocation).not.toHaveBeenCalled();
+    });
+
+    it('delays a resume refresh with jitter instead of firing immediately', async () => {
+        fetchMock.mockResolvedValue({ status: 200, json: async () => ({}) });
+        render(<AuthKeepAlive />);
+        await vi.advanceTimersByTimeAsync(61 * 1000);
+
+        window.dispatchEvent(new Event('online'));
+        expect(fetchMock).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips a resume refresh if the tab goes hidden again during the jitter delay', async () => {
+        fetchMock.mockResolvedValue({ status: 200, json: async () => ({}) });
+        render(<AuthKeepAlive />);
+        await vi.advanceTimersByTimeAsync(61 * 1000);
+
+        window.dispatchEvent(new Event('online'));
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 });

@@ -9,6 +9,8 @@ import { GUEST_ERROR_CODES } from '@/lib/guest/guest-error-codes';
 const RECHECK_INTERVAL_MS = 20 * 60 * 1000;
 // Resume events can fire in bursts (tab switch, unlock, reconnect); one check per minute is plenty
 const MIN_GAP_BETWEEN_REFRESHES_MS = 60 * 1000;
+// Spreads resume refreshes out so they don't race proxy.js's own refresh for the same token.
+const MAX_RESUME_JITTER_MS = 2000;
 
 /**
  * Maps the session endpoint's 401 code to the login page to send the user to.
@@ -32,6 +34,7 @@ export default function AuthKeepAlive() {
 
     useEffect(() => {
         let lastRefreshTimestampMs = Date.now();
+        let jitterTimeoutId = null;
 
         /**
          * Asks the server to refresh the session, and sends the user to /login only if the session has ended.
@@ -58,18 +61,31 @@ export default function AuthKeepAlive() {
             }
         }
 
+        /**
+         * Delays a refresh by a random amount so it doesn't collide with proxy.js's own refresh.
+         *
+         * @returns {void}
+         */
+        function refreshSessionWithJitter() {
+            clearTimeout(jitterTimeoutId);
+            jitterTimeoutId = setTimeout(() => {
+                if (document.visibilityState === 'visible') refreshSession();
+            }, Math.random() * MAX_RESUME_JITTER_MS);
+        }
+
         function refreshSessionWhenTabVisible() {
-            if (document.visibilityState === 'visible') refreshSession();
+            if (document.visibilityState === 'visible') refreshSessionWithJitter();
         }
 
         document.addEventListener('visibilitychange', refreshSessionWhenTabVisible);
-        window.addEventListener('online', refreshSession);
+        window.addEventListener('online', refreshSessionWithJitter);
         const recheckIntervalId = setInterval(refreshSessionWhenTabVisible, RECHECK_INTERVAL_MS);
 
         return () => {
             document.removeEventListener('visibilitychange', refreshSessionWhenTabVisible);
-            window.removeEventListener('online', refreshSession);
+            window.removeEventListener('online', refreshSessionWithJitter);
             clearInterval(recheckIntervalId);
+            clearTimeout(jitterTimeoutId);
         };
     }, [queryClient]);
 

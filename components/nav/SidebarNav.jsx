@@ -47,6 +47,7 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
                 href="/"
                 aria-current={isHomeActive ? 'page' : undefined}
                 onClick={onNavigate}
+                prefetch={false}
                 className={`mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline ${
                     isHomeActive
                         ? 'bg-sidebar-accent font-medium text-sidebar-primary'
@@ -61,6 +62,7 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
                 href="/spaces"
                 aria-current={isSpacesActive ? 'page' : undefined}
                 onClick={onNavigate}
+                prefetch={false}
                 className={`mb-4 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm no-underline ${
                     isSpacesActive
                         ? 'bg-sidebar-accent font-medium text-sidebar-primary'
@@ -94,6 +96,7 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
                                         href={`/lists/${list.id}`}
                                         aria-current={isActive ? 'page' : undefined}
                                         onClick={onNavigate}
+                                        prefetch={false}
                                         className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm no-underline ${
                                             isActive
                                                 ? 'bg-sidebar-accent font-medium text-sidebar-primary'
@@ -125,6 +128,7 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
                 <Link
                     href="/habits"
                     onClick={onNavigate}
+                    prefetch={false}
                     className="flex items-center gap-2 rounded-md px-2 py-2 text-sm mb-2 no-underline text-sidebar-foreground hover:bg-sidebar-accent/60"
                 >
                     <ArrowLeftRight aria-hidden="true" className="h-4 w-4" />
@@ -133,6 +137,7 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
                 <Link
                     href="/timer"
                     onClick={onNavigate}
+                    prefetch={false}
                     className="flex items-center gap-2 rounded-md px-2 py-2 text-sm mb-2 no-underline text-sidebar-foreground hover:bg-sidebar-accent/60"
                 >
                     <Timer aria-hidden="true" className="h-4 w-4" />
@@ -142,6 +147,7 @@ export default function SidebarNav({ onNavigate, initialSpaces, initialLists, in
                     href="/settings"
                     aria-current={isSettingsActive ? 'page' : undefined}
                     onClick={onNavigate}
+                    prefetch={false}
                     className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm mb-2 no-underline ${
                         isSettingsActive
                             ? 'bg-sidebar-accent font-medium text-sidebar-primary'
