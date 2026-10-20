@@ -33,6 +33,7 @@ export default function DesktopSidebar({ initialSpaces, initialLists, initialPro
         <aside className="hidden lg:flex sticky top-0 h-screen w-[20%] flex-shrink-0 flex-col border-r border-border bg-sidebar p-3">
             <Link
                 href={zoneHref}
+                prefetch={false}
                 className="mb-4 flex items-center gap-2 px-2 text-[0.9375rem] font-semibold text-foreground no-underline"
             >
                 {zoneLabel}

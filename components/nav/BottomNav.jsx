@@ -36,6 +36,7 @@ function HabitZoneTabs() {
                 <Link
                     href="/habits"
                     aria-current={isHabits ? 'page' : undefined}
+                    prefetch={false}
                     className={tabClassName(isHabits)}
                 >
                     <ListChecks aria-hidden="true" className="h-5 w-5" />
@@ -44,6 +45,7 @@ function HabitZoneTabs() {
                 <Link
                     href="/habits/categories"
                     aria-current={isCategories ? 'page' : undefined}
+                    prefetch={false}
                     className={tabClassName(isCategories)}
                 >
                     <LayoutGrid aria-hidden="true" className="h-5 w-5" />
@@ -57,6 +59,7 @@ function HabitZoneTabs() {
                 <Link
                     href="/habits/analytics"
                     aria-current={isAnalytics ? 'page' : undefined}
+                    prefetch={false}
                     className={tabClassName(isAnalytics)}
                 >
                     <BarChart3 aria-hidden="true" className="h-5 w-5" />
@@ -65,6 +68,7 @@ function HabitZoneTabs() {
                 <Link
                     href="/settings"
                     aria-current={isSettings ? 'page' : undefined}
+                    prefetch={false}
                     className={tabClassName(isSettings)}
                 >
                     <Settings aria-hidden="true" className="h-5 w-5" />
@@ -92,24 +96,26 @@ function TimeTrackingTabs() {
                 <Link
                     href="/timer"
                     aria-current={isTimer ? 'page' : undefined}
+                    prefetch={false}
                     className={tabClassName(isTimer)}
                 >
                     <Timer aria-hidden="true" className="h-5 w-5" />
                     Timer
                 </Link>
-                <Link href="/habits" className={tabClassName(false)}>
+                <Link href="/habits" prefetch={false} className={tabClassName(false)}>
                     <ListChecks aria-hidden="true" className="h-5 w-5" />
                     Habits
                 </Link>
             </div>
             <div className="flex-1 flex">
-                <Link href="/" className={tabClassName(false)}>
+                <Link href="/" prefetch={false} className={tabClassName(false)}>
                     <ArrowLeftRight aria-hidden="true" className="h-5 w-5" />
                     Tasks
                 </Link>
                 <Link
                     href="/settings"
                     aria-current={isSettings ? 'page' : undefined}
+                    prefetch={false}
                     className={tabClassName(isSettings)}
                 >
                     <Settings aria-hidden="true" className="h-5 w-5" />
@@ -192,6 +198,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                     <Link
                         href="/"
                         aria-current={isHome ? 'page' : undefined}
+                        prefetch={false}
                         className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isHome ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <Home aria-hidden="true" className="h-5 w-5" />
@@ -201,6 +208,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                     <Link
                         href={tasksHref}
                         aria-current={isTasks ? 'page' : undefined}
+                        prefetch={false}
                         className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isTasks ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <ListChecks aria-hidden="true" className="h-5 w-5" />
@@ -214,6 +222,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                     <Link
                         href="/spaces"
                         aria-current={isSpaces ? 'page' : undefined}
+                        prefetch={false}
                         className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isSpaces ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <LayoutGrid aria-hidden="true" className="h-5 w-5" />
@@ -223,6 +232,7 @@ export default function BottomNav({ initialSpaces, initialLists }) {
                     <Link
                         href="/settings"
                         aria-current={isSettings ? 'page' : undefined}
+                        prefetch={false}
                         className={`press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isSettings ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                         <Settings aria-hidden="true" className="h-5 w-5" />
