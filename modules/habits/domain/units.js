@@ -73,3 +73,21 @@ export function fromCanonicalValue(unitCode, canonicalValue) {
     if (!definition) throw new Error(`Unknown unit code: ${unitCode}`);
     return Math.round((canonicalValue / definition.canonicalPerUnit) * 1e6) / 1e6;
 }
+
+// Cosmetic default label for a unit-less duration habit - never affects the stored value.
+const IMPLICIT_DURATION_UNIT_LABEL = 'min';
+
+/**
+ * The unit label to show next to a habit's logged amount - recognised, custom free-text, or none.
+ *
+ * @param {Record<string, any>} habit - Needs `measure_kind` and `unit_code`.
+ * @returns {string|null} The display label, or null for `count` and binary habits.
+ */
+export function resolveHabitUnitLabel(habit) {
+    if (habit.measure_kind === 'count') return null;
+    if (!habit.unit_code) {
+        return habit.measure_kind === 'duration' ? IMPLICIT_DURATION_UNIT_LABEL : null;
+    }
+    const option = UNIT_OPTIONS.find((candidate) => candidate.code === habit.unit_code);
+    return option ? option.label : habit.unit_code;
+}

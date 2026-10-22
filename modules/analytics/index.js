@@ -11,3 +11,7 @@ export {
     computeDayTimeDistribution,
     computeTotalTrackedTime,
 } from './domain/index';
+export { listDailyHabitOutcomes } from './domain/daily-habit-outcomes';
+export { rollingCompletionRate } from './domain/rolling-completion-rate';
+export { formatRingFraction } from './domain/format-ring-fraction';
+export { buildConicGradientStops } from './domain/build-conic-gradient-stops';

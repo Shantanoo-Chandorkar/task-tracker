@@ -6,6 +6,7 @@ import {
     getUnitDimension,
     toCanonicalValue,
     fromCanonicalValue,
+    resolveHabitUnitLabel,
 } from './units';
 
 describe('isValidUnitCode', () => {
@@ -75,5 +76,28 @@ describe('toCanonicalValue / fromCanonicalValue', () => {
     it('throws for an unknown unit code', () => {
         expect(() => toCanonicalValue('parsecs', 1)).toThrow('Unknown unit code: parsecs');
         expect(() => fromCanonicalValue('parsecs', 1)).toThrow('Unknown unit code: parsecs');
+    });
+});
+
+describe('resolveHabitUnitLabel', () => {
+    it('is null for a count habit - a bare tally has no unit', () => {
+        expect(resolveHabitUnitLabel({ measure_kind: 'count', unit_code: null })).toBeNull();
+    });
+
+    it("is the recognised unit's own label for quantity/duration", () => {
+        expect(resolveHabitUnitLabel({ measure_kind: 'quantity', unit_code: 'km' })).toBe('km');
+        expect(resolveHabitUnitLabel({ measure_kind: 'duration', unit_code: 'hr' })).toBe('hr');
+    });
+
+    it('defaults a unit-less duration habit to minutes', () => {
+        expect(resolveHabitUnitLabel({ measure_kind: 'duration', unit_code: null })).toBe('min');
+    });
+
+    it('is null for a unit-less quantity habit', () => {
+        expect(resolveHabitUnitLabel({ measure_kind: 'quantity', unit_code: null })).toBeNull();
+    });
+
+    it('falls back to the raw code for a custom free-text unit', () => {
+        expect(resolveHabitUnitLabel({ measure_kind: 'quantity', unit_code: 'reps' })).toBe('reps');
     });
 });

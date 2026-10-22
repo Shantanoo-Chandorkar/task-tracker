@@ -8,23 +8,10 @@ import { Loader } from '@/components/custom/Loader';
 import FormError from '@/components/custom/FormError';
 import { useHabitCheckIn } from '@/hooks/useHabitCheckIn';
 import { useHabitEntryValue } from '@/hooks/useHabitEntryValue';
-import { UNIT_OPTIONS } from '@/modules/habits/domain/units';
+import { resolveHabitUnitLabel } from '@/modules/habits/domain/units';
 import { DEFAULT_BACKFILL_WINDOW_DAYS } from '@/modules/habits/domain/habit-input';
 import { addDaysToLocalDate } from '@/modules/habits/domain/local-date';
 import DatePillStrip from './DatePillStrip';
-
-// Cosmetic default label for a unit-less duration habit - never affects the stored value.
-const IMPLICIT_DURATION_UNIT_LABEL = 'min';
-
-/** @param {object} habit */
-function resolveUnitLabel(habit) {
-    if (habit.measure_kind === 'count') return null;
-    if (!habit.unit_code) {
-        return habit.measure_kind === 'duration' ? IMPLICIT_DURATION_UNIT_LABEL : null;
-    }
-    const option = UNIT_OPTIONS.find((candidate) => candidate.code === habit.unit_code);
-    return option ? option.label : habit.unit_code;
-}
 
 /**
  * Logs a count/quantity/duration amount, or toggles a binary habit, for today or a past day.
@@ -76,7 +63,7 @@ export default function HabitEntryDialog({
     const existingEntry = entries.find((entry) => entry.local_date === localDate) ?? null;
     const isBinary = habit.measure_kind === 'binary';
     const isQuit = habit.polarity === 'quit';
-    const unitLabel = resolveUnitLabel(habit);
+    const unitLabel = resolveHabitUnitLabel(habit);
     const loggedLocalDates = new Set(entries.map((entry) => entry.local_date));
     const draftLocalDates = new Set(Object.keys(draftsByLocalDate));
     const hasPendingDrafts = draftLocalDates.size > 0;

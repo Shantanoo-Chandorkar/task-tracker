@@ -1,6 +1,28 @@
 import { getMeasure } from './measures/index';
 import { dueDatesBetween } from './recurrence';
-import { addDaysToLocalDate, isLocalDateAfter, startOfLocalWeek } from './local-date';
+import {
+    addDaysToLocalDate,
+    isLocalDateAfter,
+    isLocalDateBefore,
+    startOfLocalWeek,
+} from './local-date';
+
+/**
+ * The real floor a habit's due-date math should use, since a backfilled entry may predate `started_on`.
+ *
+ * @param {Record<string, any>} habit - Needs `started_on`.
+ * @param {Array<Record<string, any>>} entries - All check-ins for this habit, any order.
+ * @returns {string} 'YYYY-MM-DD', `habit.started_on` or the earliest entry's date, whichever is first.
+ */
+export function resolveEffectiveStartedOn(habit, entries) {
+    let effectiveStartedOn = habit.started_on;
+    for (const entry of entries) {
+        if (isLocalDateBefore(entry.local_date, effectiveStartedOn)) {
+            effectiveStartedOn = entry.local_date;
+        }
+    }
+    return effectiveStartedOn;
+}
 
 /**
  * Whether a single due day counts as a success - for a quit habit, absence is the success (decision 7).
@@ -33,14 +55,15 @@ function isGracePeriod(habit, isSuccessful, isCurrentPeriod) {
 /**
  * Current and longest streak for a daily/weekdays/every_n_days habit, walked day by day.
  *
- * @param {Record<string, any>} habit - Needs recurrence, polarity, measure_kind, target_value, started_on.
+ * @param {Record<string, any>} habit - Needs recurrence, polarity, measure_kind, target_value.
  * @param {Map<string, object>} entriesByDate - Entries keyed by `local_date`.
  * @param {string} todayLocalDate - 'YYYY-MM-DD', the caller's current local date.
+ * @param {string} effectiveStartedOn - 'YYYY-MM-DD', from `resolveEffectiveStartedOn`.
  * @returns {{ currentStreak: number, longestStreak: number }}
  */
-function computeDailyStreaks(habit, entriesByDate, todayLocalDate) {
+function computeDailyStreaks(habit, entriesByDate, todayLocalDate, effectiveStartedOn) {
     const measure = getMeasure(habit.measure_kind);
-    const dueDates = dueDatesBetween(habit.recurrence, habit.started_on, todayLocalDate);
+    const dueDates = dueDatesBetween(habit.recurrence, effectiveStartedOn, todayLocalDate);
 
     let longestStreak = 0;
     let runningStreak = 0;
@@ -124,16 +147,17 @@ function isWeekSuccessful(habit, measure, entriesByDate, weekStartLocalDate, tar
 /**
  * Current and longest streak for a `times_per_week` habit, folded by week - there is no single due day.
  *
- * @param {Record<string, any>} habit - Needs recurrence (with `count`), polarity, measure_kind, started_on.
+ * @param {Record<string, any>} habit - Needs recurrence (with `count`), polarity, measure_kind.
  * @param {Map<string, object>} entriesByDate - Entries keyed by `local_date`.
  * @param {string} todayLocalDate - 'YYYY-MM-DD', the caller's current local date.
+ * @param {string} effectiveStartedOn - 'YYYY-MM-DD', from `resolveEffectiveStartedOn`.
  * @returns {{ currentStreak: number, longestStreak: number }}
  */
-function computeWeeklyStreaks(habit, entriesByDate, todayLocalDate) {
+function computeWeeklyStreaks(habit, entriesByDate, todayLocalDate, effectiveStartedOn) {
     const measure = getMeasure(habit.measure_kind);
     const targetCount = habit.recurrence.count;
     const todayWeekStart = startOfLocalWeek(todayLocalDate);
-    const weekStarts = listWeekStarts(startOfLocalWeek(habit.started_on), todayWeekStart);
+    const weekStarts = listWeekStarts(startOfLocalWeek(effectiveStartedOn), todayWeekStart);
 
     let longestStreak = 0;
     let runningStreak = 0;
@@ -184,10 +208,11 @@ function computeWeeklyStreaks(habit, entriesByDate, todayLocalDate) {
  */
 export function computeStreaks(habit, entries, todayLocalDate) {
     const entriesByDate = new Map(entries.map((entry) => [entry.local_date, entry]));
+    const effectiveStartedOn = resolveEffectiveStartedOn(habit, entries);
     if (habit.recurrence.kind === 'times_per_week') {
-        return computeWeeklyStreaks(habit, entriesByDate, todayLocalDate);
+        return computeWeeklyStreaks(habit, entriesByDate, todayLocalDate, effectiveStartedOn);
     }
-    return computeDailyStreaks(habit, entriesByDate, todayLocalDate);
+    return computeDailyStreaks(habit, entriesByDate, todayLocalDate, effectiveStartedOn);
 }
 
 /**
@@ -206,8 +231,25 @@ export function isHabitDaySuccessful(habit, entriesByDate, localDate) {
 }
 
 /**
+ * How much of a single day's goal was logged, as a 0-1 fraction - finer-grained than pass/fail.
+ *
+ * @param {Record<string, any>} habit - The habit, for its polarity, measure_kind and target_value.
+ * @param {Map<string, Record<string, any>>} entriesByDate - Entries keyed by `local_date`.
+ * @param {string} localDate - 'YYYY-MM-DD' day to judge.
+ * @returns {number} 0 to 1; 1 means the day's goal was fully met.
+ */
+export function computeHabitDayProgress(habit, entriesByDate, localDate) {
+    const entry = entriesByDate.get(localDate) ?? null;
+    // A quit habit is always binary (checkHabitPolarityMeasureCombination) - presence is the slip.
+    if (habit.polarity === 'quit') return entry == null ? 1 : 0;
+    if (habit.measure_kind === 'binary') return entry == null ? 0 : 1;
+    if (entry == null) return 0;
+    return Math.min(entry.value / habit.target_value, 1);
+}
+
+/**
  * Due and completed counts for a habit within a period - the completion-rate KPI's building block.
- * Clamped to `habit.started_on`, same clamp `computeStreaks` applies via `dueDatesBetween`.
+ * Clamped to the habit's effective start, same clamp `computeStreaks` applies via `dueDatesBetween`.
  *
  * @param {Record<string, any>} habit - Needs recurrence, polarity, measure_kind, target_value, started_on.
  * @param {Array<Record<string, any>>} entries - All check-ins for this habit, any order.
@@ -218,8 +260,9 @@ export function computeCompletionCounts(habit, entries, period) {
     const entriesByDate = new Map(entries.map((entry) => [entry.local_date, entry]));
     // Trusted: habits_measure_kind_valid (migration 0044) guarantees measure_kind is recognised.
     const measure = getMeasure(habit.measure_kind);
-    const periodStart = isLocalDateAfter(habit.started_on, period.start)
-        ? habit.started_on
+    const effectiveStartedOn = resolveEffectiveStartedOn(habit, entries);
+    const periodStart = isLocalDateAfter(effectiveStartedOn, period.start)
+        ? effectiveStartedOn
         : period.start;
     if (isLocalDateAfter(periodStart, period.end)) return { dueCount: 0, completedCount: 0 };
 
