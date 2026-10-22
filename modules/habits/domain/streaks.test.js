@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { computeStreaks, isHabitDaySuccessful, computeCompletionCounts } from './streaks';
+import {
+    computeStreaks,
+    isHabitDaySuccessful,
+    computeHabitDayProgress,
+    computeCompletionCounts,
+    resolveEffectiveStartedOn,
+} from './streaks';
 
-function entry(localDate) {
-    return { local_date: localDate, value: 1 };
+function entry(localDate, value = 1) {
+    return { local_date: localDate, value };
 }
 
 function buildHabit(overrides) {
@@ -16,7 +22,39 @@ function buildHabit(overrides) {
     };
 }
 
+describe('resolveEffectiveStartedOn', () => {
+    it('returns started_on unchanged when no entry predates it', () => {
+        const habit = buildHabit({ started_on: '2026-10-10' });
+        const entries = [entry('2026-10-10'), entry('2026-10-11')];
+
+        expect(resolveEffectiveStartedOn(habit, entries)).toBe('2026-10-10');
+    });
+
+    it('returns the earliest entry date when a backfilled entry predates started_on', () => {
+        const habit = buildHabit({ started_on: '2026-10-10' });
+        const entries = [entry('2026-10-10'), entry('2026-10-01'), entry('2026-10-05')];
+
+        expect(resolveEffectiveStartedOn(habit, entries)).toBe('2026-10-01');
+    });
+
+    it('returns started_on unchanged when there are no entries at all', () => {
+        const habit = buildHabit({ started_on: '2026-10-10' });
+
+        expect(resolveEffectiveStartedOn(habit, [])).toBe('2026-10-10');
+    });
+});
+
 describe('computeStreaks - daily recurrence', () => {
+    it('is due and counted for a backfilled entry dated before started_on', () => {
+        const habit = buildHabit({ started_on: '2026-10-10' });
+        const entries = [entry('2026-10-08'), entry('2026-10-09'), entry('2026-10-10')];
+
+        expect(computeStreaks(habit, entries, '2026-10-10')).toEqual({
+            currentStreak: 3,
+            longestStreak: 3,
+        });
+    });
+
     it('has a gap that resets the streak, while the longest streak keeps the earlier run', () => {
         const habit = buildHabit();
         const entries = [
@@ -193,6 +231,58 @@ describe('isHabitDaySuccessful', () => {
     });
 });
 
+describe('computeHabitDayProgress', () => {
+    it('is 1 for a binary build habit with a logged entry, 0 with none', () => {
+        const habit = buildHabit();
+        const entriesByDate = new Map([['2026-10-05', entry('2026-10-05')]]);
+
+        expect(computeHabitDayProgress(habit, entriesByDate, '2026-10-05')).toBe(1);
+        expect(computeHabitDayProgress(habit, new Map(), '2026-10-05')).toBe(0);
+    });
+
+    it('is 1 for a quit habit with no entry (held), 0 with one (slipped)', () => {
+        const habit = buildHabit({ polarity: 'quit' });
+        const entriesByDate = new Map([['2026-10-05', entry('2026-10-05')]]);
+
+        expect(computeHabitDayProgress(habit, new Map(), '2026-10-05')).toBe(1);
+        expect(computeHabitDayProgress(habit, entriesByDate, '2026-10-05')).toBe(0);
+    });
+
+    it('is the logged fraction of the target for a duration habit', () => {
+        const habit = buildHabit({ measure_kind: 'duration', target_value: 1200 });
+        const entriesByDate = new Map([['2026-10-05', entry('2026-10-05', 720)]]);
+
+        expect(computeHabitDayProgress(habit, entriesByDate, '2026-10-05')).toBeCloseTo(0.6);
+    });
+
+    it('is the logged fraction of the target for a count habit', () => {
+        const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
+        const entriesByDate = new Map([['2026-10-05', entry('2026-10-05', 5)]]);
+
+        expect(computeHabitDayProgress(habit, entriesByDate, '2026-10-05')).toBeCloseTo(0.25);
+    });
+
+    it('is the logged fraction of the target for a quantity habit', () => {
+        const habit = buildHabit({ measure_kind: 'quantity', target_value: 2000 });
+        const entriesByDate = new Map([['2026-10-05', entry('2026-10-05', 500)]]);
+
+        expect(computeHabitDayProgress(habit, entriesByDate, '2026-10-05')).toBeCloseTo(0.25);
+    });
+
+    it('clamps a quantified habit at 1 when the logged value exceeds the target', () => {
+        const habit = buildHabit({ measure_kind: 'duration', target_value: 1200 });
+        const entriesByDate = new Map([['2026-10-05', entry('2026-10-05', 1500)]]);
+
+        expect(computeHabitDayProgress(habit, entriesByDate, '2026-10-05')).toBe(1);
+    });
+
+    it('is 0 for a quantified habit with no logged entry', () => {
+        const habit = buildHabit({ measure_kind: 'duration', target_value: 1200 });
+
+        expect(computeHabitDayProgress(habit, new Map(), '2026-10-05')).toBe(0);
+    });
+});
+
 describe('computeCompletionCounts - daily recurrence', () => {
     it('counts due and completed days inside the period', () => {
         const habit = buildHabit();
@@ -218,6 +308,15 @@ describe('computeCompletionCounts - daily recurrence', () => {
         expect(
             computeCompletionCounts(habit, [], { start: '2026-10-01', end: '2026-10-05' }),
         ).toEqual({ dueCount: 0, completedCount: 0 });
+    });
+
+    it('extends the due window to a backfilled entry dated before started_on', () => {
+        const habit = buildHabit({ started_on: '2026-10-10' });
+        const entries = [entry('2026-10-08'), entry('2026-10-10')];
+
+        expect(
+            computeCompletionCounts(habit, entries, { start: '2026-10-01', end: '2026-10-10' }),
+        ).toEqual({ dueCount: 3, completedCount: 2 });
     });
 
     it('is polarity-aware: a quit habit with no entries is fully completed', () => {
