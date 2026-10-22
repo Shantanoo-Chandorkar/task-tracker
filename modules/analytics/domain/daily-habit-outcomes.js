@@ -23,30 +23,22 @@ import { groupEntriesByHabitId } from './group-by';
 export function listDailyHabitOutcomes(habits, entries, period) {
     const entriesByHabitId = groupEntriesByHabitId(entries);
     const dailyHabits = habits.filter((habit) => habit.recurrence.kind !== 'times_per_week');
-    /** @type {Map<string, Map<string, Record<string, any>>>} */
-    const entriesByDateByHabitId = new Map(
-        dailyHabits.map((habit) => [
-            habit.id,
-            new Map(
-                (entriesByHabitId.get(habit.id) ?? []).map((entry) => [entry.local_date, entry]),
-            ),
-        ]),
-    );
-    /** @type {Map<string, string>} */
-    const effectiveStartedOnByHabitId = new Map(
-        dailyHabits.map((habit) => [
-            habit.id,
-            resolveEffectiveStartedOn(habit, entriesByHabitId.get(habit.id) ?? []),
-        ]),
-    );
+    // Plain array fields, not Map.get() by habit.id - TypeScript can't prove that always resolves.
+    const dailyHabitContexts = dailyHabits.map((habit) => {
+        const habitEntries = entriesByHabitId.get(habit.id) ?? [];
+        return {
+            habit,
+            effectiveStartedOn: resolveEffectiveStartedOn(habit, habitEntries),
+            entriesByDate: new Map(habitEntries.map((entry) => [entry.local_date, entry])),
+        };
+    });
 
     /** @type {Array<{ localDate: string, habitId: string, isSuccessful: boolean, progress: number }>} */
     const outcomes = [];
     for (const localDate of localDateRange(period.start, period.end)) {
-        for (const habit of dailyHabits) {
-            if (isLocalDateBefore(localDate, effectiveStartedOnByHabitId.get(habit.id))) continue;
+        for (const { habit, effectiveStartedOn, entriesByDate } of dailyHabitContexts) {
+            if (isLocalDateBefore(localDate, effectiveStartedOn)) continue;
             if (!isDueOn(habit.recurrence, localDate)) continue;
-            const entriesByDate = entriesByDateByHabitId.get(habit.id) ?? new Map();
             outcomes.push({
                 localDate,
                 habitId: habit.id,
