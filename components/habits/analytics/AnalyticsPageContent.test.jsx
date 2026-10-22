@@ -13,7 +13,6 @@ beforeAll(() => {
 
 const queryState = vi.hoisted(() => ({
     habits: [],
-    categories: [],
     entries: [],
     sessions: [],
     isLoading: false,
@@ -21,9 +20,6 @@ const queryState = vi.hoisted(() => ({
 
 vi.mock('@/hooks/useHabitsQuery', () => ({
     useHabitsQuery: () => ({ data: queryState.habits, isLoading: queryState.isLoading }),
-}));
-vi.mock('@/hooks/useHabitCategoriesQuery', () => ({
-    useHabitCategoriesQuery: () => ({ data: queryState.categories, isLoading: false }),
 }));
 vi.mock('@/hooks/useHabitEntriesQuery', () => ({
     useHabitEntriesQuery: () => ({ data: queryState.entries, isLoading: queryState.isLoading }),
@@ -38,7 +34,6 @@ vi.mock('@/modules/habits/domain/browser-local-date', () => ({
 afterEach(() => {
     cleanup();
     queryState.habits = [];
-    queryState.categories = [];
     queryState.entries = [];
     queryState.sessions = [];
     queryState.isLoading = false;
@@ -59,6 +54,7 @@ function buildHabit(overrides = {}) {
         user_id: 'user-1',
         title: 'Meditate',
         category_id: null,
+        color: '#60a5fa',
         polarity: 'build',
         measure_kind: 'binary',
         target_value: null,
@@ -92,10 +88,9 @@ describe('AnalyticsPageContent', () => {
         queryState.entries = [{ habit_id: 'h1', local_date: '2026-10-18', value: 1 }];
         renderWithQueryClient();
 
+        expect(screen.getByText('Habits')).toBeTruthy();
         expect(screen.getByText('Completion rate')).toBeTruthy();
         expect(screen.getByText('Streaks')).toBeTruthy();
-        expect(screen.getByText('Consistency')).toBeTruthy();
-        expect(screen.getByText('Successes by weekday')).toBeTruthy();
         expect(screen.getByText('No duration habits tracked yet')).toBeTruthy();
 
         const sevenDayTab = screen.getByRole('tab', { name: 'Last 7 days' });
@@ -115,16 +110,31 @@ describe('AnalyticsPageContent', () => {
         expect(yearlyTab.getAttribute('aria-selected')).toBe('true');
     });
 
-    it('keeps showing Consistency regardless of which top-level period tab is selected', () => {
-        queryState.habits = [buildHabit()];
-        queryState.entries = [{ habit_id: 'h1', local_date: '2026-10-18', value: 1 }];
+    it('lists every active habit with a working link to its own analytics page', () => {
+        queryState.habits = [buildHabit(), buildHabit({ id: 'h2', title: 'Read before bed' })];
         renderWithQueryClient();
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Last 90 days' }));
+        const habitsSection = screen.getByText('Habits').closest('section');
+        expect(within(habitsSection).getByText('Meditate')).toBeTruthy();
+        expect(within(habitsSection).getByText('Read before bed')).toBeTruthy();
 
-        const consistencySection = screen.getByText('Consistency').closest('section');
-        expect(consistencySection).toBeTruthy();
-        expect(within(consistencySection).getByText('Last 30 days')).toBeTruthy();
+        const links = within(habitsSection).getAllByRole('link', { name: 'View analytics >' });
+        expect(links.map((link) => link.getAttribute('href'))).toEqual([
+            '/habits/analytics/h1',
+            '/habits/analytics/h2',
+        ]);
+    });
+
+    it('excludes an archived habit from the Habits launch list', () => {
+        queryState.habits = [
+            buildHabit(),
+            buildHabit({ id: 'h2', title: 'Retired habit', archived_at: '2026-10-01T00:00:00Z' }),
+        ];
+        renderWithQueryClient();
+
+        const habitsSection = screen.getByText('Habits').closest('section');
+        expect(within(habitsSection).getByText('Meditate')).toBeTruthy();
+        expect(within(habitsSection).queryByText('Retired habit')).toBeNull();
     });
 
     it('explains why every period looks the same when a habit is brand new', () => {

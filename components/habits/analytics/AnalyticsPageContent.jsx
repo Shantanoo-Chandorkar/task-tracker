@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useHabitsQuery } from '@/hooks/useHabitsQuery';
-import { useHabitCategoriesQuery } from '@/hooks/useHabitCategoriesQuery';
 import { useHabitEntriesQuery } from '@/hooks/useHabitEntriesQuery';
 import { useTimeSessionsQuery } from '@/hooks/useTimeSessionsQuery';
 import { getBrowserTodayLocalDate } from '@/modules/habits/domain/browser-local-date';
@@ -15,30 +14,26 @@ import {
 import {
     computeCompletionRate,
     computeStreakSummary,
-    computeDayTimeDistribution,
     computeTotalTrackedTime,
 } from '@/modules/analytics';
 import { Loader } from '@/components/custom/Loader';
 import AnalyticsPeriodTabs from './AnalyticsPeriodTabs';
+import HabitLaunchList from './HabitLaunchList';
 import CompletionRateSummary from './CompletionRateSummary';
 import StreakSummaryList from './StreakSummaryList';
-import ConsistencyHeatmap from './ConsistencyHeatmap';
-import DayTimeDistributionCharts from './DayTimeDistributionCharts';
 import TrackedTimeBreakdown from './TrackedTimeBreakdown';
 
 const DEFAULT_PERIOD_DAYS = 30;
 
 /**
- * The Habit Zone's analytics landing view - wires the five decision-19 KPI reducers to the
- * caller's own already-cached habits, entries and sessions, over a user-picked trailing window.
+ * The Habit Zone's analytics landing view - wires completion rate, streaks and tracked time to
+ * the caller's own already-cached habits, entries and sessions, over a user-picked trailing window.
  */
 export default function AnalyticsPageContent() {
     const [periodDays, setPeriodDays] = useState(DEFAULT_PERIOD_DAYS);
     const todayLocalDate = getBrowserTodayLocalDate();
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     const { data: habits = [], isLoading: isLoadingHabits } = useHabitsQuery();
-    const { data: categories = [] } = useHabitCategoriesQuery();
     const { data: entries = [], isLoading: isLoadingEntries } =
         useHabitEntriesQuery(todayLocalDate);
     const { data: sessions = [], isLoading: isLoadingSessions } = useTimeSessionsQuery();
@@ -72,6 +67,7 @@ export default function AnalyticsPageContent() {
         end: todayLocalDate,
     };
     const habitTitleById = new Map(activeHabits.map((habit) => [habit.id, habit.title]));
+    const habitColorById = new Map(activeHabits.map((habit) => [habit.id, habit.color]));
 
     const earliestStartedOn = activeHabits.reduce(
         (earliest, habit) =>
@@ -88,13 +84,6 @@ export default function AnalyticsPageContent() {
 
     const completionRateBreakdown = computeCompletionRate(activeHabits, entries, period);
     const streakSummary = computeStreakSummary(activeHabits, entries, period);
-    const distribution = computeDayTimeDistribution(
-        activeHabits,
-        entries,
-        sessions,
-        period,
-        timeZone,
-    );
     const trackedTime = computeTotalTrackedTime(activeHabits, sessions, period, new Date());
 
     // Span Completion Rate full-width when Streaks is empty, so no column sits blank.
@@ -111,6 +100,8 @@ export default function AnalyticsPageContent() {
                 </p>
             )}
 
+            <HabitLaunchList habits={activeHabits} />
+
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className={hasStreaks ? '' : 'lg:col-span-2'}>
                     <CompletionRateSummary
@@ -121,20 +112,11 @@ export default function AnalyticsPageContent() {
                 <StreakSummaryList streakSummary={streakSummary} habitTitleById={habitTitleById} />
             </div>
 
-            <ConsistencyHeatmap
-                activeHabits={activeHabits}
-                entries={entries}
-                todayLocalDate={todayLocalDate}
+            <TrackedTimeBreakdown
+                trackedTime={trackedTime}
+                habitTitleById={habitTitleById}
+                habitColorById={habitColorById}
             />
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <DayTimeDistributionCharts distribution={distribution} />
-                <TrackedTimeBreakdown
-                    trackedTime={trackedTime}
-                    categories={categories}
-                    habitTitleById={habitTitleById}
-                />
-            </div>
         </div>
     );
 }
