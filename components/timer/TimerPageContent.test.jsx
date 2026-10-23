@@ -157,4 +157,177 @@ describe('TimerPageContent', () => {
 
         expect(screen.queryByText('You left this running')).toBeNull();
     });
+
+    it('stacks two live sessions in the same spaced list', () => {
+        sessions = [
+            {
+                id: 'session-1',
+                label: 'First session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+            {
+                id: 'session-2',
+                label: 'Second session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+        ];
+        const { container } = renderPage();
+
+        const sessionList = container.querySelector('.space-y-4');
+        expect(sessionList).toBeTruthy();
+        expect(sessionList.textContent).toContain('First session');
+        expect(sessionList.textContent).toContain('Second session');
+    });
+
+    it('does not offer a fullscreen trigger when 2+ sessions are live', () => {
+        sessions = [
+            {
+                id: 'session-1',
+                label: 'First session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+            {
+                id: 'session-2',
+                label: 'Second session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+        ];
+        renderPage();
+
+        expect(screen.queryByText('View fullscreen')).toBeNull();
+    });
+
+    it('enters and exits fullscreen via the minimize button', () => {
+        sessions = [
+            {
+                id: 'session-1',
+                label: 'Solo session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+        ];
+        renderPage();
+
+        expect(screen.queryByText('Minimize, back to normal view')).toBeNull();
+
+        fireEvent.click(screen.getByText('View fullscreen'));
+        expect(screen.getByText('Minimize, back to normal view')).toBeTruthy();
+
+        fireEvent.click(screen.getByText('Minimize, back to normal view'));
+        expect(screen.queryByText('Minimize, back to normal view')).toBeNull();
+        expect(screen.getByText('View fullscreen')).toBeTruthy();
+    });
+
+    it('excludes the fullscreen session from the normal list while active', () => {
+        sessions = [
+            {
+                id: 'session-1',
+                label: 'Solo session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+        ];
+        renderPage();
+
+        fireEvent.click(screen.getByText('View fullscreen'));
+
+        expect(screen.getAllByText('Solo session')).toHaveLength(1);
+    });
+
+    it('auto-exits fullscreen when a 2nd session goes live', () => {
+        sessions = [
+            {
+                id: 'session-1',
+                label: 'Solo session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+        ];
+        const queryClient = new QueryClient();
+        const { rerender } = render(
+            <QueryClientProvider client={queryClient}>
+                <TimerPageContent />
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(screen.getByText('View fullscreen'));
+        expect(screen.getByText('Minimize, back to normal view')).toBeTruthy();
+
+        sessions = [
+            ...sessions,
+            {
+                id: 'session-2',
+                label: 'New session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+        ];
+        rerender(
+            <QueryClientProvider client={queryClient}>
+                <TimerPageContent />
+            </QueryClientProvider>,
+        );
+
+        expect(screen.queryByText('Minimize, back to normal view')).toBeNull();
+    });
+
+    it('auto-exits fullscreen when the fullscreen session completes', () => {
+        sessions = [
+            {
+                id: 'session-1',
+                label: 'Solo session',
+                habit_id: null,
+                task_id: null,
+                status: 'running',
+                accumulated_seconds: 0,
+                last_resumed_at: NOW,
+            },
+        ];
+        const queryClient = new QueryClient();
+        const { rerender } = render(
+            <QueryClientProvider client={queryClient}>
+                <TimerPageContent />
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(screen.getByText('View fullscreen'));
+        expect(screen.getByText('Minimize, back to normal view')).toBeTruthy();
+
+        sessions = [{ ...sessions[0], status: 'completed' }];
+        rerender(
+            <QueryClientProvider client={queryClient}>
+                <TimerPageContent />
+            </QueryClientProvider>,
+        );
+
+        expect(screen.queryByText('Minimize, back to normal view')).toBeNull();
+    });
 });

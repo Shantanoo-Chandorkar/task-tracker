@@ -45,18 +45,18 @@ export default function StandaloneSessionForm() {
     }
 
     return (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-field p-4">
+        <div className="flex flex-col gap-3 rounded-lg border border-field p-5 md:flex-row md:flex-wrap md:items-center">
             <Input
                 value={label}
                 onChange={(event) => setLabel(event.target.value)}
                 placeholder="What are you working on?"
                 disabled={isPending}
                 aria-label="Session label"
-                className="min-w-0 flex-1 basis-40"
+                className="h-14 min-w-0 flex-1 basis-40 px-[18px] md:text-[1.0625rem]"
             />
             {templates.length > 0 && (
                 <Select value={templateId} onValueChange={setTemplateId} disabled={isPending}>
-                    <SelectTrigger aria-label="Template" className="w-40 flex-shrink-0">
+                    <SelectTrigger aria-label="Template" className="w-full flex-shrink-0 md:w-40">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -69,7 +69,12 @@ export default function StandaloneSessionForm() {
                     </SelectContent>
                 </Select>
             )}
-            <Button type="button" onClick={handleStart} disabled={isPending} className="gap-1.5">
+            <Button
+                type="button"
+                onClick={handleStart}
+                disabled={isPending}
+                className="h-14 w-full gap-1.5 px-7 text-base md:w-auto"
+            >
                 {isPending && <Loader size="xs" />}
                 Start
             </Button>

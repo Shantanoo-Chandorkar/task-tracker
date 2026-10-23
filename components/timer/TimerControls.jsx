@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/custom/Loader';
 import { useTimeSessionActions } from '@/hooks/useTimeSessionActions';
+import { cn } from '@/lib/ui/class-names';
+
+const DEFAULT_BUTTON_CLASSES =
+    'h-12 grow basis-0 gap-1.5 px-[22px] text-[0.9375rem] md:grow-0 md:basis-auto';
 
 /**
  * Pause/Resume/Complete buttons for one time session - which pair shows depends on `status`.
@@ -12,8 +16,9 @@ import { useTimeSessionActions } from '@/hooks/useTimeSessionActions';
  * @param {object} props
  * @param {object} props.session - The session these controls act on.
  * @param {{ isLastBlock: boolean }|null} [props.blockDisplay] - The session's current block info.
+ * @param {string} [props.buttonClassName] - Overrides the default button size, e.g. for fullscreen.
  */
-export default function TimerControls({ session, blockDisplay = null }) {
+export default function TimerControls({ session, blockDisplay = null, buttonClassName = '' }) {
     const { pause, resume, complete, advanceBlock } = useTimeSessionActions();
     const [pendingAction, setPendingAction] = useState(null);
     const isPending = pendingAction !== null;
@@ -48,13 +53,13 @@ export default function TimerControls({ session, blockDisplay = null }) {
     }
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 shrink-0">
             <Button
                 type="button"
                 variant="outline"
                 onClick={handlePauseOrResume}
                 disabled={isPending}
-                className="gap-1.5"
+                className={cn(DEFAULT_BUTTON_CLASSES, buttonClassName)}
             >
                 {pendingAction === 'pauseResume' && <Loader size="xs" />}
                 {session.status === 'running' ? 'Pause' : 'Resume'}
@@ -65,13 +70,18 @@ export default function TimerControls({ session, blockDisplay = null }) {
                     variant="outline"
                     onClick={handleAdvanceBlock}
                     disabled={isPending}
-                    className="gap-1.5"
+                    className={cn(DEFAULT_BUTTON_CLASSES, buttonClassName)}
                 >
                     {pendingAction === 'advanceBlock' && <Loader size="xs" />}
                     Next block
                 </Button>
             )}
-            <Button type="button" onClick={handleComplete} disabled={isPending} className="gap-1.5">
+            <Button
+                type="button"
+                onClick={handleComplete}
+                disabled={isPending}
+                className={cn(DEFAULT_BUTTON_CLASSES, buttonClassName)}
+            >
                 {pendingAction === 'complete' && <Loader size="xs" />}
                 Complete
             </Button>
