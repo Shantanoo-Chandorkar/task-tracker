@@ -11,7 +11,7 @@ import { groupSessionsByHabitId } from './group-by';
  * @param {Array<Record<string, any>>} sessions - `time_sessions` rows in scope, any subject; only
  *   habit-linked ones are summed (decision 13 - task/standalone sessions aren't Habit Zone data).
  * @param {{ start: string, end: string }} period - Inclusive local-date window, compared against
- *   `started_at` as UTC calendar days (same rule as the day-time-distribution KPI).
+ *   `started_at` as UTC calendar days.
  * @param {Date} now - The instant to measure a still-running session's live elapsed time at.
  * @returns {{ byHabitId: Record<string, number>, byCategoryId: Record<string, number> }} Total
  *   seconds tracked, keyed by id - category/habit display names are a data-layer/UI concern.

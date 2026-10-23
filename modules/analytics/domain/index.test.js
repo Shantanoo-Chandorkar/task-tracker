@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { ANALYTICS_KPIS } from './index';
 
 describe('ANALYTICS_KPIS', () => {
-    it('registers exactly the 80/20 KPI set from decision 19', () => {
+    it('registers exactly the KPI set with a live UI consumer', () => {
         expect(ANALYTICS_KPIS.map((kpi) => kpi.key)).toEqual([
             'completionRate',
             'streakSummary',
             'consistencyHeatmap',
-            'dayTimeDistribution',
             'totalTrackedTime',
         ]);
     });
