@@ -8,20 +8,27 @@ import StandaloneSessionForm from './StandaloneSessionForm';
 import StaleSessionPrompt from './StaleSessionPrompt';
 import TimerViewTabs from './TimerViewTabs';
 import TimerTemplateManager from './TimerTemplateManager';
+import FullscreenTimerOverlay from './FullscreenTimerOverlay';
 
 const isStandalone = (session) => session.habit_id === null && session.task_id === null;
 
 /**
- * The Time Tracking zone's landing page content: live sessions, the start form, any stale
- * prompt, and the template manager behind its own tab.
+ * The Time Tracking zone's landing page: sessions, the start form, stale prompts, templates, fullscreen.
  */
 export default function TimerPageContent() {
     const [view, setView] = useState('sessions');
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const { data: sessions = [] } = useTimeSessionsQuery();
     const liveSessions = sessions.filter((session) => session.status !== 'completed');
     const hasLiveStandaloneSession = liveSessions.some(isStandalone);
     const now = new Date();
     const staleSessions = liveSessions.filter((session) => isSessionStale(session, now));
+
+    // Fullscreen gates on exactly 1 live session - auto-exits on its own the moment that changes.
+    const fullscreenSession = isFullscreen && liveSessions.length === 1 ? liveSessions[0] : null;
+    const panelSessions = fullscreenSession
+        ? liveSessions.filter((session) => session.id !== fullscreenSession.id)
+        : liveSessions;
 
     return (
         <div className="px-4 md:px-8 py-8 space-y-4">
@@ -33,9 +40,17 @@ export default function TimerPageContent() {
                 <TimerTemplateManager />
             ) : (
                 <>
-                    <div className="space-y-3">
-                        {liveSessions.map((session) => (
-                            <TimerPanel key={session.id} session={session} />
+                    <div className="space-y-4">
+                        {panelSessions.map((session) => (
+                            <TimerPanel
+                                key={session.id}
+                                session={session}
+                                onEnterFullscreen={
+                                    liveSessions.length === 1
+                                        ? () => setIsFullscreen(true)
+                                        : undefined
+                                }
+                            />
                         ))}
                     </div>
 
@@ -45,6 +60,13 @@ export default function TimerPageContent() {
                         <StaleSessionPrompt key={session.id} session={session} />
                     ))}
                 </>
+            )}
+
+            {fullscreenSession && (
+                <FullscreenTimerOverlay
+                    sessions={[fullscreenSession]}
+                    onExit={() => setIsFullscreen(false)}
+                />
             )}
         </div>
     );

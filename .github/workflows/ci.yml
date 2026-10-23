@@ -27,8 +27,6 @@ jobs:
             # Vitest only: Playwright specs are deliberately never run in CI, they take too long
             - run: npm test
 
-            # Scoped to production dependencies: lighthouse (a devDependency used only for local
-            # perf audits) pulls in transitive high-severity CVEs that never ship to production,
-            # already accepted in bucket-4-perf-findings.md. --omit=dev keeps the gate meaningful
-            # instead of permanently red over a dev-only tool.
+            # Scoped to production dependencies: dev-only tooling CVEs never ship to production,
+            # so --omit=dev keeps the gate meaningful instead of chasing dev-tool advisories.
             - run: npm audit --omit=dev --audit-level=high

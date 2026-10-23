@@ -8,7 +8,6 @@ export {
     computeCompletionRate,
     computeStreakSummary,
     computeConsistencyHeatmap,
-    computeDayTimeDistribution,
     computeTotalTrackedTime,
 } from './domain/index';
 export { listDailyHabitOutcomes } from './domain/daily-habit-outcomes';

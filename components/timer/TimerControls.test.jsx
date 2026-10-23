@@ -99,4 +99,16 @@ describe('TimerControls', () => {
         fireEvent.click(screen.getByText('Next block'));
         expect(advanceBlock).toHaveBeenCalledWith('session-1');
     });
+
+    it('applies buttonClassName to every rendered button', () => {
+        render(
+            <TimerControls
+                session={{ id: 'session-1', status: 'running' }}
+                buttonClassName="fullscreen-size"
+            />,
+        );
+
+        expect(screen.getByText('Pause').closest('button').className).toMatch(/fullscreen-size/);
+        expect(screen.getByText('Complete').closest('button').className).toMatch(/fullscreen-size/);
+    });
 });

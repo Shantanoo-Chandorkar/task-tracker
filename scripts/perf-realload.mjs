@@ -54,7 +54,7 @@ async function loadAndMeasure(page, url) {
 async function runOnce(browser, url) {
     const context = await browser.newContext();
     const page = await context.newPage();
-    // 4G-ish throttle, matches the mobile preset used by the Lighthouse scripts.
+    // 4G-ish throttle, matches the mobile preset the (now-removed) Lighthouse scripts used.
     const client = await context.newCDPSession(page);
     await client.send('Network.emulateNetworkConditions', {
         offline: false,
