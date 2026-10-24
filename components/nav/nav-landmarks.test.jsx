@@ -4,6 +4,7 @@ import BottomNav from './BottomNav';
 import SidebarNav from './SidebarNav';
 
 const currentPath = vi.hoisted(() => ({ value: '/' }));
+const currentSearch = vi.hoisted(() => ({ value: '' }));
 
 vi.mock('next/link', () => ({
     default: ({ children, href, ...rest }) => (
@@ -15,6 +16,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
     usePathname: () => currentPath.value,
     useParams: () => ({}),
+    useSearchParams: () => new URLSearchParams(currentSearch.value),
 }));
 vi.mock('@/hooks/useSpacesQuery', () => ({ useSpacesQuery: () => ({ data: [] }) }));
 vi.mock('@/hooks/useListsQuery', () => ({ useListsQuery: () => ({ data: [] }) }));
@@ -26,7 +28,10 @@ vi.mock('@/components/habits/HabitQuickCreateFab', () => ({ default: () => null 
 vi.mock('@/components/ThemeToggle', () => ({ default: () => null }));
 vi.mock('@/components/nav/LogoutButton', () => ({ default: () => null }));
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    currentSearch.value = '';
+});
 
 function currentLinks(navigationName) {
     return screen
@@ -77,6 +82,54 @@ describe('BottomNav - Habit Zone', () => {
 
         expect(screen.queryByText('Switch to Tasks')).toBeNull();
         expect(screen.getByText('Analytics')).toBeTruthy();
+    });
+});
+
+describe('BottomNav - zone-aware Settings', () => {
+    it('shows the default Task Tracker tabs on a bare /settings with no zone param', () => {
+        currentPath.value = '/settings';
+        render(<BottomNav initialSpaces={[]} initialLists={[]} />);
+
+        expect(screen.getByText('Home')).toBeTruthy();
+        expect(screen.queryByText('Categories')).toBeNull();
+        expect(screen.queryByText('Timer')).toBeNull();
+    });
+
+    it('keeps the Habit Zone tabs on /settings?zone=habits', () => {
+        currentPath.value = '/settings';
+        currentSearch.value = 'zone=habits';
+        render(<BottomNav initialSpaces={[]} initialLists={[]} />);
+
+        expect(screen.getByText('Categories')).toBeTruthy();
+        expect(screen.getByText('Analytics')).toBeTruthy();
+        expect(screen.queryByText('Home')).toBeNull();
+    });
+
+    it('keeps the Time Tracking tabs on /settings?zone=timer', () => {
+        currentPath.value = '/settings';
+        currentSearch.value = 'zone=timer';
+        render(<BottomNav initialSpaces={[]} initialLists={[]} />);
+
+        expect(screen.getByText('Timer')).toBeTruthy();
+        expect(screen.queryByText('Home')).toBeNull();
+    });
+
+    it("Habit Zone's own Settings link carries zone=habits", () => {
+        currentPath.value = '/habits';
+        render(<BottomNav initialSpaces={[]} initialLists={[]} />);
+
+        expect(screen.getByText('Settings').closest('a').getAttribute('href')).toBe(
+            '/settings?zone=habits',
+        );
+    });
+
+    it("Time Tracking's own Settings link carries zone=timer", () => {
+        currentPath.value = '/timer';
+        render(<BottomNav initialSpaces={[]} initialLists={[]} />);
+
+        expect(screen.getByText('Settings').closest('a').getAttribute('href')).toBe(
+            '/settings?zone=timer',
+        );
     });
 });
 

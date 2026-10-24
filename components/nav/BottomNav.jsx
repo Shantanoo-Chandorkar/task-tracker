@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname, useParams, useSearchParams } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
 import {
@@ -66,7 +66,7 @@ function HabitZoneTabs() {
                     Analytics
                 </Link>
                 <Link
-                    href="/settings"
+                    href="/settings?zone=habits"
                     aria-current={isSettings ? 'page' : undefined}
                     prefetch={false}
                     className={tabClassName(isSettings)}
@@ -113,7 +113,7 @@ function TimeTrackingTabs() {
                     Tasks
                 </Link>
                 <Link
-                    href="/settings"
+                    href="/settings?zone=timer"
                     aria-current={isSettings ? 'page' : undefined}
                     prefetch={false}
                     className={tabClassName(isSettings)}
@@ -138,9 +138,12 @@ function TimeTrackingTabs() {
 export default function BottomNav({ initialSpaces, initialLists }) {
     const pathname = usePathname();
     const params = useParams();
+    const searchParams = useSearchParams();
     const listId = params?.listId;
-    const isHabitZone = pathname.startsWith('/habits');
-    const isTimeTracking = pathname.startsWith('/timer');
+    // Settings has no zone of its own, so the opening link's ?zone= param says which tabs to keep.
+    const settingsZone = pathname.startsWith('/settings') ? searchParams.get('zone') : null;
+    const isHabitZone = pathname.startsWith('/habits') || settingsZone === 'habits';
+    const isTimeTracking = pathname.startsWith('/timer') || settingsZone === 'timer';
 
     const { data: spaces } = useSpacesQuery({
         initialData: initialSpaces,

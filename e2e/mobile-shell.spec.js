@@ -137,6 +137,40 @@ test.describe('mobile shell', () => {
         await expect(page.locator('#sample-text-xl')).toHaveCSS('letter-spacing', '-0.2px');
     });
 
+    test('opening Settings from the Habit Zone keeps the Habit Zone tabs, not the Task Tracker ones', async ({
+        page,
+        testUser,
+        isMobile,
+    }) => {
+        test.skip(!isMobile, 'The bottom nav only exists below the lg breakpoint');
+        await loginAs(page, testUser);
+        await page.goto('/habits');
+        const bottomNav = page.locator('nav.translucent-bar');
+
+        await bottomNav.getByRole('link', { name: 'Settings' }).click();
+        await page.waitForURL(/\/settings/);
+
+        await expect(bottomNav.getByRole('link', { name: 'Categories' })).toBeVisible();
+        await expect(bottomNav.getByRole('link', { name: 'Home' })).toHaveCount(0);
+    });
+
+    test('opening Settings from Time Tracking keeps the Time Tracking tabs, not the Task Tracker ones', async ({
+        page,
+        testUser,
+        isMobile,
+    }) => {
+        test.skip(!isMobile, 'The bottom nav only exists below the lg breakpoint');
+        await loginAs(page, testUser);
+        await page.goto('/timer');
+        const bottomNav = page.locator('nav.translucent-bar');
+
+        await bottomNav.getByRole('link', { name: 'Settings' }).click();
+        await page.waitForURL(/\/settings/);
+
+        await expect(bottomNav.getByRole('link', { name: 'Timer' })).toBeVisible();
+        await expect(bottomNav.getByRole('link', { name: 'Home' })).toHaveCount(0);
+    });
+
     test('reduced motion turns slide-in movement into a plain fade', async ({ page }) => {
         await page.goto('/login');
         await page.evaluate(() => {
