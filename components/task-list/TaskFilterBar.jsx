@@ -66,10 +66,24 @@ function buildFilterChipGroups(filters, statuses, tags, members) {
  * @param {string|null} props.spaceId - Space the current list belongs to
  * @param {object[]} props.statuses - This space's statuses, for status chip labels
  * @param {Function} props.onOpenSheet - Called when the "Filters" button is clicked
+ * @param {object[]} [props.initialTags] - SSR-fetched tags, so a tag chip never flashes its raw id
+ * @param {object[]} [props.initialCollaborators] - SSR-fetched collaborators, for the "Created by" chips
+ * @param {object[]} [props.initialSpaces] - SSR-fetched spaces, so the owner chip never flashes "Owner"
  */
-export default function TaskFilterBar({ spaceId, statuses, onOpenSheet }) {
+export default function TaskFilterBar({
+    spaceId,
+    statuses,
+    onOpenSheet,
+    initialTags,
+    initialCollaborators,
+    initialSpaces,
+}) {
     const { filters, activeCount, toggleFilter, clearAll } = useTaskFilters();
-    const { tags, members } = useTaskFilterOptions(spaceId);
+    const { tags, members } = useTaskFilterOptions(spaceId, {
+        initialTags,
+        initialCollaborators,
+        initialSpaces,
+    });
     const chipGroups = buildFilterChipGroups(filters, statuses, tags, members);
 
     return (

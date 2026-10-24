@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname, useParams, useSearchParams } from 'next/navigation';
 import { useSpacesQuery } from '@/hooks/useSpacesQuery';
 import { useListsQuery } from '@/hooks/useListsQuery';
 import {
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
 import HabitQuickCreateFab from '@/components/habits/HabitQuickCreateFab';
+import TimeTrackingQuickCreateFab from '@/components/timer/TimeTrackingQuickCreateFab';
 
 const tabClassName = (isActive) =>
     `press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isActive ? 'text-primary' : 'text-muted-foreground'}`;
@@ -66,7 +67,7 @@ function HabitZoneTabs() {
                     Analytics
                 </Link>
                 <Link
-                    href="/settings"
+                    href="/settings?zone=habits"
                     aria-current={isSettings ? 'page' : undefined}
                     prefetch={false}
                     className={tabClassName(isSettings)}
@@ -82,7 +83,7 @@ function HabitZoneTabs() {
 }
 
 /**
- * Time Tracking's tabs: Timer / Switch to Habit Zone / [gap, no FAB] / Switch to Task Tracker / Settings.
+ * Time Tracking's tabs: Timer / Switch to Habit Zone / [FAB] / Switch to Task Tracker / Settings.
  * Deliberately links to both other zones, unlike Habit Zone's single switch tab (see BottomNav's docblock).
  */
 function TimeTrackingTabs() {
@@ -91,7 +92,7 @@ function TimeTrackingTabs() {
     const isSettings = pathname.startsWith('/settings');
 
     return (
-        <div className="flex items-center">
+        <div className="relative flex items-center">
             <div className="flex-1 flex">
                 <Link
                     href="/timer"
@@ -107,13 +108,16 @@ function TimeTrackingTabs() {
                     Habits
                 </Link>
             </div>
+
+            <div className="w-12 flex-shrink-0" aria-hidden="true" />
+
             <div className="flex-1 flex">
                 <Link href="/" prefetch={false} className={tabClassName(false)}>
                     <ArrowLeftRight aria-hidden="true" className="h-5 w-5" />
                     Tasks
                 </Link>
                 <Link
-                    href="/settings"
+                    href="/settings?zone=timer"
                     aria-current={isSettings ? 'page' : undefined}
                     prefetch={false}
                     className={tabClassName(isSettings)}
@@ -122,6 +126,8 @@ function TimeTrackingTabs() {
                     Settings
                 </Link>
             </div>
+
+            <TimeTrackingQuickCreateFab className="press-feedback absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center" />
         </div>
     );
 }
@@ -138,9 +144,12 @@ function TimeTrackingTabs() {
 export default function BottomNav({ initialSpaces, initialLists }) {
     const pathname = usePathname();
     const params = useParams();
+    const searchParams = useSearchParams();
     const listId = params?.listId;
-    const isHabitZone = pathname.startsWith('/habits');
-    const isTimeTracking = pathname.startsWith('/timer');
+    // Settings has no zone of its own, so the opening link's ?zone= param says which tabs to keep.
+    const settingsZone = pathname.startsWith('/settings') ? searchParams.get('zone') : null;
+    const isHabitZone = pathname.startsWith('/habits') || settingsZone === 'habits';
+    const isTimeTracking = pathname.startsWith('/timer') || settingsZone === 'timer';
 
     const { data: spaces } = useSpacesQuery({
         initialData: initialSpaces,

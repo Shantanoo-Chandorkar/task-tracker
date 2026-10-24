@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computeElapsedSeconds, isSessionStale, formatElapsedDuration } from './session-clock';
+import {
+    computeElapsedSeconds,
+    isSessionStale,
+    isLiveSession,
+    isStandaloneSession,
+    formatElapsedDuration,
+} from './session-clock';
 
 describe('computeElapsedSeconds', () => {
     it('adds the current running segment to the sealed accumulated seconds', () => {
@@ -87,6 +93,34 @@ describe('isSessionStale', () => {
     it('is false for a running session with no last_resumed_at', () => {
         const session = { status: 'running', last_resumed_at: null };
         expect(isSessionStale(session, new Date('2026-10-18T10:00:00.000Z'))).toBe(false);
+    });
+});
+
+describe('isLiveSession', () => {
+    it('is true for a running session', () => {
+        expect(isLiveSession({ status: 'running' })).toBe(true);
+    });
+
+    it('is true for a paused session', () => {
+        expect(isLiveSession({ status: 'paused' })).toBe(true);
+    });
+
+    it('is false for a completed session', () => {
+        expect(isLiveSession({ status: 'completed' })).toBe(false);
+    });
+});
+
+describe('isStandaloneSession', () => {
+    it('is true when neither a habit nor a task is attached', () => {
+        expect(isStandaloneSession({ habit_id: null, task_id: null })).toBe(true);
+    });
+
+    it('is false when a habit is attached', () => {
+        expect(isStandaloneSession({ habit_id: 'habit-1', task_id: null })).toBe(false);
+    });
+
+    it('is false when a task is attached', () => {
+        expect(isStandaloneSession({ habit_id: null, task_id: 'task-1' })).toBe(false);
     });
 });
 

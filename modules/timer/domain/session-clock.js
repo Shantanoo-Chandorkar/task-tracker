@@ -30,6 +30,26 @@ export function isSessionStale(session, now) {
 }
 
 /**
+ * Whether a session is still live - running or paused, not yet sealed into history.
+ *
+ * @param {Record<string, any>} session - The session row; needs status.
+ * @returns {boolean} True unless the session is completed.
+ */
+export function isLiveSession(session) {
+    return session.status !== 'completed';
+}
+
+/**
+ * Whether a session has no task or habit attached - a free-text/quick-capture session.
+ *
+ * @param {Record<string, any>} session - The session row; needs habit_id, task_id.
+ * @returns {boolean} True when neither a habit nor a task is attached.
+ */
+export function isStandaloneSession(session) {
+    return session.habit_id === null && session.task_id === null;
+}
+
+/**
  * Formats a second count as `mm:ss`, or `h:mm:ss` once it reaches an hour.
  *
  * @param {number} totalSeconds - Elapsed seconds, as from `computeElapsedSeconds`.

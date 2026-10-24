@@ -20,12 +20,13 @@ vi.mock('@/hooks/useTimeSessionActions', () => ({
 vi.mock('@/hooks/useTimerTemplatesQuery', () => ({
     useTimerTemplatesQuery: () => ({ data: [], isLoading: false }),
 }));
+vi.mock('@/hooks/useHabitsQuery', () => ({ useHabitsQuery: () => ({ data: [] }) }));
 vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), dismiss: vi.fn() },
 }));
 
-// Radix Select (StandaloneSessionForm) and dialogs (TimerTemplateManager) need these, even closed
+// Radix Select/Command (the start sheets) and dialogs (TimerTemplateManager) need these, even closed
 beforeAll(() => {
     globalThis.ResizeObserver = class {
         observe() {}
@@ -90,7 +91,7 @@ describe('TimerPageContent', () => {
         expect(screen.queryByText('Old one')).toBeNull();
     });
 
-    it('shows the start form when no standalone session is live, even with a habit session live', () => {
+    it('keeps the Standalone button enabled when no standalone session is live, even with a habit session live', () => {
         sessions = [
             {
                 id: 'session-1',
@@ -104,10 +105,13 @@ describe('TimerPageContent', () => {
         ];
         renderPage();
 
-        expect(screen.getByLabelText('Session label')).toBeTruthy();
+        expect(screen.getByRole('button', { name: /start standalone timer/i }).disabled).toBe(
+            false,
+        );
+        expect(screen.queryByText(/you already have a running timer/i)).toBeNull();
     });
 
-    it('hides the start form while a standalone session is already live', () => {
+    it('disables the Standalone button and shows a message while one is already live', () => {
         sessions = [
             {
                 id: 'session-1',
@@ -121,7 +125,8 @@ describe('TimerPageContent', () => {
         ];
         renderPage();
 
-        expect(screen.queryByLabelText('Session label')).toBeNull();
+        expect(screen.getByRole('button', { name: /start standalone timer/i }).disabled).toBe(true);
+        expect(screen.getByText(/you already have a running timer/i)).toBeTruthy();
     });
 
     it('shows a stale-session prompt for a running session left unattended over a day', () => {

@@ -481,6 +481,27 @@ describe('HabitEntryDialog multi-day batch save', () => {
         expect(setValues).toHaveBeenCalledWith(habit, [{ localDate: TODAY, rawValue: true }]);
     });
 
+    it('drafts null, not false, when toggling an already-logged binary day off', async () => {
+        const habit = buildHabit();
+        const entries = [{ id: 'entry-1', habit_id: 'habit-1', local_date: TODAY, value: 1 }];
+        render(
+            <HabitEntryDialog
+                open
+                onClose={vi.fn()}
+                habit={habit}
+                entries={entries}
+                todayLocalDate={TODAY}
+                allowDateNavigation
+            />,
+        );
+
+        fireEvent.click(screen.getByText('Done'));
+        fireEvent.click(screen.getByText('Save'));
+
+        await waitFor(() => expect(setValues).toHaveBeenCalledTimes(1));
+        expect(setValues).toHaveBeenCalledWith(habit, [{ localDate: TODAY, rawValue: null }]);
+    });
+
     it('discards drafts when the dialog is reopened for the same habit', () => {
         const habit = buildHabit({ measure_kind: 'count', target_value: 20 });
         const { rerender } = render(

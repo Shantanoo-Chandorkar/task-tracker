@@ -5,6 +5,7 @@ import {
     createList,
     createSublist,
     spaceSection,
+    submitDialog,
 } from './fixtures/app-data.js';
 
 test.describe('sublists', () => {
@@ -22,6 +23,21 @@ test.describe('sublists', () => {
 
     test('creating a sublist shows it in the list', async ({ page }) => {
         const sublistName = await createSublist(page, spaceName, listName);
+        await expect(page.getByText(sublistName, { exact: false })).toBeVisible();
+    });
+
+    test('a fresh, empty list has its own "New Sub-list" button, not just the global FAB', async ({
+        page,
+    }) => {
+        const sublistName = uniqueName('Sublist');
+
+        await page.getByRole('button', { name: 'New Sub-list', exact: true }).click();
+        await submitDialog(page, {
+            placeholder: 'Sublist name',
+            value: sublistName,
+            submitName: 'Create sublist',
+        });
+
         await expect(page.getByText(sublistName, { exact: false })).toBeVisible();
     });
 

@@ -21,9 +21,8 @@ import DeleteTaskDialog from '@/components/task-list/DeleteTaskDialog';
 import MoveDestinationList from '@/components/task-list/MoveDestinationList';
 import { bustPageCache } from '@/lib/cache/service-worker-cache';
 import { claimInFlight } from '@/lib/in-flight-entities';
-import { createClientId } from '@/lib/client-id';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
-import { startTimeSession } from '@/modules/timer/actions/time-session-actions';
+import { useTimeSessionActions } from '@/hooks/useTimeSessionActions';
 
 /**
  * Where a task can be moved, worked out only while the menu item or the sheet that needs it is mounted.
@@ -127,6 +126,7 @@ export default function TaskRowActions({
     const queryClient = useQueryClient();
     const getTasks = useGetTasks(listId);
     const { duplicateTaskById } = useDuplicateTask(listId);
+    const { start: startTimer } = useTimeSessionActions();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [moveSheetOpen, setMoveSheetOpen] = useState(false);
@@ -244,30 +244,9 @@ export default function TaskRowActions({
     }
 
     async function handleStartTimer() {
-        const releaseInFlight = claimInFlight(`timer-start:${task.id}`);
-        if (!releaseInFlight) return;
         setPending(true);
-        const toastId = toast.loading('Starting timer...');
-        try {
-            let startResult;
-            try {
-                startResult = await startTimeSession({ taskId: task.id, id: createClientId() });
-            } catch {
-                toast.error('Could not reach the server. Check your connection and try again.', {
-                    id: toastId,
-                });
-                return;
-            }
-            if (startResult.error) {
-                toast.error(startResult.error, { id: toastId });
-                return;
-            }
-            queryClient.invalidateQueries({ queryKey: ['time-sessions'] });
-            toast.success('Timer started', { id: toastId });
-        } finally {
-            setPending(false);
-            releaseInFlight();
-        }
+        await startTimer({ taskId: task.id });
+        setPending(false);
     }
 
     return (

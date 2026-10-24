@@ -109,7 +109,7 @@ export default function HabitEntryDialog({
         if (allowDateNavigation) {
             setDraftsByLocalDate((previousDrafts) => ({
                 ...previousDrafts,
-                [localDate]: !isLoggedForDisplay,
+                [localDate]: isLoggedForDisplay ? null : true,
             }));
             return;
         }

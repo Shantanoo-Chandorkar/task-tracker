@@ -89,9 +89,7 @@ export async function createList(page, spaceName, name = uniqueName('List')) {
 }
 
 /**
- * Creates a sublist via the global "Create new..." FAB, so it works even on a still-empty list.
- *
- * The inline "Create New Sublist" button doesn't exist on a fresh, empty list - see docs/e2e-test-quality.md.
+ * Creates a sublist via the global "Create new..." FAB, so it works regardless of list state.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} spaceName
@@ -271,6 +269,24 @@ export async function createTask(
 export async function waitForCreatedToastsToClear(page) {
     await page.mouse.move(0, 0);
     await expect(page.getByText('Task created successfully')).toHaveCount(0);
+}
+
+/**
+ * Creates a habit via the Habit Zone's "New habit" FAB, leaving every other field at its default.
+ *
+ * @param {import('@playwright/test').Page} page - Already on `/habits`.
+ * @param {object} [fields]
+ * @param {string} [fields.title] - Defaults to a generated unique name.
+ * @returns {Promise<string>} The habit's title.
+ */
+export async function createHabit(page, { title = uniqueName('Habit') } = {}) {
+    await page.getByRole('button', { name: 'New habit' }).click();
+    await submitDialog(page, {
+        placeholder: 'Habit title',
+        value: title,
+        submitName: 'Create habit',
+    });
+    return title;
 }
 
 /**

@@ -92,10 +92,26 @@ function FilterSection({ title, isOpen, onToggle, loading, children }) {
  * @param {string|null} props.spaceId - Space the current list belongs to
  * @param {object[]} props.statuses - This space's statuses
  * @param {object} props.countsByStatusId - Task count per status id, for the Status section's badges
+ * @param {object[]} [props.initialTags] - SSR-fetched tags, so a tag row never flashes its raw id
+ * @param {object[]} [props.initialCollaborators] - SSR-fetched collaborators, for the "Created by" rows
+ * @param {object[]} [props.initialSpaces] - SSR-fetched spaces, so the owner row never flashes "Owner"
  */
-export default function TaskFilterSheet({ open, onClose, spaceId, statuses, countsByStatusId }) {
+export default function TaskFilterSheet({
+    open,
+    onClose,
+    spaceId,
+    statuses,
+    countsByStatusId,
+    initialTags,
+    initialCollaborators,
+    initialSpaces,
+}) {
     const isDesktop = useIsDesktop();
-    const { tags, members, tagsLoading, membersLoading } = useTaskFilterOptions(spaceId);
+    const { tags, members, tagsLoading, membersLoading } = useTaskFilterOptions(spaceId, {
+        initialTags,
+        initialCollaborators,
+        initialSpaces,
+    });
     const { filters, applyFilters, clearAll } = useTaskFilters();
 
     const [draftFilters, setDraftFilters] = useState(filters);

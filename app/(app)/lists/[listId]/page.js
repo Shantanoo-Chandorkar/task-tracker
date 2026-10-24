@@ -4,6 +4,7 @@ import { isUuid } from '@/lib/validation';
 import { throwIfQueryFailed } from '@/lib/supabase/throw-if-query-failed';
 import TaskList from '@/components/task-list/TaskList';
 import { attachOwnerDisplayName } from '@/lib/permissions/space-owner-identity';
+import { attachCollaboratorDisplayNames } from '@/lib/permissions/attach-collaborator-display-names';
 import { loadListName } from '@/modules/tasks/domain/page-titles';
 import { loadRequestUser, loadShellData } from '@/lib/app-shell-data';
 import { fetchListTasks } from '@/modules/tasks/data/list-tasks';
@@ -51,16 +52,36 @@ export default async function ListPage({ params }) {
     const { data: tasks } = tasksResult;
     const { data: sublists } = sublistsResult;
 
-    const statusesResult = await supabase
-        .from('statuses')
-        .select('*')
-        .eq('space_id', list.space_id)
-        .order('position', { ascending: true });
-    throwIfQueryFailed('[list-page]', statusesResult);
+    // Also seeds the tags/collaborators caches, so their filter chips never flash a raw id on first paint.
+    const [statusesResult, tagsResult, collaboratorsResult] = await Promise.all([
+        supabase
+            .from('statuses')
+            .select('*')
+            .eq('space_id', list.space_id)
+            .order('position', { ascending: true }),
+        supabase
+            .from('tags')
+            .select('id, name, color, position')
+            .eq('space_id', list.space_id)
+            .order('position', { ascending: true })
+            .order('name', { ascending: true }),
+        supabase
+            .from('space_collaborators')
+            .select('*')
+            .eq('space_id', list.space_id)
+            .eq('status', 'accepted')
+            .order('created_at', { ascending: true }),
+    ]);
+    throwIfQueryFailed('[list-page]', statusesResult, tagsResult, collaboratorsResult);
     const { data: statuses } = statusesResult;
+    const { data: tags } = tagsResult;
+    const { data: collaboratorsRaw } = collaboratorsResult;
 
-    // Matches /api/spaces' computation, so the client refetch never hydration-mismatches this field.
-    const spacesWithPermission = await attachOwnerDisplayName(shellData.initialSpaces);
+    // Matches /api/spaces' and /api/space-collaborators' computation, so the client refetch never mismatches.
+    const [spacesWithPermission, collaborators] = await Promise.all([
+        attachOwnerDisplayName(shellData.initialSpaces),
+        attachCollaboratorDisplayNames(collaboratorsRaw || []),
+    ]);
 
     return (
         <div className="px-4 md:px-8 py-6">
@@ -71,6 +92,8 @@ export default async function ListPage({ params }) {
                 initialSpaces={spacesWithPermission}
                 initialLists={shellData.initialLists}
                 initialSublists={sublists || []}
+                initialTags={tags || []}
+                initialCollaborators={collaborators}
                 currentUserId={user?.id ?? null}
             />
         </div>
