@@ -1,26 +1,35 @@
 'use client';
 
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useTimeSessionsQuery } from '@/hooks/useTimeSessionsQuery';
-import { isSessionStale } from '@/modules/timer/domain/session-clock';
+import {
+    isSessionStale,
+    isLiveSession,
+    isStandaloneSession,
+} from '@/modules/timer/domain/session-clock';
 import TimerPanel from './TimerPanel';
-import StandaloneSessionForm from './StandaloneSessionForm';
+import StartStandaloneTimerSheet from './StartStandaloneTimerSheet';
+import StartTaskTimerSheet from './StartTaskTimerSheet';
+import StartHabitTimerSheet from './StartHabitTimerSheet';
 import StaleSessionPrompt from './StaleSessionPrompt';
 import TimerViewTabs from './TimerViewTabs';
 import TimerTemplateManager from './TimerTemplateManager';
 import FullscreenTimerOverlay from './FullscreenTimerOverlay';
 
-const isStandalone = (session) => session.habit_id === null && session.task_id === null;
-
 /**
- * The Time Tracking zone's landing page: sessions, the start form, stale prompts, templates, fullscreen.
+ * The Time Tracking zone's landing page: sessions, the start buttons, stale prompts, templates, fullscreen.
  */
 export default function TimerPageContent() {
     const [view, setView] = useState('sessions');
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isStandaloneSheetOpen, setIsStandaloneSheetOpen] = useState(false);
+    const [isTaskSheetOpen, setIsTaskSheetOpen] = useState(false);
+    const [isHabitSheetOpen, setIsHabitSheetOpen] = useState(false);
     const { data: sessions = [] } = useTimeSessionsQuery();
-    const liveSessions = sessions.filter((session) => session.status !== 'completed');
-    const hasLiveStandaloneSession = liveSessions.some(isStandalone);
+    const liveSessions = sessions.filter(isLiveSession);
+    const hasLiveStandaloneSession = liveSessions.some(isStandaloneSession);
     const now = new Date();
     const staleSessions = liveSessions.filter((session) => isSessionStale(session, now));
 
@@ -54,7 +63,39 @@ export default function TimerPageContent() {
                         ))}
                     </div>
 
-                    {!hasLiveStandaloneSession && <StandaloneSessionForm />}
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-col w-full gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-center">
+                            <Button
+                                className="w-full sm:w-auto"
+                                disabled={hasLiveStandaloneSession}
+                                onClick={() => setIsStandaloneSheetOpen(true)}
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                Start Standalone Timer
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="w-full sm:w-auto"
+                                onClick={() => setIsTaskSheetOpen(true)}
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                Start Task Timer
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="w-full sm:w-auto"
+                                onClick={() => setIsHabitSheetOpen(true)}
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                Start Habit Timer
+                            </Button>
+                        </div>
+                        {hasLiveStandaloneSession && (
+                            <p className="text-xs text-muted-foreground">
+                                You already have a running timer - stop it to start a new one.
+                            </p>
+                        )}
+                    </div>
 
                     {staleSessions.map((session) => (
                         <StaleSessionPrompt key={session.id} session={session} />
@@ -68,6 +109,16 @@ export default function TimerPageContent() {
                     onExit={() => setIsFullscreen(false)}
                 />
             )}
+
+            <StartStandaloneTimerSheet
+                open={isStandaloneSheetOpen}
+                onClose={() => setIsStandaloneSheetOpen(false)}
+            />
+            <StartTaskTimerSheet open={isTaskSheetOpen} onClose={() => setIsTaskSheetOpen(false)} />
+            <StartHabitTimerSheet
+                open={isHabitSheetOpen}
+                onClose={() => setIsHabitSheetOpen(false)}
+            />
         </div>
     );
 }

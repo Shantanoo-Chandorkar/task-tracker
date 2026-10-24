@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import QuickCreateFab from './QuickCreateFab';
 import HabitQuickCreateFab from '@/components/habits/HabitQuickCreateFab';
+import TimeTrackingQuickCreateFab from '@/components/timer/TimeTrackingQuickCreateFab';
 
 const tabClassName = (isActive) =>
     `press-feedback flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${isActive ? 'text-primary' : 'text-muted-foreground'}`;
@@ -82,7 +83,7 @@ function HabitZoneTabs() {
 }
 
 /**
- * Time Tracking's tabs: Timer / Switch to Habit Zone / [gap, no FAB] / Switch to Task Tracker / Settings.
+ * Time Tracking's tabs: Timer / Switch to Habit Zone / [FAB] / Switch to Task Tracker / Settings.
  * Deliberately links to both other zones, unlike Habit Zone's single switch tab (see BottomNav's docblock).
  */
 function TimeTrackingTabs() {
@@ -91,7 +92,7 @@ function TimeTrackingTabs() {
     const isSettings = pathname.startsWith('/settings');
 
     return (
-        <div className="flex items-center">
+        <div className="relative flex items-center">
             <div className="flex-1 flex">
                 <Link
                     href="/timer"
@@ -107,6 +108,9 @@ function TimeTrackingTabs() {
                     Habits
                 </Link>
             </div>
+
+            <div className="w-12 flex-shrink-0" aria-hidden="true" />
+
             <div className="flex-1 flex">
                 <Link href="/" prefetch={false} className={tabClassName(false)}>
                     <ArrowLeftRight aria-hidden="true" className="h-5 w-5" />
@@ -122,6 +126,8 @@ function TimeTrackingTabs() {
                     Settings
                 </Link>
             </div>
+
+            <TimeTrackingQuickCreateFab className="press-feedback absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center" />
         </div>
     );
 }

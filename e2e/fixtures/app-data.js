@@ -272,6 +272,24 @@ export async function waitForCreatedToastsToClear(page) {
 }
 
 /**
+ * Creates a habit via the Habit Zone's "New habit" FAB, leaving every other field at its default.
+ *
+ * @param {import('@playwright/test').Page} page - Already on `/habits`.
+ * @param {object} [fields]
+ * @param {string} [fields.title] - Defaults to a generated unique name.
+ * @returns {Promise<string>} The habit's title.
+ */
+export async function createHabit(page, { title = uniqueName('Habit') } = {}) {
+    await page.getByRole('button', { name: 'New habit' }).click();
+    await submitDialog(page, {
+        placeholder: 'Habit title',
+        value: title,
+        submitName: 'Create habit',
+    });
+    return title;
+}
+
+/**
  * Adds a subtask under an existing row via its "More actions" menu.
  *
  * @param {import('@playwright/test').Page} page

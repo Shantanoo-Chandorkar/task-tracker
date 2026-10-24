@@ -28,12 +28,16 @@ export default function EmptyListState({ listId, initialSpaces, initialLists, ca
                     No tasks yet. Add your first task or sub-list to get started.
                 </p>
                 {canWrite && (
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Button onClick={() => setIsCreateOpen(true)}>
+                    <div className="flex flex-col w-full gap-2 px-4 sm:w-auto sm:flex-row sm:items-center sm:justify-center sm:px-0">
+                        <Button className="w-full sm:w-auto" onClick={() => setIsCreateOpen(true)}>
                             <Plus className="h-4 w-4 mr-1" />
                             New Task
                         </Button>
-                        <Button variant="outline" onClick={() => setIsSublistOpen(true)}>
+                        <Button
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                            onClick={() => setIsSublistOpen(true)}
+                        >
                             <Plus className="h-4 w-4 mr-1" />
                             New Sub-list
                         </Button>

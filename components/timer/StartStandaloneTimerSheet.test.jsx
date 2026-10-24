@@ -1,6 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import StandaloneSessionForm from './StandaloneSessionForm';
+import StartStandaloneTimerSheet from './StartStandaloneTimerSheet';
+
+vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => false }));
 
 // Radix Select positions its listbox with ResizeObserver and scrollIntoView, which jsdom lacks
 beforeAll(() => {
@@ -26,69 +28,74 @@ beforeEach(() => {
     templatesState.templates = [];
 });
 
-describe('StandaloneSessionForm', () => {
-    it('starts a session with the typed label', () => {
+function renderSheet(onClose = vi.fn()) {
+    render(<StartStandaloneTimerSheet open onClose={onClose} />);
+    return onClose;
+}
+
+describe('StartStandaloneTimerSheet', () => {
+    it('starts a session with the typed label and closes on success', async () => {
         start.mockResolvedValue(true);
-        render(<StandaloneSessionForm />);
+        const onClose = renderSheet();
 
         fireEvent.change(screen.getByLabelText('Session label'), {
             target: { value: 'Deep work' },
         });
-        fireEvent.click(screen.getByText('Start'));
+        fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
         expect(start).toHaveBeenCalledWith({ label: 'Deep work' });
+        await waitFor(() => expect(onClose).toHaveBeenCalled());
     });
 
-    it('clears the label after a successful start', async () => {
-        start.mockResolvedValue(true);
-        render(<StandaloneSessionForm />);
-
-        const labelInput = screen.getByLabelText('Session label');
-        fireEvent.change(labelInput, { target: { value: 'Deep work' } });
-        fireEvent.click(screen.getByText('Start'));
-
-        await waitFor(() => expect(labelInput.value).toBe(''));
-    });
-
-    it('keeps the typed label when starting fails, so nothing is lost', async () => {
+    it('keeps the typed label and stays open when starting fails', async () => {
         start.mockResolvedValue(false);
-        render(<StandaloneSessionForm />);
+        const onClose = renderSheet();
 
         const labelInput = screen.getByLabelText('Session label');
         fireEvent.change(labelInput, { target: { value: 'Deep work' } });
-        fireEvent.click(screen.getByText('Start'));
+        fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
         await waitFor(() => expect(start).toHaveBeenCalled());
         expect(labelInput.value).toBe('Deep work');
+        expect(onClose).not.toHaveBeenCalled();
     });
 
-    it('disables the input and button while starting', () => {
+    it('disables the input and both buttons while starting', () => {
         let finishStart;
         start.mockReturnValueOnce(new Promise((resolve) => (finishStart = resolve)));
-        render(<StandaloneSessionForm />);
+        renderSheet();
 
-        fireEvent.click(screen.getByText('Start'));
+        fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
         expect(screen.getByLabelText('Session label').disabled).toBe(true);
-        expect(screen.getByText('Start').closest('button').disabled).toBe(true);
+        expect(screen.getByRole('button', { name: /Starting/ }).disabled).toBe(true);
+        expect(screen.getByRole('button', { name: 'Cancel' }).disabled).toBe(true);
 
         finishStart(true);
     });
 
     it('hides the template picker when there are no templates', () => {
-        render(<StandaloneSessionForm />);
+        renderSheet();
         expect(screen.queryByRole('combobox', { name: 'Template' })).toBeNull();
     });
 
     it('shows and passes through the chosen template', () => {
         templatesState.templates = [{ id: 'template-1', name: 'Pomodoro' }];
         start.mockResolvedValue(true);
-        render(<StandaloneSessionForm />);
+        renderSheet();
 
         fireEvent.click(screen.getByRole('combobox', { name: 'Template' }));
-        fireEvent.click(screen.getByText('Pomodoro'));
-        fireEvent.click(screen.getByText('Start'));
+        fireEvent.click(screen.getByRole('option', { name: 'Pomodoro' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
         expect(start).toHaveBeenCalledWith({ label: '', templateId: 'template-1' });
+    });
+
+    it('calls onClose when Cancel is clicked', () => {
+        const onClose = renderSheet();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        expect(onClose).toHaveBeenCalled();
     });
 });

@@ -25,6 +25,7 @@ vi.mock('@/hooks/useCurrentUserProfileQuery', () => ({
 }));
 vi.mock('./QuickCreateFab', () => ({ default: () => null }));
 vi.mock('@/components/habits/HabitQuickCreateFab', () => ({ default: () => null }));
+vi.mock('@/components/timer/TimeTrackingQuickCreateFab', () => ({ default: () => null }));
 vi.mock('@/components/ThemeToggle', () => ({ default: () => null }));
 vi.mock('@/components/nav/LogoutButton', () => ({ default: () => null }));
 
