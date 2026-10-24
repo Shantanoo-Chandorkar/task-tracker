@@ -1,9 +1,14 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import {
+    browserSupportsWebAuthnAutofill,
+    startAuthentication,
+    WebAuthnAbortService,
+} from '@simplewebauthn/browser';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/custom/Loader';
@@ -11,12 +16,18 @@ import FormError from '@/components/custom/FormError';
 import PasswordInput from '@/components/auth/PasswordInput';
 import GuestEntryButton from '@/components/auth/GuestEntryButton';
 import { signInAction } from '@/actions/auth-actions';
+import {
+    getPasskeyAuthenticationOptionsAction,
+    verifyPasskeyAuthenticationAction,
+} from '@/actions/webauthn-login-actions';
 import { clearAllCaches } from '@/lib/cache/clear-client-caches';
 
 /**
  * Email/password login form. On success, clears any stale cached shell from a
  * previous session before navigating - the service worker's page cache isn't
  * keyed by user, so a leftover snapshot could otherwise flash before revalidating.
+ *
+ * Also silently offers passkey login through the browser's native autofill UI - no separate button or visible UI.
  *
  * @param {object} props
  * @param {boolean} [props.hasGuestSessionEnded] - Shows a notice that the guest session ran out.
@@ -34,10 +45,78 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
     const errorId = useId();
     // Both fields share one message: the server does not say which of them was wrong
     const errorFieldProps = error ? { 'aria-invalid': true, 'aria-describedby': errorId } : {};
+    // Shared with the effect below, so whichever of password-submit or passkey-pick settles first wins.
+    const handledRef = useRef(false);
+
+    async function completeLogin() {
+        await clearAllCaches(queryClient);
+        // replace keeps Back off the login card; no refresh, the action's cookie already refreshed the router.
+        router.replace(redirectTo);
+    }
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        async function tryConditionalPasskeyLogin() {
+            if (!(await browserSupportsWebAuthnAutofill())) return;
+
+            let optionsResult;
+            try {
+                optionsResult = await getPasskeyAuthenticationOptionsAction();
+            } catch {
+                // Server Actions reject on a transport failure - must never throw unhandled here.
+                return;
+            }
+            if (isCancelled || optionsResult.error) return;
+
+            let assertionResponse;
+            try {
+                assertionResponse = await startAuthentication({
+                    optionsJSON: optionsResult.data,
+                    useBrowserAutofill: true,
+                });
+            } catch {
+                // Dismissed or failed silently - the password form is right there as the real fallback.
+                return;
+            }
+            if (isCancelled || handledRef.current) return;
+            handledRef.current = true;
+
+            setSubmitting(true);
+            let verifyResult;
+            try {
+                verifyResult = await verifyPasskeyAuthenticationAction({ assertionResponse });
+            } catch {
+                // Without this catch a transport failure here would leave the form locked forever.
+                if (isCancelled) return;
+                handledRef.current = false;
+                setSubmitting(false);
+                setError('Could not reach the server. Check your connection and try again.');
+                return;
+            }
+            if (isCancelled) return;
+
+            if (verifyResult.error) {
+                handledRef.current = false;
+                setSubmitting(false);
+                setError(verifyResult.error);
+                return;
+            }
+            await completeLogin();
+        }
+
+        tryConditionalPasskeyLogin();
+        return () => {
+            isCancelled = true;
+            WebAuthnAbortService.cancelCeremony();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately mount-only.
+    }, []);
 
     async function handleSubmit(event) {
         event.preventDefault();
-        if (!email.trim() || !password) return;
+        if (!email.trim() || !password || handledRef.current) return;
+        handledRef.current = true;
 
         setSubmitting(true);
         setError('');
@@ -48,21 +127,21 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
         } catch {
             // Server Actions reject on a transport failure (offline, server down) - without
             // this catch, submitting would stay true forever with no feedback to the client.
+            handledRef.current = false;
             setSubmitting(false);
             setError('Could not reach the server. Check your connection and try again.');
             return;
         }
 
         if (signInResult.error) {
+            handledRef.current = false;
             setSubmitting(false);
             setError(signInResult.error);
             return;
         }
 
         // Stays locked through navigation, or a double click would submit the login twice.
-        await clearAllCaches(queryClient);
-        // replace keeps Back off the login card; no refresh, the action's cookie already refreshed the router.
-        router.replace(redirectTo);
+        await completeLogin();
     }
 
     return (
@@ -88,7 +167,7 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
                     <Input
                         id="email"
                         type="email"
-                        autoComplete="email"
+                        autoComplete="username webauthn"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         disabled={submitting}
