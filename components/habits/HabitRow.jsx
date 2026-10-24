@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { Flame } from 'lucide-react';
 import { computeStreaks } from '@/modules/habits/domain/streaks';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import RowActionsMenu from '@/components/custom/RowActionsMenu';
+import { useTimeSessionActions } from '@/hooks/useTimeSessionActions';
 import HabitCheckInControl from './HabitCheckInControl';
 
 /**
@@ -33,6 +35,14 @@ export default function HabitRow({
     onLogPastDayRequest,
 }) {
     const { currentStreak } = computeStreaks(habit, entries, todayLocalDate);
+    const { start } = useTimeSessionActions();
+    const [isStartingTimer, setIsStartingTimer] = useState(false);
+
+    async function handleStartTimer() {
+        setIsStartingTimer(true);
+        await start({ habitId: habit.id });
+        setIsStartingTimer(false);
+    }
 
     return (
         <div className="flex items-center gap-3 border-b border-border/60 px-2 py-3 last:border-b-0">
@@ -60,7 +70,12 @@ export default function HabitRow({
                 todayEntry={todayEntry}
                 todayLocalDate={todayLocalDate}
             />
-            <RowActionsMenu label={`More actions for ${habit.title}`} isCompact>
+            <RowActionsMenu
+                label={`More actions for ${habit.title}`}
+                isPending={isStartingTimer}
+                isCompact
+            >
+                <DropdownMenuItem onClick={handleStartTimer}>Start Timer</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onEditRequest(habit)}>Edit</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onLogPastDayRequest(habit)}>
                     Log a different day

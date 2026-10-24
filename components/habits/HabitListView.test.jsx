@@ -67,6 +67,10 @@ vi.mock('@/hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
 vi.mock('sonner', () => ({
     toast: { loading: () => 'toast-id', success: vi.fn(), error: vi.fn(), dismiss: vi.fn() },
 }));
+const startTimer = vi.fn();
+vi.mock('@/hooks/useTimeSessionActions', () => ({
+    useTimeSessionActions: () => ({ start: (...args) => startTimer(...args) }),
+}));
 
 /** @param {string} habitTitle */
 function openRowMenu(habitTitle) {
@@ -203,5 +207,36 @@ describe('HabitListView edit/delete parity', () => {
         });
 
         expect(await screen.findByText('Not allowed')).toBeTruthy();
+    });
+});
+
+describe('HabitListView Start Timer', () => {
+    // Radix's dropdown menu and RTL's findBy* queries both rely on real timers to settle.
+    beforeEach(() => vi.useRealTimers());
+    afterEach(() => startTimer.mockReset());
+
+    it('starts a timer for the habit via the shared time-session hook', async () => {
+        startTimer.mockResolvedValue(true);
+        renderView();
+
+        openRowMenu('Meditate');
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Start Timer' }));
+
+        await waitFor(() => expect(startTimer).toHaveBeenCalledWith({ habitId: 'habit-daily' }));
+    });
+
+    it('locks the row menu button while starting, and unlocks it once the request settles', async () => {
+        let finishStart;
+        startTimer.mockReturnValueOnce(new Promise((resolve) => (finishStart = resolve)));
+        renderView();
+
+        openRowMenu('Meditate');
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Start Timer' }));
+
+        const menuButton = screen.getByRole('button', { name: 'More actions for Meditate' });
+        expect(menuButton.disabled).toBe(true);
+
+        finishStart(true);
+        await waitFor(() => expect(menuButton.disabled).toBe(false));
     });
 });
