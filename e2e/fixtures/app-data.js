@@ -89,9 +89,7 @@ export async function createList(page, spaceName, name = uniqueName('List')) {
 }
 
 /**
- * Creates a sublist via the global "Create new..." FAB, so it works even on a still-empty list.
- *
- * The inline "Create New Sublist" button doesn't exist on a fresh, empty list - see docs/e2e-test-quality.md.
+ * Creates a sublist via the global "Create new..." FAB, so it works regardless of list state.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} spaceName
