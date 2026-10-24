@@ -12,7 +12,9 @@ import {
     recordFailedAttempt,
     resetAttempts,
     getClientIp,
+    LOCKOUT_ERROR_MESSAGE,
 } from '@/lib/auth/rate-limit';
+import { logAuthFailure } from '@/lib/auth/log-auth-failure';
 import { sendPasswordResetEmail } from '@/lib/email/notifications/send-password-reset-email';
 import { sendSignupConfirmationEmail } from '@/lib/email/notifications/send-signup-confirmation-email';
 import { sendExistingAccountEmail } from '@/lib/email/notifications/send-existing-account-email';
@@ -21,18 +23,6 @@ import { sanitizeString, checkMaxLength, sanitizeRedirectPath } from '@/lib/vali
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Length over composition rules (NIST 800-63B, OWASP) -- no forced uppercase/symbol/number.
 const MIN_PASSWORD_LENGTH = 12;
-const LOCKOUT_ERROR_MESSAGE = (minutes) =>
-    `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
-
-/**
- * Logs an auth failure server-side, never the password or the email address (personal data).
- *
- * @param {string} code - One of AUTH_ERROR_CODES
- * @param {string} detail - The underlying error message, if any
- */
-function logAuthFailure(code, detail) {
-    console.warn(`[auth] ${code}`, { detail });
-}
 
 /**
  * Creates an unconfirmed account; the response is identical for already-registered emails to block enumeration.

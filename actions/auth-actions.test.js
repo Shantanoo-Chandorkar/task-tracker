@@ -22,6 +22,7 @@ vi.mock('@/lib/auth/rate-limit', () => ({
     recordFailedAttempt: vi.fn(),
     resetAttempts: (...args) => resetAttempts(...args),
     getClientIp: () => '1.2.3.4',
+    LOCKOUT_ERROR_MESSAGE: (minutes) => `Too many attempts. Try again in ${minutes} minutes.`,
 }));
 vi.mock('@/lib/email/notifications/send-password-reset-email', () => ({}));
 vi.mock('@/lib/email/notifications/send-signup-confirmation-email', () => ({}));

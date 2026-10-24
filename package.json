@@ -21,6 +21,8 @@
         "perf:realload:prod": "node scripts/perf-realload.mjs https://task-tracker-ashy-one.vercel.app/lists/e92f917d-721e-40ee-978e-65c34f739f66"
     },
     "dependencies": {
+        "@simplewebauthn/browser": "^14.0.0",
+        "@simplewebauthn/server": "^14.0.3",
         "@supabase/ssr": "^0.10.2",
         "@supabase/supabase-js": "^2.116.0",
         "@tanstack/react-query": "^5.99.0",
