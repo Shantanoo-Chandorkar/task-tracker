@@ -37,6 +37,8 @@ import DeleteSublistDialog from './DeleteSublistDialog';
  * @param {object[]} [props.initialSpaces] - SSR-fetched spaces, passed through to ListHeader
  * @param {object[]} [props.initialLists] - SSR-fetched lists, passed through to ListHeader
  * @param {object[]} [props.initialSublists] - SSR-fetched sublists for this list
+ * @param {object[]} [props.initialTags] - SSR-fetched tags, passed through to the filter bar/sheet
+ * @param {object[]} [props.initialCollaborators] - SSR-fetched collaborators, passed through to the filter bar/sheet
  * @param {string|null} [props.currentUserId] - Caller's user id, for row-level ownership checks
  */
 export default function TaskList({
@@ -46,6 +48,8 @@ export default function TaskList({
     initialSpaces,
     initialLists,
     initialSublists,
+    initialTags,
+    initialCollaborators,
     currentUserId,
 }) {
     const [createDialog, setCreateDialog] = useState({
@@ -145,6 +149,9 @@ export default function TaskList({
                     spaceId={spaceId}
                     statuses={statuses}
                     onOpenSheet={() => setFilterSheetOpen(true)}
+                    initialTags={initialTags}
+                    initialCollaborators={initialCollaborators}
+                    initialSpaces={initialSpaces}
                 />
 
                 <TaskFilterSheet
@@ -153,6 +160,9 @@ export default function TaskList({
                     spaceId={spaceId}
                     statuses={statuses}
                     countsByStatusId={countsByStatusId}
+                    initialTags={initialTags}
+                    initialCollaborators={initialCollaborators}
+                    initialSpaces={initialSpaces}
                 />
 
                 {buckets.map((bucket) => (
