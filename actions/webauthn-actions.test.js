@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { COSEALG as COSEAlgorithm } from '@simplewebauthn/server/helpers';
 
 const mocks = vi.hoisted(() => ({
     getCurrentUser: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     checkRateLimit: vi.fn(),
     recordFailedAttempt: vi.fn(),
     resetAttempts: vi.fn(),
+    logClientCeremonyFailure: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({ getCurrentUser: mocks.getCurrentUser }));
@@ -34,13 +36,20 @@ vi.mock('@simplewebauthn/server', () => ({
     generateRegistrationOptions: mocks.generateRegistrationOptions,
     verifyRegistrationResponse: mocks.verifyRegistrationResponse,
 }));
-vi.mock('@simplewebauthn/server/helpers', () => ({
-    isoUint8Array: { fromUTF8String: (value) => new Uint8Array(Buffer.from(value)) },
-}));
+vi.mock('@simplewebauthn/server/helpers', async () => {
+    const actual = await vi.importActual('@simplewebauthn/server/helpers');
+    return {
+        COSEALG: actual.COSEALG,
+        isoUint8Array: { fromUTF8String: (value) => new Uint8Array(Buffer.from(value)) },
+    };
+});
 vi.mock('@/lib/webauthn/challenge-cookies', () => ({
     WEBAUTHN_REGISTRATION_CHALLENGE_COOKIE: 'webauthn_registration_challenge',
     setChallengeCookie: mocks.setChallengeCookie,
     readAndClearChallengeCookie: mocks.readAndClearChallengeCookie,
+}));
+vi.mock('@/lib/webauthn/log-client-ceremony-failure', () => ({
+    logClientCeremonyFailure: mocks.logClientCeremonyFailure,
 }));
 
 const {
@@ -48,6 +57,7 @@ const {
     verifyPasskeyRegistrationAction,
     listPasskeysAction,
     revokePasskeyAction,
+    reportPasskeyRegistrationFailureAction,
 } = await import('./webauthn-actions');
 
 const OWNER = { id: 'owner-1', is_anonymous: false, email: 'owner@example.com' };
@@ -147,6 +157,23 @@ describe('getPasskeyRegistrationOptionsAction', () => {
             error: null,
             code: null,
         });
+    });
+
+    it('never offers an algorithm no real authenticator supports, even when the library would default to one', async () => {
+        setUpWorld();
+        mocks.generateRegistrationOptions.mockResolvedValue({ challenge: 'the-challenge' });
+
+        await getPasskeyRegistrationOptionsAction();
+
+        expect(mocks.generateRegistrationOptions).toHaveBeenCalledWith(
+            expect.objectContaining({
+                supportedAlgorithmIDs: [
+                    COSEAlgorithm.ES256,
+                    COSEAlgorithm.EdDSA,
+                    COSEAlgorithm.RS256,
+                ],
+            }),
+        );
     });
 
     it('refuses once the device cap is reached, before generating any options', async () => {
@@ -433,6 +460,42 @@ describe('revokePasskeyAction', () => {
             'id',
             '11111111-1111-1111-1111-111111111111',
         );
+        expect(result).toEqual({ error: null, code: null });
+    });
+});
+
+describe('reportPasskeyRegistrationFailureAction', () => {
+    it('refuses a guest', async () => {
+        setUpWorld({ user: GUEST });
+        expect(
+            await reportPasskeyRegistrationFailureAction({ errorName: 'Error', errorMessage: 'x' }),
+        ).toMatchObject({ code: 'GUEST_ACTION_NOT_ALLOWED' });
+        expect(mocks.logClientCeremonyFailure).not.toHaveBeenCalled();
+    });
+
+    it('refuses an unauthenticated caller', async () => {
+        setUpWorld({ user: null });
+        expect(
+            await reportPasskeyRegistrationFailureAction({ errorName: 'Error', errorMessage: 'x' }),
+        ).toMatchObject({ code: 'NOT_AUTHENTICATED' });
+        expect(mocks.logClientCeremonyFailure).not.toHaveBeenCalled();
+    });
+
+    it('logs the ceremony failure server-side via the shared helper and reports no error back', async () => {
+        setUpWorld();
+
+        const result = await reportPasskeyRegistrationFailureAction({
+            errorName: 'NotSupportedError',
+            errorMessage:
+                'No available authenticator recognized any of the specified pubKeyCredParams',
+        });
+
+        expect(mocks.logClientCeremonyFailure).toHaveBeenCalledWith('registration', {
+            errorName: 'NotSupportedError',
+            errorMessage:
+                'No available authenticator recognized any of the specified pubKeyCredParams',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+        });
         expect(result).toEqual({ error: null, code: null });
     });
 });

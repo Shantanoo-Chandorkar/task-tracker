@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers';
 import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
-import { isoUint8Array } from '@simplewebauthn/server/helpers';
+import { COSEALG as COSEAlgorithm, isoUint8Array } from '@simplewebauthn/server/helpers';
 import { createClient as createAdminClient } from '@/lib/supabase/admin';
 import { withAuthenticatedAction } from '@/lib/auth/with-authenticated-action';
 import { AUTH_ERROR_CODES } from '@/lib/auth/error-codes';
@@ -22,6 +22,7 @@ import {
 } from '@/lib/webauthn/challenge-cookies';
 import { deriveDeviceLabel } from '@/lib/webauthn/device-label';
 import { encodeBytesForBytea } from '@/lib/webauthn/credential-encoding';
+import { logClientCeremonyFailure } from '@/lib/webauthn/log-client-ceremony-failure';
 import { sanitizeString, checkMaxLength, isUuid } from '@/lib/validation';
 
 const WEBAUTHN_DEVICE_LIMIT = 5;
@@ -95,6 +96,8 @@ export const getPasskeyRegistrationOptionsAction = withAuthenticatedAction(
                 userVerification: 'required',
                 authenticatorAttachment: 'platform',
             },
+            // Explicit, not the library's default list, which also offers a PQC algorithm no real device supports yet.
+            supportedAlgorithmIDs: [COSEAlgorithm.ES256, COSEAlgorithm.EdDSA, COSEAlgorithm.RS256],
         });
 
         await setChallengeCookie(WEBAUTHN_REGISTRATION_CHALLENGE_COOKIE, options.challenge);
@@ -282,6 +285,30 @@ export const revokePasskeyAction = withAuthenticatedAction(
                 code: AUTH_ERROR_CODES.WEBAUTHN_CREDENTIAL_NOT_FOUND,
             };
         }
+        return { error: null, code: null };
+    },
+    { blockGuest: true, hasData: false },
+);
+
+/**
+ * Reports a registration ceremony that failed entirely in the browser, for server-side logging only.
+ *
+ * Never fails loudly back to the client - logging is this action's only job.
+ *
+ * @param {object} fields
+ * @param {string} fields.errorName - The browser error's `.name`.
+ * @param {string} fields.errorMessage - The browser error's `.message`.
+ * @returns {Promise<{ error: string|null, code: string|null }>}
+ */
+export const reportPasskeyRegistrationFailureAction = withAuthenticatedAction(
+    '[webauthn] registration-ceremony-report',
+    'Unexpected error',
+    async (user, supabase, fields) => {
+        logClientCeremonyFailure('registration', {
+            errorName: fields.errorName,
+            errorMessage: fields.errorMessage,
+            userAgent: (await headers()).get('user-agent'),
+        });
         return { error: null, code: null };
     },
     { blockGuest: true, hasData: false },
