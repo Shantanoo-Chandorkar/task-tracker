@@ -10,6 +10,7 @@ import { runExclusively } from '@/lib/in-flight-entities';
 import {
     getPasskeyRegistrationOptionsAction,
     verifyPasskeyRegistrationAction,
+    reportPasskeyRegistrationFailureAction,
 } from '@/actions/webauthn-actions';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/custom/Loader';
@@ -54,6 +55,11 @@ async function registerNewPasskey(queryClient) {
         attestationResponse = await startRegistration({ optionsJSON: optionsResult.data });
     } catch (thrown) {
         if (thrown?.name === 'NotAllowedError') return;
+        // Fire-and-forget: the real error is for the Vercel log only, never shown to the user.
+        reportPasskeyRegistrationFailureAction({
+            errorName: thrown?.name,
+            errorMessage: thrown?.message,
+        }).catch(() => {});
         toast.error('Could not set up your passkey. Please try again.');
         return;
     }

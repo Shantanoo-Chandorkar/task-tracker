@@ -8,6 +8,7 @@ const browserSupportsWebAuthn = vi.fn();
 const startRegistration = vi.fn();
 const getPasskeyRegistrationOptionsAction = vi.fn();
 const verifyPasskeyRegistrationAction = vi.fn();
+const reportPasskeyRegistrationFailureAction = vi.fn();
 
 vi.mock('@simplewebauthn/browser', () => ({
     browserSupportsWebAuthn: (...args) => browserSupportsWebAuthn(...args),
@@ -16,6 +17,8 @@ vi.mock('@simplewebauthn/browser', () => ({
 vi.mock('@/actions/webauthn-actions', () => ({
     getPasskeyRegistrationOptionsAction: (...args) => getPasskeyRegistrationOptionsAction(...args),
     verifyPasskeyRegistrationAction: (...args) => verifyPasskeyRegistrationAction(...args),
+    reportPasskeyRegistrationFailureAction: (...args) =>
+        reportPasskeyRegistrationFailureAction(...args),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // The row itself (its own confirm-popup discipline) is covered by PasskeyRow.test.jsx.
@@ -119,6 +122,7 @@ describe('PasskeySettingsSection registration flow', () => {
         browserSupportsWebAuthn.mockReturnValue(true);
         profileState = { is_guest: false };
         queryState = { data: [], isLoading: false, isError: false, refetch: vi.fn() };
+        reportPasskeyRegistrationFailureAction.mockResolvedValue({ error: null, code: null });
     });
 
     it('runs the full ceremony and refreshes the list on success', async () => {
@@ -169,9 +173,10 @@ describe('PasskeySettingsSection registration flow', () => {
 
         expect(toast.error).not.toHaveBeenCalled();
         expect(verifyPasskeyRegistrationAction).not.toHaveBeenCalled();
+        expect(reportPasskeyRegistrationFailureAction).not.toHaveBeenCalled();
     });
 
-    it('shows one generic message for any other ceremony failure, never the raw error', async () => {
+    it('shows one generic message for any other ceremony failure, never the raw error, and reports it server-side', async () => {
         getPasskeyRegistrationOptionsAction.mockResolvedValue({ data: {}, error: null });
         startRegistration.mockRejectedValue(new Error('invalid domain for this RP ID'));
         renderSection();
@@ -181,6 +186,10 @@ describe('PasskeySettingsSection registration flow', () => {
         expect(toast.error).toHaveBeenCalledWith(
             'Could not set up your passkey. Please try again.',
         );
+        expect(reportPasskeyRegistrationFailureAction).toHaveBeenCalledWith({
+            errorName: 'Error',
+            errorMessage: 'invalid domain for this RP ID',
+        });
         expect(verifyPasskeyRegistrationAction).not.toHaveBeenCalled();
     });
 

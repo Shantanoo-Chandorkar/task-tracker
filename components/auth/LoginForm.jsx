@@ -19,6 +19,7 @@ import { signInAction } from '@/actions/auth-actions';
 import {
     getPasskeyAuthenticationOptionsAction,
     verifyPasskeyAuthenticationAction,
+    reportPasskeyLoginFailureAction,
 } from '@/actions/webauthn-login-actions';
 import { clearAllCaches } from '@/lib/cache/clear-client-caches';
 
@@ -75,8 +76,15 @@ export default function LoginForm({ hasGuestSessionEnded = false, redirectTo = '
                     optionsJSON: optionsResult.data,
                     useBrowserAutofill: true,
                 });
-            } catch {
+            } catch (thrown) {
                 // Dismissed or failed silently - the password form is right there as the real fallback.
+                if (thrown?.name !== 'NotAllowedError') {
+                    // Fire-and-forget: the real error is for the Vercel log only, never shown here.
+                    reportPasskeyLoginFailureAction({
+                        errorName: thrown?.name,
+                        errorMessage: thrown?.message,
+                    }).catch(() => {});
+                }
                 return;
             }
             if (isCancelled || handledRef.current) return;
