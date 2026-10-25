@@ -10,12 +10,18 @@ const mocks = vi.hoisted(() => ({
     checkRateLimit: vi.fn(),
     recordFailedAttempt: vi.fn(),
     resetAttempts: vi.fn(),
+    logClientCeremonyFailure: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createSessionClient }));
 vi.mock('@/lib/supabase/admin', () => ({ createClient: mocks.createAdminClient }));
 vi.mock('next/headers', () => ({
-    headers: async () => new Headers({ 'x-forwarded-for': '1.2.3.4' }),
+    headers: async () =>
+        new Headers({
+            'x-forwarded-for': '1.2.3.4',
+            'user-agent':
+                'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        }),
 }));
 vi.mock('@/lib/webauthn/config', () => ({
     getWebauthnOrigin: () => 'https://example.com',
@@ -37,9 +43,15 @@ vi.mock('@/lib/auth/rate-limit', () => ({
     getClientIp: () => '1.2.3.4',
     LOCKOUT_ERROR_MESSAGE: (minutes) => `Too many attempts. Try again in ${minutes} minutes.`,
 }));
+vi.mock('@/lib/webauthn/log-client-ceremony-failure', () => ({
+    logClientCeremonyFailure: mocks.logClientCeremonyFailure,
+}));
 
-const { getPasskeyAuthenticationOptionsAction, verifyPasskeyAuthenticationAction } =
-    await import('./webauthn-login-actions');
+const {
+    getPasskeyAuthenticationOptionsAction,
+    verifyPasskeyAuthenticationAction,
+    reportPasskeyLoginFailureAction,
+} = await import('./webauthn-login-actions');
 
 const ASSERTION_RESPONSE = { id: 'cred-abc', response: {} };
 const CREDENTIAL_ROW = {
@@ -270,5 +282,36 @@ describe('verifyPasskeyAuthenticationAction', () => {
         expect(credentialsTable.update).toHaveBeenCalledWith(
             expect.objectContaining({ sign_count: 1 }),
         );
+    });
+});
+
+describe('reportPasskeyLoginFailureAction', () => {
+    it('logs the ceremony failure server-side via the shared helper and reports no error back', async () => {
+        const result = await reportPasskeyLoginFailureAction({
+            errorName: 'NotSupportedError',
+            errorMessage:
+                'No available authenticator recognized any of the specified pubKeyCredParams',
+        });
+
+        expect(mocks.logClientCeremonyFailure).toHaveBeenCalledWith('authentication', {
+            errorName: 'NotSupportedError',
+            errorMessage:
+                'No available authenticator recognized any of the specified pubKeyCredParams',
+            userAgent: expect.stringContaining('Android'),
+        });
+        expect(result).toEqual({ error: null, code: null });
+    });
+
+    it('never throws back to the client when logging itself fails', async () => {
+        mocks.logClientCeremonyFailure.mockImplementationOnce(() => {
+            throw new Error('log sink unavailable');
+        });
+
+        const result = await reportPasskeyLoginFailureAction({
+            errorName: 'Error',
+            errorMessage: 'x',
+        });
+
+        expect(result).toEqual({ error: null, code: null });
     });
 });

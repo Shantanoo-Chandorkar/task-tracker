@@ -12,6 +12,7 @@ const startAuthentication = vi.fn();
 const cancelCeremony = vi.fn();
 const getPasskeyAuthenticationOptionsAction = vi.fn();
 const verifyPasskeyAuthenticationAction = vi.fn();
+const reportPasskeyLoginFailureAction = vi.fn();
 
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ replace: routerReplace, refresh: routerRefresh }),
@@ -31,6 +32,7 @@ vi.mock('@/actions/webauthn-login-actions', () => ({
     getPasskeyAuthenticationOptionsAction: (...args) =>
         getPasskeyAuthenticationOptionsAction(...args),
     verifyPasskeyAuthenticationAction: (...args) => verifyPasskeyAuthenticationAction(...args),
+    reportPasskeyLoginFailureAction: (...args) => reportPasskeyLoginFailureAction(...args),
 }));
 
 function renderLoginForm() {
@@ -135,7 +137,10 @@ describe('LoginForm', () => {
 });
 
 describe('LoginForm passkey autofill login', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => {
+        vi.clearAllMocks();
+        reportPasskeyLoginFailureAction.mockResolvedValue({ error: null, code: null });
+    });
 
     it('never asks the server for options when the browser lacks autofill support', async () => {
         browserSupportsWebAuthnAutofill.mockResolvedValue(false);
@@ -159,6 +164,34 @@ describe('LoginForm passkey autofill login', () => {
 
         await waitFor(() => expect(startAuthentication).toHaveBeenCalledTimes(1));
         expect(verifyPasskeyAuthenticationAction).not.toHaveBeenCalled();
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(reportPasskeyLoginFailureAction).not.toHaveBeenCalled();
+
+        fireEvent.click(submitButton());
+        await waitFor(() => expect(signInAction).toHaveBeenCalledTimes(1));
+    });
+
+    it('stays silent but reports a genuine ceremony failure server-side, never to the browser console', async () => {
+        browserSupportsWebAuthnAutofill.mockResolvedValue(true);
+        getPasskeyAuthenticationOptionsAction.mockResolvedValue({
+            data: { challenge: 'c' },
+            error: null,
+        });
+        startAuthentication.mockRejectedValue(
+            new Error(
+                'No available authenticator recognized any of the specified pubKeyCredParams',
+            ),
+        );
+        signInAction.mockReturnValue(new Promise(() => {}));
+        renderLoginForm();
+
+        await waitFor(() =>
+            expect(reportPasskeyLoginFailureAction).toHaveBeenCalledWith({
+                errorName: 'Error',
+                errorMessage:
+                    'No available authenticator recognized any of the specified pubKeyCredParams',
+            }),
+        );
         expect(screen.queryByRole('alert')).toBeNull();
 
         fireEvent.click(submitButton());

@@ -23,6 +23,7 @@ import {
     readAndClearChallengeCookie,
 } from '@/lib/webauthn/challenge-cookies';
 import { decodeBytesFromBytea } from '@/lib/webauthn/credential-encoding';
+import { logClientCeremonyFailure } from '@/lib/webauthn/log-client-ceremony-failure';
 
 // No user exists yet for a lockout key in this anonymous flow, so every call here is IP-only.
 const WEBAUTHN_LOGIN_RATE_LIMIT_ACTION = 'webauthn_auth_verify';
@@ -255,4 +256,29 @@ export async function verifyPasskeyAuthenticationAction(fields) {
             code: AUTH_ERROR_CODES.WEBAUTHN_AUTHENTICATION_FAILED,
         };
     }
+}
+
+/**
+ * Reports a login ceremony that failed entirely in the browser, for server-side logging only.
+ *
+ * Never fails loudly back to the client - logging is this action's only job.
+ *
+ * @param {object} fields
+ * @param {string} fields.errorName - The browser error's `.name`.
+ * @param {string} fields.errorMessage - The browser error's `.message`.
+ * @returns {Promise<{ error: string|null, code: string|null }>}
+ */
+export async function reportPasskeyLoginFailureAction(fields) {
+    try {
+        logClientCeremonyFailure('authentication', {
+            errorName: fields.errorName,
+            errorMessage: fields.errorMessage,
+            userAgent: (await headers()).get('user-agent'),
+        });
+    } catch (thrown) {
+        console.error('[webauthn] could not log a client-side authentication failure', {
+            detail: thrown?.message,
+        });
+    }
+    return { error: null, code: null };
 }
